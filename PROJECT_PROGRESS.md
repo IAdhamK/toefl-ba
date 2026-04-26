@@ -103,6 +103,12 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - UI `Perjalanan Belajar Saya`
   - daily plan, continue learning, review list, mentor summary
   - scoring endpoint sekarang mengirim `journey_update`
+- Adaptive mentor:
+  - endpoint latihan adaptif
+  - endpoint mentor summary
+  - endpoint complete adaptive practice
+  - UI latihan adaptif di halaman Perjalanan
+  - masih rule-based, belum LLM asli
 
 ## Verifikasi
 
@@ -115,6 +121,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - state frontend termigrasi.
 - `.venv/bin/python scripts/smoke_api.py` berhasil terhadap FastAPI di port 8001.
 - Smoke test diperluas untuk journey summary, skill journeys, attempt, continue learning, daily plan, dan review list.
+- Smoke test diperluas lagi untuk adaptive practice, mentor summary, dan complete adaptive practice.
 
 ## Cara Menjalankan Saat Ini
 

@@ -2,7 +2,10 @@ from fastapi import APIRouter, HTTPException, Query
 
 from backend.services.journey_service import (
     SKILL_TYPES,
+    complete_adaptive_practice,
     generate_next_recommendation,
+    get_adaptive_mentor_summary,
+    get_adaptive_practice,
     get_all_skill_journeys,
     get_continue_learning_state,
     get_daily_study_plan,
@@ -79,6 +82,34 @@ def daily_plan(user_id: str | None = None) -> dict:
 @router.get("/review-list")
 def review_list(user_id: str | None = None) -> dict:
     return get_review_list(get_default_user_id(user_id))
+
+
+@router.get("/adaptive-practice")
+def adaptive_practice(user_id: str | None = None, skill_type: str | None = None) -> dict:
+    try:
+        return get_adaptive_practice(get_default_user_id(user_id), skill_type)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get("/mentor-summary")
+def mentor_summary(user_id: str | None = None) -> dict:
+    return get_adaptive_mentor_summary(get_default_user_id(user_id))
+
+
+@router.post("/adaptive-practice/complete")
+def adaptive_practice_complete(payload: dict) -> dict:
+    try:
+        return complete_adaptive_practice(
+            user_id=payload.get("user_id") or payload.get("userId") or get_default_user_id(None),
+            skill_type=payload.get("skill_type", ""),
+            score=payload.get("score", 0),
+            max_score=payload.get("max_score", 100),
+            notes=payload.get("notes", ""),
+            mistakes=payload.get("mistakes", []),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.post("/reset")

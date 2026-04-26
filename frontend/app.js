@@ -37,6 +37,7 @@ const defaultState = {
     vocabulary: null
   },
   integratedJourney: null,
+  adaptivePractice: null,
   chat: [
     {
       role: "assistant",
@@ -729,6 +730,7 @@ async function refreshIntegratedJourney() {
   }
   try {
     state.integratedJourney = await apiRequest(`/journey/summary${state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : ""}`);
+    state.adaptivePractice = state.integratedJourney.adaptive_practice || null;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     apiOnline = false;
@@ -968,6 +970,8 @@ function renderDashboard() {
 }
 
 function renderJourney() {
+  const summary = state.integratedJourney || localJourneySummary();
+  const adaptive = state.adaptivePractice || summary.adaptive_practice || localAdaptivePractice(summary);
   document.getElementById("journeyView").innerHTML = `
     <header class="topbar">
       <div>
@@ -981,12 +985,14 @@ function renderJourney() {
       </div>
     </header>
     ${integratedJourneySection(true)}
+    ${adaptivePracticeSection(adaptive)}
   `;
   document.getElementById("refreshJourneyButton").addEventListener("click", async () => {
     await refreshIntegratedJourney();
     renderJourney();
   });
   bindJourneyActions();
+  bindAdaptiveActions();
 }
 
 function integratedJourneySection(expanded = false) {
@@ -996,6 +1002,7 @@ function integratedJourneySection(expanded = false) {
   const continueState = summary.continue_learning || {};
   const reviewList = summary.review_list || {};
   const dailyPlan = summary.daily_plan || [];
+  const adaptive = state.adaptivePractice || summary.adaptive_practice || localAdaptivePractice(summary);
   return `
     <section class="journey-hub">
       <div class="journey-hub-header">
@@ -1021,6 +1028,12 @@ function integratedJourneySection(expanded = false) {
           <p class="muted">${continueState.message || continueState.next_action || "Mulai dari modul yang paling lemah dulu."}</p>
           <small>Aktivitas terakhir: ${formatDate(journey.last_activity_at) || "Belum ada aktivitas tersimpan"}</small>
         </div>
+        <div class="panel adaptive-mini">
+          <h3>Latihan Adaptif Hari Ini</h3>
+          <p><strong>${escapeHtml(adaptive.title)}</strong></p>
+          <p class="muted">${escapeHtml(adaptive.reason)}</p>
+          <button class="secondary-button" data-open-journey>Detail latihan</button>
+        </div>
         <div class="panel">
           <h3>Daily Study Plan</h3>
           <div class="activity-list">
@@ -1032,6 +1045,49 @@ function integratedJourneySection(expanded = false) {
         ${skills.map(skillJourneyCard).join("")}
       </section>
       ${expanded ? reviewListTemplate(reviewList) : ""}
+    </section>
+  `;
+}
+
+function adaptivePracticeSection(adaptive) {
+  return `
+    <section class="adaptive-practice-panel">
+      <div class="journey-hub-header">
+        <div>
+          <p class="eyebrow">AI Mentor Adaptif</p>
+          <h3>${escapeHtml(adaptive.title)}</h3>
+          <p>${escapeHtml(adaptive.mentor_message)}</p>
+        </div>
+        <div class="adaptive-score-actions">
+          <button class="secondary-button" data-adaptive-refresh>Ambil Latihan Baru</button>
+          <button class="primary-button" data-adaptive-complete>Saya Selesai</button>
+        </div>
+      </div>
+      <div class="adaptive-prompt">
+        <strong>Prompt latihan</strong>
+        <p>${escapeHtml(adaptive.practice_prompt)}</p>
+      </div>
+      <div class="adaptive-task-grid">
+        ${(adaptive.tasks || []).map((task, index) => `
+          <article>
+            <span class="pill">Step ${index + 1}</span>
+            <strong>${escapeHtml(task.title)}</strong>
+            <p>${escapeHtml(task.instruction)}</p>
+          </article>
+        `).join("")}
+      </div>
+      <div class="content-grid">
+        <div class="panel no-shadow">
+          <h3>Kenapa ini dipilih?</h3>
+          <p class="muted">${escapeHtml(adaptive.reason)}</p>
+        </div>
+        <div class="panel no-shadow">
+          <h3>Recent Attempts</h3>
+          ${adaptive.recent_attempts?.length
+            ? adaptive.recent_attempts.map((item) => `<p><strong>${skillLabel(item.skill_type)}</strong> - ${Math.round(item.accuracy || 0)}% <small>${formatDate(item.created_at)}</small></p>`).join("")
+            : `<p class="muted">Belum ada attempt untuk skill ini. Latihan pertama akan mulai membentuk rekomendasi.</p>`}
+        </div>
+      </div>
     </section>
   `;
 }
@@ -1099,6 +1155,82 @@ function bindJourneyActions() {
       render();
     });
   });
+  document.querySelectorAll("[data-open-journey]").forEach((button) => {
+    if (button.dataset.boundOpenJourney === "true") return;
+    button.dataset.boundOpenJourney = "true";
+    button.addEventListener("click", () => {
+      state.activeView = "journey";
+      saveState();
+      render();
+    });
+  });
+}
+
+function bindAdaptiveActions() {
+  document.querySelectorAll("[data-adaptive-refresh]").forEach((button) => {
+    if (button.dataset.boundAdaptiveRefresh === "true") return;
+    button.dataset.boundAdaptiveRefresh = "true";
+    button.addEventListener("click", async () => {
+      await refreshAdaptivePractice();
+      renderJourney();
+    });
+  });
+  document.querySelectorAll("[data-adaptive-complete]").forEach((button) => {
+    if (button.dataset.boundAdaptiveComplete === "true") return;
+    button.dataset.boundAdaptiveComplete = "true";
+    button.addEventListener("click", async () => {
+      await completeAdaptivePractice();
+      renderJourney();
+      renderDashboard();
+    });
+  });
+}
+
+async function refreshAdaptivePractice() {
+  const summary = state.integratedJourney || localJourneySummary();
+  const skillType = state.adaptivePractice?.skill_type || summary.journey?.next_recommended_module || "grammar";
+  if (!apiOnline) {
+    state.adaptivePractice = localAdaptivePractice(summary);
+    return;
+  }
+  try {
+    state.adaptivePractice = await apiRequest(`/journey/adaptive-practice?skill_type=${encodeURIComponent(skillType)}${state.user?.id ? `&user_id=${encodeURIComponent(state.user.id)}` : ""}`);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    apiOnline = false;
+    state.adaptivePractice = localAdaptivePractice(summary);
+  }
+}
+
+async function completeAdaptivePractice() {
+  const summary = state.integratedJourney || localJourneySummary();
+  const adaptive = state.adaptivePractice || summary.adaptive_practice || localAdaptivePractice(summary);
+  const score = Math.max(65, Math.round(summary.journey?.overall_score || 65));
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/journey/adaptive-practice/complete", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          skill_type: adaptive.skill_type,
+          score,
+          max_score: 100,
+          notes: "User menyelesaikan latihan adaptif dari halaman Perjalanan."
+        }
+      });
+      state.adaptivePractice = response.next_practice;
+      await refreshIntegratedJourney();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  const label = skillLabel(adaptive.skill_type).replace(" BA", "");
+  state.progress[label] = Math.max(state.progress[label] || 0, score);
+  state.completedExercises += 1;
+  addActivity("Adaptive", adaptive.title, score);
+  state.adaptivePractice = localAdaptivePractice(localJourneySummary());
+  saveState();
 }
 
 function moduleToView(skillType) {
@@ -1160,7 +1292,7 @@ function localJourneySummary() {
   const overall = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0;
   const weakest = skills.reduce((lowest, skill) => (skill.average_score < lowest.average_score ? skill : lowest), skills[0]);
   const strongest = skills.reduce((highest, skill) => (skill.average_score > highest.average_score ? skill : highest), skills[0]);
-  return {
+  const summary = {
     journey: {
       current_level: scoreLevel(overall),
       overall_score: overall,
@@ -1183,7 +1315,29 @@ function localJourneySummary() {
       { skill_type: "listening", task: "Short dialogue level 1.", duration: "10 menit" }
     ],
     review_list: { weak_vocabulary: [], weak_grammar_topics: [], due_for_review: [] },
+    adaptive_practice: null,
     mentor_message: `Progress lokal tersimpan. Hari ini fokus ke ${skillLabel(weakest?.skill_type || "grammar")}.`
+  };
+  summary.adaptive_practice = localAdaptivePractice(summary);
+  return summary;
+}
+
+function localAdaptivePractice(summary) {
+  const skillType = summary.journey?.next_recommended_module || "grammar";
+  return {
+    skill_type: skillType,
+    title: `Latihan Adaptif ${skillLabel(skillType)}`,
+    level: summary.journey?.current_level || "Beginner 1",
+    reason: `${skillLabel(skillType)} dipilih dari progress lokal sebagai fokus paling ringan hari ini.`,
+    mentor_message: `Kita fokus ke ${skillLabel(skillType)}. Kerjakan 3 langkah pendek, lalu lanjut ke modul terkait.`,
+    practice_prompt: localNextAction(skillType),
+    recent_attempts: [],
+    next_action: localNextAction(skillType),
+    tasks: [
+      { title: "Pahami tugas", instruction: localNextAction(skillType) },
+      { title: "Kerjakan 10 menit", instruction: "Tulis jawaban singkat dan jangan mengejar sempurna dulu." },
+      { title: "Catat kesalahan", instruction: "Tulis satu hal yang masih membingungkan untuk direview." }
+    ]
   };
 }
 

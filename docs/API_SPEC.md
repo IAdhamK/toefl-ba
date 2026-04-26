@@ -91,6 +91,9 @@ Compatibility endpoint lama:
 - `GET /api/journey/recommendations`
 - `GET /api/journey/daily-plan`
 - `GET /api/journey/review-list`
+- `GET /api/journey/adaptive-practice`
+- `GET /api/journey/mentor-summary`
+- `POST /api/journey/adaptive-practice/complete`
 - `POST /api/journey/reset?dev=true`
 
 Valid `skill_type`: `reading`, `grammar`, `vocabulary`, `writing`, `listening`, `scenario`.

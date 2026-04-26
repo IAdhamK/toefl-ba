@@ -114,6 +114,13 @@ Setiap scoring endpoint menambahkan field `journey_update` tanpa mengubah format
 GET /api/journey/summary
 ```
 
+Adaptive mentor sederhana juga tersedia. Ia membaca weakest skill, recent attempts, weak grammar/vocabulary, lalu membuat 3 langkah latihan pendek:
+
+```text
+GET /api/journey/adaptive-practice
+POST /api/journey/adaptive-practice/complete
+```
+
 ## Docker Opsional
 
 Jika kamu memakai Docker:

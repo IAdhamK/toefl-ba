@@ -166,6 +166,7 @@ def get_user_journey_summary(user_id: str) -> dict[str, Any]:
     journey = get_or_create_learning_journey(user_id)
     skills = get_all_skill_journeys(user_id)
     recommendation = generate_next_recommendation(user_id)
+    adaptive_practice = get_adaptive_practice(user_id)
     return {
         "user_id": user_id,
         "journey": journey,
@@ -174,6 +175,7 @@ def get_user_journey_summary(user_id: str) -> dict[str, Any]:
         "daily_plan": get_daily_study_plan(user_id),
         "review_list": get_review_list(user_id),
         "recommendation": recommendation,
+        "adaptive_practice": adaptive_practice,
         "mentor_message": mentor_message(journey),
     }
 
@@ -557,6 +559,76 @@ def get_review_list(user_id: str) -> dict[str, list[dict[str, Any]]]:
     }
 
 
+def get_adaptive_practice(user_id: str, skill_type: str | None = None) -> dict[str, Any]:
+    user_id = get_default_user_id(user_id)
+    journey = get_or_create_learning_journey(user_id)
+    target_skill = validate_skill_type(skill_type) if skill_type else journey.get("weakest_skill") or "grammar"
+    skill = get_or_create_skill_journey(user_id, target_skill)
+    recent_attempts = get_recent_attempts(user_id, target_skill)
+    weak_topics = get_weak_topics(user_id, target_skill)
+    review_list = get_review_list(user_id)
+    prompt = build_adaptive_prompt(target_skill, skill, weak_topics, review_list)
+    return {
+        "user_id": user_id,
+        "skill_type": target_skill,
+        "title": f"Latihan Adaptif {label_skill(target_skill)}",
+        "level": skill.get("current_level", "Beginner 1"),
+        "reason": adaptive_reason(target_skill, skill, weak_topics),
+        "mentor_message": adaptive_mentor_message(target_skill, skill),
+        "tasks": adaptive_tasks(target_skill, weak_topics, review_list),
+        "practice_prompt": prompt,
+        "recent_attempts": recent_attempts,
+        "next_action": NEXT_ACTIONS.get(target_skill, NEXT_ACTIONS["grammar"]),
+    }
+
+
+def get_adaptive_mentor_summary(user_id: str) -> dict[str, Any]:
+    user_id = get_default_user_id(user_id)
+    summary = get_user_journey_summary(user_id)
+    journey = summary["journey"]
+    adaptive = summary["adaptive_practice"]
+    return {
+        "message": (
+            f"Fokus utama hari ini adalah {label_skill(adaptive['skill_type'])}. "
+            f"Level Anda {journey['current_level']} dengan overall score {journey['overall_score']}%. "
+            f"Kerjakan latihan adaptif pendek dulu, lalu review item yang paling lemah."
+        ),
+        "focus_skill": adaptive["skill_type"],
+        "recommended_action": adaptive["next_action"],
+        "practice_title": adaptive["title"],
+    }
+
+
+def complete_adaptive_practice(
+    user_id: str,
+    skill_type: str,
+    score: float,
+    max_score: float = 100,
+    notes: str = "",
+    mistakes: list | None = None,
+) -> dict[str, Any]:
+    skill_type = validate_skill_type(skill_type)
+    feedback = notes or "Latihan adaptif selesai. Lanjutkan review item yang masih terasa sulit."
+    update = save_learning_attempt(
+        user_id=get_default_user_id(user_id),
+        skill_type=skill_type,
+        activity_id=f"adaptive-{skill_type}",
+        activity_type="adaptive_practice",
+        score=score,
+        max_score=max_score,
+        mistakes=mistakes or [],
+        feedback=feedback,
+    )
+    update_skill_mastery(
+        user_id=get_default_user_id(user_id),
+        skill_type=skill_type,
+        topic=STAGE_NAMES[skill_type],
+        is_correct=(float(score or 0) / max(float(max_score or 100), 1)) >= 0.75,
+        score=round((float(score or 0) / max(float(max_score or 100), 1)) * 100, 1),
+    )
+    return {"journey_update": update, "next_practice": get_adaptive_practice(user_id)}
+
+
 def reset_journey_data(user_id: str) -> dict[str, Any]:
     user_id = get_default_user_id(user_id)
     with get_connection() as conn:
@@ -591,6 +663,116 @@ def mentor_message(journey: dict[str, Any]) -> str:
     return (
         f"Progress Anda sudah berjalan. Hari ini sebaiknya fokus ke {label_skill(weakest)} "
         f"karena skor rata-rata masih lebih rendah dibanding {label_skill(strongest)}."
+    )
+
+
+def get_recent_attempts(user_id: str, skill_type: str, limit: int = 3) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, skill_type, activity_id, activity_type, score, max_score, accuracy, feedback, created_at
+            FROM learning_attempts
+            WHERE user_id = ? AND skill_type = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (user_id, skill_type, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_weak_topics(user_id: str, skill_type: str, limit: int = 5) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT topic, mastery_score, attempt_count, wrong_count, next_review_at
+            FROM skill_mastery
+            WHERE user_id = ? AND skill_type = ?
+            ORDER BY mastery_score ASC, wrong_count DESC
+            LIMIT ?
+            """,
+            (user_id, skill_type, limit),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def adaptive_reason(skill_type: str, skill: dict[str, Any], weak_topics: list[dict[str, Any]]) -> str:
+    if weak_topics:
+        topic = weak_topics[0]["topic"]
+        return f"{label_skill(skill_type)} dipilih karena topik '{topic}' masih perlu review."
+    if skill.get("completed_count", 0) == 0:
+        return f"{label_skill(skill_type)} dipilih sebagai langkah awal karena belum ada latihan tersimpan."
+    return f"{label_skill(skill_type)} dipilih karena rata-rata skill ini masih perlu diperkuat."
+
+
+def adaptive_mentor_message(skill_type: str, skill: dict[str, Any]) -> str:
+    score = round(float(skill.get("average_score") or 0))
+    return (
+        f"Kita fokus ke {label_skill(skill_type)}. Skor rata-rata saat ini {score}%. "
+        "Kerjakan latihan pendek, jangan mengejar sempurna dulu. Yang penting tahu pola salahnya."
+    )
+
+
+def adaptive_tasks(skill_type: str, weak_topics: list[dict[str, Any]], review_list: dict[str, Any]) -> list[dict[str, str]]:
+    topic = weak_topics[0]["topic"] if weak_topics else STAGE_NAMES[skill_type]
+    vocab_items = review_list.get("weak_vocabulary", [])
+    vocab_word = vocab_items[0]["word"] if vocab_items else "elicit"
+    task_bank = {
+        "reading": [
+            {"title": "Cari main idea", "instruction": "Baca satu passage BA dan tulis ide utama dalam satu kalimat Indonesia."},
+            {"title": "Cari bukti jawaban", "instruction": "Tandai satu kalimat yang membuktikan jawabanmu."},
+            {"title": "Vocabulary context", "instruction": f"Jelaskan arti kata '{vocab_word}' sesuai konteks passage."},
+        ],
+        "grammar": [
+            {"title": "Subject dan verb", "instruction": "Ambil satu kalimat panjang, garis bawahi subject dan main verb."},
+            {"title": "Buang phrase tambahan", "instruction": f"Pisahkan phrase tambahan dari inti kalimat. Fokus topik: {topic}."},
+            {"title": "Terjemah natural", "instruction": "Terjemahkan inti kalimat ke Bahasa Indonesia sederhana."},
+        ],
+        "vocabulary": [
+            {"title": "Review kata lemah", "instruction": f"Tulis arti dan contoh kalimat BA untuk kata '{vocab_word}'."},
+            {"title": "Recall cepat", "instruction": "Tutup arti kata, lalu coba sebutkan makna Indonesia tanpa melihat."},
+            {"title": "Pakai dalam konteks", "instruction": "Buat satu kalimat requirement menggunakan kata tersebut."},
+        ],
+        "writing": [
+            {"title": "Requirement pendek", "instruction": "Tulis satu kalimat dengan pola: The system must + verb + object."},
+            {"title": "Tambah ukuran", "instruction": "Tambahkan angka, waktu, atau kondisi agar requirement measurable."},
+            {"title": "Revisi formal", "instruction": "Ubah kalimat menjadi lebih profesional tetapi tetap sederhana."},
+        ],
+        "listening": [
+            {"title": "Tangkap masalah utama", "instruction": "Baca transcript pendek dan jawab: masalah utamanya apa?"},
+            {"title": "Cari kata kunci", "instruction": "Tulis 3 kata yang menunjukkan masalah stakeholder."},
+            {"title": "Ringkas meeting", "instruction": "Buat ringkasan 1 kalimat: issue, cause, next action."},
+        ],
+        "scenario": [
+            {"title": "Clarify first", "instruction": "Baca case BA dan tulis pertanyaan klarifikasi pertama."},
+            {"title": "Identifikasi stakeholder", "instruction": "Sebutkan siapa stakeholder dan kebutuhannya."},
+            {"title": "Pilih tindakan BA", "instruction": "Pilih tindakan paling aman: elicit, validate, prioritize, atau align."},
+        ],
+    }
+    return task_bank.get(skill_type, task_bank["grammar"])
+
+
+def build_adaptive_prompt(
+    skill_type: str,
+    skill: dict[str, Any],
+    weak_topics: list[dict[str, Any]],
+    review_list: dict[str, Any],
+) -> str:
+    topic = weak_topics[0]["topic"] if weak_topics else STAGE_NAMES[skill_type]
+    weak_words = [item["word"] for item in review_list.get("weak_vocabulary", [])[:3]]
+    words_text = ", ".join(weak_words) if weak_words else "elicit, requirement, stakeholder"
+    prompts = {
+        "reading": "Read this BA sentence: A stakeholder describes a problem vaguely, so the analyst clarifies the expected outcome before proposing a solution. What is the main idea?",
+        "grammar": "Break this sentence: The analyst working with multiple stakeholders must clarify requirements before recommending a solution.",
+        "vocabulary": f"Explain and use these words in BA context: {words_text}.",
+        "writing": "Write one measurable requirement for a reporting system using clear subject + verb.",
+        "listening": "Transcript: The report is late because two departments send data in different formats. What is the main issue?",
+        "scenario": "A manager asks for a mobile app but cannot explain the business problem. What should the BA ask first?",
+    }
+    return (
+        f"Level: {skill.get('current_level', 'Beginner 1')}. "
+        f"Focus topic: {topic}. "
+        f"Task: {prompts.get(skill_type, prompts['grammar'])}"
     )
 
 

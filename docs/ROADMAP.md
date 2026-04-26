@@ -36,9 +36,8 @@ Phase 2:
 - More detailed mistake analysis.
 
 Phase 3:
-- AI mentor reads journey memory.
-- Personalized learning path.
-- Adaptive question difficulty.
+- AI mentor reads journey memory with real LLM support.
+- Personalized learning path with adaptive question difficulty.
 
 Phase 4:
 - Production auth and per-user security.

@@ -29,3 +29,5 @@ TOEFL Analyst AI sekarang memakai struktur bertahap:
 Journey layer menambahkan memori belajar terpadu per user. Setiap attempt dari reading, grammar, vocabulary, writing, listening, dan scenario masuk ke `learning_attempts`, lalu service memperbarui `skill_journeys`, `learning_journeys`, `skill_mastery`, `vocabulary_memory`, dan `ai_recommendations`.
 
 Frontend membaca ringkasan dari `/api/journey/summary` dan tetap memakai fallback lokal jika backend mati.
+
+Adaptive mentor berada di service yang sama. Untuk fase ini, mentor belum memanggil LLM asli; ia membaca journey memory dari SQLite, memilih weakest skill, melihat weak topics/review list, lalu mengembalikan 3 task pendek yang bisa langsung dikerjakan user.

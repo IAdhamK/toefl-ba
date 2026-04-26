@@ -458,6 +458,57 @@ textarea {
   font-weight: 800;
 }
 
+.adaptive-practice-panel {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.adaptive-mini p {
+  line-height: 1.45;
+}
+
+.adaptive-score-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.adaptive-prompt {
+  border: 1px solid #e6c57a;
+  border-radius: 8px;
+  background: #fff8e8;
+  padding: 14px;
+}
+
+.adaptive-prompt p,
+.adaptive-task-grid p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.adaptive-task-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.adaptive-task-grid article {
+  min-height: 148px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
 .journey-summary {
   display: flex;
   justify-content: space-between;
@@ -872,6 +923,7 @@ textarea {
   .metrics-grid,
   .journey-overview-grid,
   .skill-card-grid,
+  .adaptive-task-grid,
   .drill-result-grid,
   .learning-steps,
   .journey-steps,

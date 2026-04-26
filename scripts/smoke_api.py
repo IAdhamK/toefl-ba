@@ -65,6 +65,24 @@ def main():
     status, review_list = call("/journey/review-list")
     assert_ok("review list", status == 200 and "weak_vocabulary" in review_list)
 
+    status, adaptive = call("/journey/adaptive-practice")
+    assert_ok("adaptive practice", status == 200 and "tasks" in adaptive and len(adaptive["tasks"]) == 3)
+
+    status, mentor = call("/journey/mentor-summary")
+    assert_ok("adaptive mentor summary", status == 200 and "message" in mentor)
+
+    status, adaptive_done = call(
+        "/journey/adaptive-practice/complete",
+        {
+            "user_id": "default-user",
+            "skill_type": "grammar",
+            "score": 75,
+            "max_score": 100,
+            "notes": "Smoke adaptive practice complete.",
+        },
+    )
+    assert_ok("complete adaptive practice", status == 200 and "journey_update" in adaptive_done)
+
     status, daily_vocab = call("/vocabulary/daily")
     assert_ok("daily vocabulary", status == 200 and len(daily_vocab["items"]) == 25)
 
