@@ -1,6 +1,7 @@
-__pycache__/
+.git
+.venv
+__pycache__
 *.pyc
 .DS_Store
-.venv/
 data/app_data.json
 data/*.sqlite3

@@ -23,11 +23,17 @@ def assert_ok(name, condition):
 
 
 def main():
+    print("Smoke test TOEFL Analyst AI API")
+    print(f"Target: {BASE_URL}")
+
     status, health = call("/health")
-    assert_ok("health", status == 200 and health["ok"])
+    assert_ok("health check FastAPI", status == 200 and health["ok"])
 
     status, lessons = call("/lessons")
     assert_ok("lessons", status == 200 and len(lessons["lessons"]) > 0)
+
+    status, progress = call("/progress/summary")
+    assert_ok("progress summary", status == 200 and "progress" in progress)
 
     status, daily_vocab = call("/vocabulary/daily")
     assert_ok("daily vocabulary", status == 200 and len(daily_vocab["items"]) == 25)
@@ -36,6 +42,10 @@ def main():
     answers = {question["id"]: question["answer"] for question in lesson["questions"]}
     status, reading = call("/reading/submit-answer", {"lessonId": lesson["id"], "answers": answers})
     assert_ok("reading scoring", status == 200 and reading["score"] == 100)
+
+    first_vocab = daily_vocab["items"][0]
+    status, vocab_score = call("/scoring/vocabulary", {"itemId": first_vocab["id"], "answer": first_vocab["answer"]})
+    assert_ok("vocabulary scoring", status == 200 and vocab_score["isCorrect"])
 
     status, grammar = call(
         "/grammar/breakdown",
@@ -55,6 +65,9 @@ def main():
     status, tutor = call("/ai-tutor/recommendation", {"progress": {"Reading": 80, "Grammar": 20}})
     assert_ok("tutor recommendation", status == 200 and tutor["weakness"] == "Grammar")
 
+    status, ai_chat = call("/ai/chat", {"message": "Explain requirement for beginner"})
+    assert_ok("ai mock chat", status == 200 and "reply" in ai_chat)
+
     status, analytics = call(
         "/progress/analytics",
         {"progress": {"Reading": 80, "Grammar": 20}, "completedExercises": 2, "activity": [{"module": "Reading"}]},
@@ -66,6 +79,8 @@ def main():
         {"text": "A business analyst must elicit requirements from stakeholders.", "type": "simple"},
     )
     assert_ok("indonesian help", status == 200 and "simpleMeaning" in help_result)
+
+    print("Selesai. API utama berjalan baik.")
 
 
 if __name__ == "__main__":

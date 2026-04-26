@@ -1,54 +1,136 @@
 # TOEFL Analyst AI
 
-MVP awal untuk aplikasi pembelajaran TOEFL berbasis konteks Business Analyst.
+TOEFL Analyst AI adalah aplikasi belajar TOEFL dengan konteks kerja Business Analyst. Fokusnya untuk pemula: membaca kalimat Inggris pelan-pelan, memahami subject dan verb, menghafal vocabulary harian, latihan scoring, dan mendapat bantuan Bahasa Indonesia.
 
-## Fitur MVP
+## Fitur Saat Ini
 
-- Auth/profile lokal dengan `localStorage`.
-- Dashboard progress.
-- Reading Analyzer dengan passage BA dan TOEFL-style questions.
-- Grammar Breakdown Engine versi rule-based.
-- Vocabulary Drill.
-- AI Tutor Chat versi lokal.
-- Writing Evaluator awal.
-- Listening scenario awal.
-- Scenario-Based BA Practice.
-- Admin CMS lokal untuk menambah reading lesson dan vocabulary.
-- Recent activity untuk ringkasan latihan.
-- Backend REST lokal tanpa dependency eksternal.
-- Sinkronisasi state, content, progress, grammar breakdown, dan AI Tutor mock via `/api/*`.
-- Endpoint scoring untuk reading, vocabulary, writing, listening, scenario, dan rekomendasi AI Tutor.
-- Progress analytics untuk average score, weakest skill, strongest skill, total exercises, dan activity count.
-- Bantuan Bahasa Indonesia untuk menerjemahkan, menjelaskan kosakata, dan menemukan subject/verb bagi user basic.
-- Daily random vocabulary drill dengan target 25 kata per hari, reminder, dan result progress drill.
-- Journey panel di Reading, Grammar, Vocabulary, Writing, dan Listening untuk melihat posisi belajar dan next step.
+- Frontend MVP di `frontend/` dengan dashboard, journey panel, dan UX Bahasa Indonesia.
+- FastAPI backend di `backend/` dengan pola endpoint `/api/*`.
+- SQLite foundation di `data/toefl_ba.sqlite3` yang dibuat otomatis saat backend berjalan.
+- Migrasi data lama dari `data/app_data.json` ke SQLite.
+- Reading Analyzer, Grammar Breakdown, Vocabulary Drill 25 kata/hari, Writing Evaluator, Listening scenario, Scenario BA, AI Tutor mock, Bantuan ID, Admin CMS dasar.
+- Safe AI fallback: tanpa API key, aplikasi tetap menjawab memakai mock rule-based.
 
-## Menjalankan
+## Struktur Folder
 
-Mode lengkap dengan backend:
+```text
+toefl-ba/
+├── frontend/
+│   ├── index.html
+│   ├── app.js
+│   └── styles.css
+├── backend/
+│   ├── main.py
+│   ├── database.py
+│   ├── models.py
+│   ├── schemas.py
+│   ├── seed.py
+│   ├── routers/
+│   └── services/
+├── data/
+│   ├── app_data.json
+│   └── toefl_ba.sqlite3
+├── docs/
+├── scripts/
+├── README.md
+├── PROJECT_PROGRESS.md
+└── requirements.txt
+```
+
+Catatan: `data/app_data.json`, `data/toefl_ba.sqlite3`, dan `.venv/` adalah file runtime lokal dan tidak perlu masuk git.
+
+## Cara Menjalankan Untuk Pemula
+
+1. Buat virtual environment:
+
+```bash
+python3 -m venv .venv
+```
+
+2. Aktifkan environment:
+
+```bash
+source .venv/bin/activate
+```
+
+3. Install dependency:
+
+```bash
+pip install -r requirements.txt
+```
+
+4. Jalankan backend + frontend:
+
+```bash
+uvicorn backend.main:app --reload --port 8001
+```
+
+5. Buka aplikasi:
+
+```text
+http://127.0.0.1:8001
+```
+
+Perintah lama juga masih bisa dipakai:
 
 ```bash
 python3 server.py
 ```
 
-Buka:
+## Migrasi Data Lama
 
-```text
-http://localhost:8001
-```
-
-Mode statis saja:
+Jika ada data lama di `data/app_data.json`, jalankan:
 
 ```bash
-python3 -m http.server 8000
+python3 scripts/migrate_json_to_sqlite.py
 ```
 
-Smoke test API:
+Backend juga akan melakukan seed otomatis saat pertama kali berjalan.
+
+## Smoke Test
+
+Pastikan backend sedang berjalan, lalu jalankan:
 
 ```bash
 python3 scripts/smoke_api.py
 ```
 
-## Catatan
+Output yang sehat akan berisi banyak baris `ok - ...` dan ditutup dengan:
 
-MVP ini sengaja dibuat tanpa dependency agar langsung dapat digunakan. Data backend tersimpan di `data/app_data.json`. Tahap berikutnya dapat memecah backend ini menjadi FastAPI atau Node.js, PostgreSQL, dan integrasi LLM/TTS sesuai `SKILL.md`.
+```text
+Selesai. API utama berjalan baik.
+```
+
+## Docker Opsional
+
+Jika kamu memakai Docker:
+
+```bash
+docker compose up --build
+```
+
+Buka:
+
+```text
+http://127.0.0.1:8001
+```
+
+## Konfigurasi AI Opsional
+
+Tanpa API key, aplikasi memakai mock AI yang aman untuk lokal. Untuk provider OpenAI/OpenRouter-compatible di masa depan, gunakan environment variable:
+
+```bash
+export LLM_PROVIDER=openai
+export LLM_API_KEY=isi_api_key_di_mesin_lokal
+export LLM_BASE_URL=https://api.openai.com/v1
+export LLM_MODEL=gpt-4o-mini
+```
+
+Jangan menulis API key langsung di kode.
+
+## Troubleshooting
+
+- Jika `uvicorn` tidak ditemukan, aktifkan `.venv` lalu ulangi `pip install -r requirements.txt`.
+- Jika port 8001 sudah dipakai, hentikan proses lama atau gunakan port lain.
+- Jika data kosong, jalankan `python3 scripts/migrate_json_to_sqlite.py`.
+- Jika frontend dibuka tanpa backend, beberapa fitur tetap fallback lokal, tetapi scoring API dan sinkronisasi tidak aktif.

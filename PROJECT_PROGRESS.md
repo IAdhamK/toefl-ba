@@ -2,12 +2,11 @@
 
 ## Status Saat Ini
 
-Project sudah berada pada tahap **MVP fungsional dengan frontend, backend lokal, assessment scoring, dan progress analytics**.
+Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan FastAPI, SQLite foundation, service layer, router API, migrasi data, dan dokumentasi pemula**.
 
-## Selesai
+## Selesai Sebelumnya
 
-- Menyusun `SKILL.md` dari dokumen planning proyek.
-- Membuat frontend MVP:
+- Frontend MVP:
   - Auth/profile lokal.
   - Dashboard progress.
   - Reading Analyzer.
@@ -18,70 +17,130 @@ Project sudah berada pada tahap **MVP fungsional dengan frontend, backend lokal,
   - Listening scenario.
   - Scenario-Based BA Practice.
   - Admin CMS lokal.
-- Membuat backend REST lokal di `server.py`:
-  - Auth register/login.
-  - Lessons.
-  - Vocabulary.
-  - State persistence.
-  - Progress summary.
-  - Grammar breakdown.
-  - AI Tutor chat.
-  - Reading scoring.
-  - Vocabulary scoring.
-  - Writing evaluation.
-  - Listening scoring.
-  - Scenario scoring.
-  - AI Tutor recommendation.
-  - Progress analytics.
-- Improvisasi UI/UX untuk pemula:
-  - Navigasi dengan label Bahasa Indonesia.
-  - Beranda dengan langkah belajar 1-2-3.
-  - Tips pemula di Reading, Grammar, Vocabulary, Writing, Listening, dan Scenario.
-  - Fitur Bantuan ID untuk menjelaskan kalimat Inggris dalam Bahasa Indonesia.
-- Vocabulary drill harian:
-  - Random 25 kata per hari.
-  - Pengingat target belajar harian.
-  - Result drill: terjawab, benar, salah, sisa, akurasi, dan kata yang perlu diulang.
-  - Bank kosakata dasar diperluas menjadi 30 kata.
-- Journey panel per modul:
-  - Reading journey.
-  - Grammar journey.
-  - Vocabulary journey.
-  - Writing journey.
-  - Listening journey.
-  - Setiap journey menampilkan posisi saat ini, progress score, tahap belajar, dan next action.
-- Verifikasi UI di in-app browser:
-  - Navigasi pemula tampil.
-  - Bantuan ID dapat menerima kalimat Inggris dan menampilkan penjelasan Bahasa Indonesia.
-  - Tidak ada error console browser setelah uji fitur Bantuan ID.
-- Menambahkan smoke test API di `scripts/smoke_api.py`.
-- Menambahkan dokumentasi menjalankan aplikasi di `README.md`.
+- UI/UX Bahasa Indonesia untuk pemula.
+- Bantuan ID untuk menjelaskan kalimat Inggris.
+- Daily vocabulary drill 25 kata/hari.
+- Journey panel di Reading, Grammar, Vocabulary, Writing, dan Listening.
+- Smoke test API awal.
 
-## Sedang Berjalan
+## Selesai Pada Fase Ini
 
-- Aplikasi berjalan di backend lokal:
-  - `http://localhost:8001`
-- Data runtime backend disimpan di:
-  - `data/app_data.json`
-- Frontend otomatis fallback ke mode lokal jika backend mati.
+- Struktur project dirapikan:
+  - `frontend/`
+  - `backend/`
+  - `backend/routers/`
+  - `backend/services/`
+  - `docs/`
+  - `scripts/`
+  - `data/`
+- Frontend dipindah ke:
+  - `frontend/index.html`
+  - `frontend/app.js`
+  - `frontend/styles.css`
+- Backend FastAPI baru dibuat di:
+  - `backend/main.py`
+- SQLite foundation dibuat di:
+  - `backend/database.py`
+  - `backend/models.py`
+  - `backend/schemas.py`
+  - `backend/seed.py`
+- Tabel awal disiapkan:
+  - `users`
+  - `sessions`
+  - `lessons`
+  - `questions`
+  - `vocabulary`
+  - `progress`
+  - `attempts`
+  - `ai_sessions`
+  - `prompts`
+  - `app_state`
+  - `admin_content`
+- Migrasi data lama dibuat:
+  - `scripts/migrate_json_to_sqlite.py`
+- Router API dibuat:
+  - `auth`
+  - `lessons`
+  - `vocabulary`
+  - `progress`
+  - `scoring`
+  - `ai_tutor`
+  - `admin`
+- Endpoint lama tetap dipertahankan agar frontend tidak rusak:
+  - `/api/reading/submit-answer`
+  - `/api/grammar/breakdown`
+  - `/api/ai-tutor/chat`
+  - `/api/ai-tutor/recommendation`
+  - `/api/help/indonesian`
+  - `/api/writing/evaluate`
+  - `/api/listening/submit-answer`
+  - `/api/scenario/submit-answer`
+- AI service layer dibuat:
+  - Mock provider default.
+  - OpenAI/OpenRouter-compatible provider disiapkan lewat environment variable.
+  - Tidak ada API key yang di-hardcode.
+- Listening service disiapkan:
+  - Mock audio metadata.
+  - Transcript.
+  - Listening question.
+  - Scoring.
+  - Catatan integrasi TTS/STT masa depan.
+- Smoke test diperbarui untuk FastAPI.
+- Dokumentasi dibuat:
+  - `README.md`
+  - `docs/ARCHITECTURE.md`
+  - `docs/API_SPEC.md`
+  - `docs/DEV_PROGRESS.md`
+  - `docs/ROADMAP.md`
+- Docker support dasar dibuat:
+  - `Dockerfile`
+  - `docker-compose.yml`
+  - `.dockerignore`
+
+## Verifikasi
+
+- `python3 -m py_compile ...` berhasil.
+- `node --check frontend/app.js` berhasil.
+- `python3 scripts/migrate_json_to_sqlite.py` berhasil:
+  - 2 lessons.
+  - 30 vocabulary items.
+  - 2 users.
+  - state frontend termigrasi.
+- `.venv/bin/python scripts/smoke_api.py` berhasil terhadap FastAPI di port 8001.
+
+## Cara Menjalankan Saat Ini
+
+```bash
+source .venv/bin/activate
+uvicorn backend.main:app --reload --port 8001
+```
+
+Buka:
+
+```text
+http://127.0.0.1:8001
+```
+
+Smoke test:
+
+```bash
+python3 scripts/smoke_api.py
+```
 
 ## Belum Dikerjakan
 
-- Migrasi backend ke FastAPI atau Node.js.
-- Database PostgreSQL.
-- JWT authentication production-grade.
-- Role-based access control.
-- Integrasi LLM asli untuk AI Tutor.
-- Integrasi LLM asli untuk Bantuan ID.
-- Integrasi TTS/STT untuk AI Listening Engine.
-- Admin CMS dengan edit/delete konten.
-- Test end-to-end browser.
-- Deployment Docker/cloud.
+- UI edit/delete Admin CMS di frontend.
+- Browser end-to-end tests.
+- API unit tests dengan test database terpisah.
+- PostgreSQL migration path.
+- Real LLM integration di production.
+- TTS/STT provider nyata untuk Listening Engine.
+- Auth production-grade dan role-based access control.
 
 ## Rekomendasi Step Berikutnya
 
-1. Rapikan struktur project menjadi `frontend/` dan `backend/`.
-2. Migrasikan backend lokal ke FastAPI.
-3. Tambahkan database SQLite atau PostgreSQL schema awal.
-4. Tambahkan endpoint CRUD lengkap untuk lesson, question, vocabulary, dan prompt.
-5. Tambahkan integrasi LLM asli di balik endpoint AI.
+1. Tambahkan edit/delete di Admin CMS frontend.
+2. Tambahkan Dockerfile dan `docker-compose.yml`.
+3. Tambahkan E2E browser tests untuk alur utama.
+4. Tambahkan API tests dengan SQLite test database.
+5. Hubungkan AI service ke provider asli setelah API key tersedia.
