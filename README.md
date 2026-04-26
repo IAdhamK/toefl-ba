@@ -52,5 +52,3 @@ python3 scripts/smoke_api.py
 ## Catatan
 
 MVP ini sengaja dibuat tanpa dependency agar langsung dapat digunakan. Data backend tersimpan di `data/app_data.json`. Tahap berikutnya dapat memecah backend ini menjadi FastAPI atau Node.js, PostgreSQL, dan integrasi LLM/TTS sesuai `SKILL.md`.
-
-> > > > > > > 4bb649d (Initial TOEFL Analyst AI MVP)
