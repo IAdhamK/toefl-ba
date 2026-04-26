@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TOEFL Analyst AI</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">TA</div>
+          <div>
+            <strong>TOEFL Analyst AI</strong>
+            <span>Belajar Inggris dari basic</span>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Main navigation">
+          <button class="nav-item active" data-view="dashboard"><strong>Beranda</strong><span>Ringkasan belajar</span></button>
+          <button class="nav-item" data-view="help"><strong>Bantuan ID</strong><span>Terjemah & jelaskan</span></button>
+          <button class="nav-item" data-view="reading"><strong>Reading</strong><span>Baca pelan-pelan</span></button>
+          <button class="nav-item" data-view="grammar"><strong>Grammar</strong><span>Subject & verb</span></button>
+          <button class="nav-item" data-view="vocabulary"><strong>Vocabulary</strong><span>Kosakata BA</span></button>
+          <button class="nav-item" data-view="tutor"><strong>AI Tutor</strong><span>Tanya bebas</span></button>
+          <button class="nav-item" data-view="writing"><strong>Writing</strong><span>Latihan menulis</span></button>
+          <button class="nav-item" data-view="listening"><strong>Listening</strong><span>Dengar & pahami</span></button>
+          <button class="nav-item" data-view="scenario"><strong>Scenario</strong><span>Keputusan BA</span></button>
+          <button class="nav-item" data-view="admin"><strong>Admin CMS</strong><span>Tambah konten</span></button>
+        </nav>
+
+        <div class="profile-box">
+          <span id="profileName">Guest Learner</span>
+          <small id="profileGoal">Target: TOEFL + BA readiness</small>
+          <button id="logoutButton" class="ghost-button">Reset Session</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section id="authView" class="auth-view">
+          <div class="auth-copy">
+            <p class="eyebrow">Mode Pemula Aktif</p>
+            <h1>Belajar TOEFL dari nol dengan konteks Business Analyst.</h1>
+            <p>
+              Aplikasi ini membantu kamu membaca, memahami grammar, menghafal kosakata,
+              dan bertanya dalam Bahasa Indonesia saat kalimat Inggris terasa sulit.
+            </p>
+            <div class="starter-steps">
+              <div><strong>1</strong><span>Baca arti umum dulu</span></div>
+              <div><strong>2</strong><span>Cari subject dan verb</span></div>
+              <div><strong>3</strong><span>Latih soal kecil</span></div>
+            </div>
+          </div>
+          <form id="authForm" class="auth-form">
+            <label>
+              Nama
+              <input id="nameInput" type="text" placeholder="Junior BA Learner" required />
+            </label>
+            <label>
+              Target skor TOEFL
+              <input id="targetInput" type="number" min="310" max="677" value="500" required />
+            </label>
+            <label>
+              Area tersulit saat ini
+              <select id="weaknessInput">
+                <option value="Grammar">Grammar</option>
+                <option value="Reading">Reading</option>
+                <option value="Vocabulary">Vocabulary</option>
+                <option value="Listening">Listening</option>
+                <option value="Writing">Writing</option>
+              </select>
+            </label>
+            <button type="submit" class="primary-button">Masuk Dashboard</button>
+          </form>
+        </section>
+
+        <section id="dashboardView" class="view active"></section>
+        <section id="helpView" class="view"></section>
+        <section id="readingView" class="view"></section>
+        <section id="grammarView" class="view"></section>
+        <section id="vocabularyView" class="view"></section>
+        <section id="tutorView" class="view"></section>
+        <section id="writingView" class="view"></section>
+        <section id="listeningView" class="view"></section>
+        <section id="scenarioView" class="view"></section>
+        <section id="adminView" class="view"></section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
