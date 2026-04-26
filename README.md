@@ -10,6 +10,7 @@ TOEFL Analyst AI adalah aplikasi belajar TOEFL dengan konteks kerja Business Ana
 - Migrasi data lama dari `data/app_data.json` ke SQLite.
 - Reading Analyzer, Grammar Breakdown, Vocabulary Drill 25 kata/hari, Writing Evaluator, Listening scenario, Scenario BA, AI Tutor mock, Bantuan ID, Admin CMS dasar.
 - Safe AI fallback: tanpa API key, aplikasi tetap menjawab memakai mock rule-based.
+- Integrated User Learning Journey: satu progress terpadu untuk Reading, Grammar, Vocabulary, Writing, Listening, dan Scenario BA.
 
 ## Struktur Folder
 
@@ -99,6 +100,18 @@ Output yang sehat akan berisi banyak baris `ok - ...` dan ditutup dengan:
 
 ```text
 Selesai. API utama berjalan baik.
+```
+
+## Integrated User Learning Journey
+
+Fitur ini menyimpan memori belajar user agar tidak mulai dari nol saat aplikasi dibuka lagi. Journey menyimpan level, overall score, progress per skill, last activity, total latihan, skill terkuat/terlemah, vocabulary dan grammar yang perlu review, rekomendasi next action, dan daily study plan.
+
+Data disimpan di SQLite lewat tabel `learning_journeys`, `skill_journeys`, `learning_attempts`, `skill_mastery`, `vocabulary_memory`, dan `ai_recommendations`.
+
+Setiap scoring endpoint menambahkan field `journey_update` tanpa mengubah format lama. Dashboard baru membaca ringkasan dari:
+
+```text
+GET /api/journey/summary
 ```
 
 ## Docker Opsional

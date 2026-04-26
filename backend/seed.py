@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from backend.database import get_connection, init_db, load_json_data, now_iso, table_count
 from backend.repository import upsert_lesson, upsert_vocabulary
+from backend.services.journey_service import backfill_user_journeys
 
 
 DEFAULT_LESSONS = [
@@ -69,6 +70,8 @@ def seed_database() -> None:
 
     if table_count("prompts") == 0:
         seed_prompts()
+
+    backfill_user_journeys()
 
 
 def seed_prompts() -> None:

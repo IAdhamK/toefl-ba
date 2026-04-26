@@ -35,6 +35,36 @@ def main():
     status, progress = call("/progress/summary")
     assert_ok("progress summary", status == 200 and "progress" in progress)
 
+    status, journey = call("/journey/summary")
+    assert_ok("journey summary", status == 200 and "journey" in journey)
+
+    status, skills = call("/journey/skills")
+    assert_ok("skill journeys", status == 200 and len(skills["skills"]) == 6)
+
+    status, attempt = call(
+        "/journey/attempt",
+        {
+            "user_id": "default-user",
+            "skill_type": "reading",
+            "activity_id": "smoke-reading",
+            "activity_type": "smoke_test",
+            "score": 8,
+            "max_score": 10,
+            "mistakes": [],
+            "feedback": "Good progress.",
+        },
+    )
+    assert_ok("save journey attempt", status == 201 and "journey_update" in attempt)
+
+    status, continue_learning = call("/journey/continue")
+    assert_ok("continue learning", status == 200 and "recommended_module" in continue_learning)
+
+    status, daily_plan = call("/journey/daily-plan")
+    assert_ok("daily plan", status == 200 and len(daily_plan["plan"]) == 3)
+
+    status, review_list = call("/journey/review-list")
+    assert_ok("review list", status == 200 and "weak_vocabulary" in review_list)
+
     status, daily_vocab = call("/vocabulary/daily")
     assert_ok("daily vocabulary", status == 200 and len(daily_vocab["items"]) == 25)
 

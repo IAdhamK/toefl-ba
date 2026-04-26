@@ -387,6 +387,77 @@ textarea {
   padding: 18px;
 }
 
+.journey-hub {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.journey-hub-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.journey-hub-header p {
+  max-width: 780px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.journey-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.compact-metric {
+  min-height: 86px;
+  padding: 12px;
+  box-shadow: none;
+}
+
+.skill-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.skill-journey-card {
+  min-width: 0;
+  min-height: 190px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.skill-journey-card > div:first-child,
+.skill-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.skill-journey-card p,
+.skill-journey-card small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.skill-card-meta {
+  color: var(--teal);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .journey-summary {
   display: flex;
   justify-content: space-between;
@@ -799,6 +870,8 @@ textarea {
   .auth-view,
   .content-grid,
   .metrics-grid,
+  .journey-overview-grid,
+  .skill-card-grid,
   .drill-result-grid,
   .learning-steps,
   .journey-steps,
@@ -808,6 +881,10 @@ textarea {
   }
 
   .journey-summary {
+    display: grid;
+  }
+
+  .journey-hub-header {
     display: grid;
   }
 }

@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from backend.schemas import ChatPayload, TextPayload
 from backend.services.ai_service import ai_service
 from backend.services.grammar_service import grammar_breakdown, indonesian_help
+from backend.services.journey_service import save_learning_attempt, update_skill_mastery
 from backend.services.progress_service import recommendation
 
 
@@ -24,7 +25,34 @@ def explain_sentence(payload: TextPayload) -> dict:
 @router.post("/api/ai/grammar-breakdown")
 @router.post("/api/grammar/breakdown")
 def grammar(payload: dict) -> dict:
-    return {"analysis": grammar_breakdown(payload.get("sentence", payload.get("text", "")))}
+    sentence = payload.get("sentence", payload.get("text", ""))
+    analysis = grammar_breakdown(sentence)
+    update = save_learning_attempt(
+        payload.get("user_id") or payload.get("userId") or "default-user",
+        "grammar",
+        payload.get("activity_id", "grammar-breakdown"),
+        "grammar_breakdown",
+        100 if sentence.strip() else 0,
+        100,
+        [],
+        "Grammar breakdown selesai. Fokus pada subject, main verb, dan phrase tambahan.",
+    )
+    update_skill_mastery(
+        payload.get("user_id") or payload.get("userId") or "default-user",
+        "grammar",
+        "subject and verb",
+        bool(sentence.strip()),
+        100 if sentence.strip() else 0,
+    )
+    return {
+        "analysis": analysis,
+        "journey_update": {
+            "skill_type": "grammar",
+            "average_score": update.get("skill_journey", {}).get("average_score", 0),
+            "next_action": update.get("skill_journey", {}).get("next_action", ""),
+            "overall_score": update.get("journey", {}).get("overall_score", 0),
+        },
+    }
 
 
 @router.post("/api/ai/writing-feedback")

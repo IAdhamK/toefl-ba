@@ -150,6 +150,99 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS learning_journeys (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL UNIQUE,
+                current_level TEXT DEFAULT 'Beginner 1',
+                overall_score REAL DEFAULT 0,
+                total_exercises INTEGER DEFAULT 0,
+                learning_streak INTEGER DEFAULT 0,
+                weakest_skill TEXT DEFAULT 'grammar',
+                strongest_skill TEXT DEFAULT 'reading',
+                next_recommended_module TEXT DEFAULT 'grammar',
+                last_activity_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS skill_journeys (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_type TEXT NOT NULL,
+                current_stage TEXT DEFAULT 'Foundation',
+                current_level TEXT DEFAULT 'Beginner 1',
+                average_score REAL DEFAULT 0,
+                completed_count INTEGER DEFAULT 0,
+                total_time_spent INTEGER DEFAULT 0,
+                last_activity_at TEXT,
+                next_action TEXT DEFAULT '',
+                status TEXT DEFAULT 'not_started',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, skill_type)
+            );
+
+            CREATE TABLE IF NOT EXISTS learning_attempts (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_type TEXT NOT NULL,
+                activity_id TEXT NOT NULL,
+                activity_type TEXT NOT NULL,
+                score REAL DEFAULT 0,
+                max_score REAL DEFAULT 100,
+                accuracy REAL DEFAULT 0,
+                mistakes_json TEXT DEFAULT '[]',
+                feedback TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS skill_mastery (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                skill_type TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                mastery_score REAL DEFAULT 0,
+                attempt_count INTEGER DEFAULT 0,
+                correct_count INTEGER DEFAULT 0,
+                wrong_count INTEGER DEFAULT 0,
+                last_practiced_at TEXT,
+                next_review_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, skill_type, topic)
+            );
+
+            CREATE TABLE IF NOT EXISTS vocabulary_memory (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                word TEXT NOT NULL,
+                meaning TEXT DEFAULT '',
+                context TEXT DEFAULT '',
+                mastery_score REAL DEFAULT 0,
+                review_count INTEGER DEFAULT 0,
+                wrong_count INTEGER DEFAULT 0,
+                last_reviewed_at TEXT,
+                next_review_at TEXT,
+                status TEXT DEFAULT 'learning',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(user_id, word)
+            );
+
+            CREATE TABLE IF NOT EXISTS ai_recommendations (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                recommendation_type TEXT NOT NULL,
+                source_skill TEXT DEFAULT '',
+                target_skill TEXT DEFAULT '',
+                reason TEXT DEFAULT '',
+                recommended_action TEXT NOT NULL,
+                priority INTEGER DEFAULT 2,
+                status TEXT DEFAULT 'active',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """
         )
 

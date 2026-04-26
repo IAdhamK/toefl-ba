@@ -22,6 +22,27 @@
 3. Add STT-ready endpoint for spoken answers.
 4. Add listening question generation from transcript.
 
+## Integrated Journey Roadmap
+
+Phase 1:
+- Basic integrated journey.
+- Skill progress.
+- Continue learning.
+- Daily plan.
+
+Phase 2:
+- Better mastery calculation.
+- Spaced repetition vocabulary.
+- More detailed mistake analysis.
+
+Phase 3:
+- AI mentor reads journey memory.
+- Personalized learning path.
+- Adaptive question difficulty.
+
+Phase 4:
+- Production auth and per-user security.
+
 ## Deployment Roadmap
 
 1. Improve Docker setup with production and development profiles.

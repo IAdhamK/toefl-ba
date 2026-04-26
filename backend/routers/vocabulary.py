@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from backend.repository import delete_vocabulary, get_vocabulary_item, list_vocabulary, upsert_vocabulary
 from backend.schemas import VocabularyPayload
 from backend.services.scoring_service import score_vocabulary
+from backend.services.journey_service import save_learning_attempt, update_vocabulary_memory
 
 
 router = APIRouter(prefix="/api/vocabulary", tags=["vocabulary"])
@@ -61,4 +62,29 @@ def submit_vocabulary_answer(payload: dict) -> dict:
     item = get_vocabulary_item(payload.get("itemId", ""))
     if not item:
         raise HTTPException(status_code=404, detail="Vocabulary item not found")
-    return score_vocabulary(item, payload.get("answer", ""))
+    result = score_vocabulary(item, payload.get("answer", ""))
+    user_id = payload.get("user_id") or payload.get("userId") or "default-user"
+    update = save_learning_attempt(
+        user_id,
+        "vocabulary",
+        item["id"],
+        "vocabulary_drill",
+        result.get("score", 0),
+        100,
+        [] if result.get("isCorrect") else [{"word": item.get("word"), "answer": payload.get("answer", "")}],
+        result.get("explanation", ""),
+    )
+    update_vocabulary_memory(
+        user_id,
+        item.get("word", ""),
+        item.get("meaningId", ""),
+        item.get("example", ""),
+        bool(result.get("isCorrect")),
+    )
+    result["journey_update"] = {
+        "skill_type": "vocabulary",
+        "average_score": update.get("skill_journey", {}).get("average_score", 0),
+        "next_action": update.get("skill_journey", {}).get("next_action", ""),
+        "overall_score": update.get("journey", {}).get("overall_score", 0),
+    }
+    return result

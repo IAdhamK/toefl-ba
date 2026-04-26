@@ -12,6 +12,7 @@
 - Smoke test updated for FastAPI endpoints and compatibility endpoints.
 - Beginner-friendly README and API documentation added.
 - Basic Docker support added for local development.
+- Integrated User Learning Journey added with database tables, service layer, router, scoring integration, frontend journey UI, and smoke checks.
 
 ## Verified
 
@@ -23,3 +24,5 @@
 ## Notes
 
 The frontend remains intentionally simple and build-free. Admin CMS UI still focuses on create operations, while backend CRUD support is now ready for edit/delete UI in the next phase.
+
+Journey calculation is intentionally simple for this phase: score averages, score-based levels, basic review status, and mock AI-style recommendations. Later phases can make mastery, spaced repetition, and adaptive difficulty smarter.

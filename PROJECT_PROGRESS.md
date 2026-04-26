@@ -96,6 +96,13 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - `Dockerfile`
   - `docker-compose.yml`
   - `.dockerignore`
+- Integrated User Learning Journey:
+  - tabel `learning_journeys`, `skill_journeys`, `learning_attempts`, `skill_mastery`, `vocabulary_memory`, `ai_recommendations`
+  - service `backend/services/journey_service.py`
+  - router `backend/routers/journey.py`
+  - UI `Perjalanan Belajar Saya`
+  - daily plan, continue learning, review list, mentor summary
+  - scoring endpoint sekarang mengirim `journey_update`
 
 ## Verifikasi
 
@@ -107,6 +114,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - 2 users.
   - state frontend termigrasi.
 - `.venv/bin/python scripts/smoke_api.py` berhasil terhadap FastAPI di port 8001.
+- Smoke test diperluas untuk journey summary, skill journeys, attempt, continue learning, daily plan, dan review list.
 
 ## Cara Menjalankan Saat Ini
 
@@ -132,6 +140,8 @@ python3 scripts/smoke_api.py
 - UI edit/delete Admin CMS di frontend.
 - Browser end-to-end tests.
 - API unit tests dengan test database terpisah.
+- Mastery calculation yang lebih detail.
+- Spaced repetition vocabulary yang lebih matang.
 - PostgreSQL migration path.
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
@@ -140,7 +150,7 @@ python3 scripts/smoke_api.py
 ## Rekomendasi Step Berikutnya
 
 1. Tambahkan edit/delete di Admin CMS frontend.
-2. Tambahkan Dockerfile dan `docker-compose.yml`.
-3. Tambahkan E2E browser tests untuk alur utama.
-4. Tambahkan API tests dengan SQLite test database.
+2. Tambahkan E2E browser tests untuk alur utama.
+3. Tambahkan API tests dengan SQLite test database.
+4. Matangkan mastery calculation dan spaced repetition.
 5. Hubungkan AI service ke provider asli setelah API key tersedia.

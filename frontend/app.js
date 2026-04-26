@@ -36,6 +36,7 @@ const defaultState = {
     lessons: null,
     vocabulary: null
   },
+  integratedJourney: null,
   chat: [
     {
       role: "assistant",
@@ -643,6 +644,7 @@ let state = loadState();
 
 const viewIds = {
   dashboard: "dashboardView",
+  journey: "journeyView",
   help: "helpView",
   reading: "readingView",
   grammar: "grammarView",
@@ -713,8 +715,24 @@ async function hydrateFromApi() {
       body: state
     });
     state.latestAnalytics = analyticsResponse.analytics;
+    await refreshIntegratedJourney();
   } catch (error) {
     apiOnline = false;
+    state.integratedJourney = localJourneySummary();
+  }
+}
+
+async function refreshIntegratedJourney() {
+  if (!apiOnline) {
+    state.integratedJourney = localJourneySummary();
+    return;
+  }
+  try {
+    state.integratedJourney = await apiRequest(`/journey/summary${state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : ""}`);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    apiOnline = false;
+    state.integratedJourney = localJourneySummary();
   }
 }
 
@@ -761,6 +779,7 @@ function bindShell() {
     }
     state.activeView = "dashboard";
     saveState();
+    await refreshIntegratedJourney();
     render();
   });
 
@@ -803,6 +822,7 @@ function render() {
   });
 
   renderDashboard();
+  renderJourney();
   renderHelp();
   renderReading();
   renderGrammar();
@@ -833,6 +853,8 @@ function renderDashboard() {
       </div>
     </header>
     <div class="pill-row"><span class="pill">${apiStatus}</span><span class="pill">REST-ready MVP</span></div>
+
+    ${integratedJourneySection()}
 
     <section class="learning-steps">
       <article>
@@ -921,6 +943,7 @@ function renderDashboard() {
       render();
     });
   });
+  bindJourneyActions();
 
   if (apiOnline) {
     Promise.all([
@@ -942,6 +965,246 @@ function renderDashboard() {
         apiOnline = false;
       });
   }
+}
+
+function renderJourney() {
+  document.getElementById("journeyView").innerHTML = `
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Perjalanan Belajar Saya</p>
+        <h2>Satu peta belajar untuk Reading, Grammar, Vocabulary, Writing, Listening, dan Scenario BA.</h2>
+        <p>Progress ini tersimpan di backend jika API aktif, jadi kamu tidak mulai dari nol saat membuka aplikasi lagi.</p>
+      </div>
+      <div class="top-actions">
+        <button id="refreshJourneyButton" class="secondary-button">Refresh Progress</button>
+        <button class="primary-button" data-journey-continue>Lanjutkan Belajar</button>
+      </div>
+    </header>
+    ${integratedJourneySection(true)}
+  `;
+  document.getElementById("refreshJourneyButton").addEventListener("click", async () => {
+    await refreshIntegratedJourney();
+    renderJourney();
+  });
+  bindJourneyActions();
+}
+
+function integratedJourneySection(expanded = false) {
+  const summary = state.integratedJourney || localJourneySummary();
+  const journey = summary.journey;
+  const skills = summary.skills || [];
+  const continueState = summary.continue_learning || {};
+  const reviewList = summary.review_list || {};
+  const dailyPlan = summary.daily_plan || [];
+  return `
+    <section class="journey-hub">
+      <div class="journey-hub-header">
+        <div>
+          <p class="eyebrow">Perjalanan Belajar Saya</p>
+          <h3>${journey.current_level} - skor keseluruhan ${Math.round(journey.overall_score || 0)}%</h3>
+          <p>${summary.mentor_message || "Progress Anda tersimpan. Hari ini cukup fokus ke satu langkah kecil dulu."}</p>
+        </div>
+        <button class="primary-button" data-journey-continue>Lanjutkan Belajar</button>
+      </div>
+      <div class="journey-overview-grid">
+        ${journeyMetric("Level", journey.current_level)}
+        ${journeyMetric("Overall", `${Math.round(journey.overall_score || 0)}%`)}
+        ${journeyMetric("Streak", `${journey.learning_streak || 0} hari`)}
+        ${journeyMetric("Latihan", journey.total_exercises || 0)}
+        ${journeyMetric("Terkuat", skillLabel(journey.strongest_skill))}
+        ${journeyMetric("Terlemah", skillLabel(journey.weakest_skill))}
+      </div>
+      <div class="content-grid">
+        <div class="panel">
+          <h3>Continue Learning</h3>
+          <p><strong>${skillLabel(continueState.recommended_module || journey.next_recommended_module)}</strong></p>
+          <p class="muted">${continueState.message || continueState.next_action || "Mulai dari modul yang paling lemah dulu."}</p>
+          <small>Aktivitas terakhir: ${formatDate(journey.last_activity_at) || "Belum ada aktivitas tersimpan"}</small>
+        </div>
+        <div class="panel">
+          <h3>Daily Study Plan</h3>
+          <div class="activity-list">
+            ${dailyPlan.map((item) => `<div class="activity-row"><strong>${skillLabel(item.skill_type)}</strong><span>${item.task}</span><small>${item.duration}</small></div>`).join("")}
+          </div>
+        </div>
+      </div>
+      <section class="skill-card-grid">
+        ${skills.map(skillJourneyCard).join("")}
+      </section>
+      ${expanded ? reviewListTemplate(reviewList) : ""}
+    </section>
+  `;
+}
+
+function journeyMetric(label, value) {
+  return `
+    <div class="metric compact-metric">
+      <span class="muted">${label}</span>
+      <strong class="metric-word">${escapeHtml(String(value ?? "-"))}</strong>
+    </div>
+  `;
+}
+
+function skillJourneyCard(skill) {
+  const score = Math.round(skill.average_score || 0);
+  return `
+    <article class="skill-journey-card">
+      <div>
+        <span class="pill">${skillLabel(skill.skill_type)}</span>
+        <strong>${skill.current_level}</strong>
+      </div>
+      <div class="progress-bar"><span style="width:${score}%"></span></div>
+      <div class="skill-card-meta">
+        <span>${score}%</span>
+        <span>${skill.completed_count || 0} latihan</span>
+        <span>${statusLabel(skill.status)}</span>
+      </div>
+      <p>${skill.next_action || "Lanjutkan satu latihan pendek hari ini."}</p>
+      <small>Terakhir: ${formatDate(skill.last_activity_at) || "Belum pernah"}</small>
+    </article>
+  `;
+}
+
+function reviewListTemplate(reviewList) {
+  const weakVocabulary = reviewList.weak_vocabulary || [];
+  const weakGrammar = reviewList.weak_grammar_topics || [];
+  const dueItems = reviewList.due_for_review || [];
+  return `
+    <section class="content-grid">
+      <div class="panel">
+        <h3>Review Vocabulary</h3>
+        ${weakVocabulary.length ? weakVocabulary.map((item) => `<p><strong>${escapeHtml(item.word)}</strong> - ${escapeHtml(item.meaning || "review meaning")} <small>${item.status}</small></p>`).join("") : `<p class="muted">Belum ada vocabulary lemah. Nanti akan muncul setelah drill.</p>`}
+      </div>
+      <div class="panel">
+        <h3>Review Grammar</h3>
+        ${weakGrammar.length ? weakGrammar.map((item) => `<p><strong>${escapeHtml(item.topic)}</strong> - mastery ${Math.round(item.mastery_score || 0)}%</p>`).join("") : `<p class="muted">Belum ada topik grammar yang perlu review.</p>`}
+      </div>
+      <div class="panel">
+        <h3>Due Review</h3>
+        ${dueItems.length ? dueItems.map((item) => `<p><strong>${escapeHtml(item.item)}</strong><br><small>${formatDate(item.next_review_at)}</small></p>`).join("") : `<p class="muted">Belum ada item yang jatuh tempo.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function bindJourneyActions() {
+  document.querySelectorAll("[data-journey-continue]").forEach((button) => {
+    if (button.dataset.boundJourney === "true") return;
+    button.dataset.boundJourney = "true";
+    button.addEventListener("click", () => {
+      const summary = state.integratedJourney || localJourneySummary();
+      const moduleName = summary.continue_learning?.recommended_module || summary.journey?.next_recommended_module || "grammar";
+      state.activeView = moduleToView(moduleName);
+      saveState();
+      render();
+    });
+  });
+}
+
+function moduleToView(skillType) {
+  return skillType === "scenario" ? "scenario" : skillType || "grammar";
+}
+
+function skillLabel(skillType) {
+  const labels = {
+    reading: "Reading",
+    grammar: "Grammar",
+    vocabulary: "Vocabulary",
+    writing: "Writing",
+    listening: "Listening",
+    scenario: "Scenario BA"
+  };
+  return labels[skillType] || skillType || "-";
+}
+
+function statusLabel(status) {
+  const labels = {
+    not_started: "Belum mulai",
+    on_track: "On track",
+    needs_practice: "Perlu latihan",
+    needs_review: "Perlu review"
+  };
+  return labels[status] || status || "Belum mulai";
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function localJourneySummary() {
+  const skillMap = {
+    reading: "Reading",
+    grammar: "Grammar",
+    vocabulary: "Vocabulary",
+    writing: "Writing",
+    listening: "Listening",
+    scenario: "Scenario"
+  };
+  const skills = Object.entries(skillMap).map(([skill_type, label]) => {
+    const average = state.progress[label] || 0;
+    return {
+      skill_type,
+      current_stage: "Foundation",
+      current_level: scoreLevel(average),
+      average_score: average,
+      completed_count: Math.max(0, state.activity.filter((item) => item.module === label).length),
+      last_activity_at: "",
+      next_action: localNextAction(skill_type),
+      status: average > 0 ? (average >= 70 ? "on_track" : "needs_review") : "not_started"
+    };
+  });
+  const scores = skills.map((skill) => skill.average_score);
+  const overall = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : 0;
+  const weakest = skills.reduce((lowest, skill) => (skill.average_score < lowest.average_score ? skill : lowest), skills[0]);
+  const strongest = skills.reduce((highest, skill) => (skill.average_score > highest.average_score ? skill : highest), skills[0]);
+  return {
+    journey: {
+      current_level: scoreLevel(overall),
+      overall_score: overall,
+      total_exercises: state.completedExercises || 0,
+      learning_streak: state.completedExercises ? 1 : 0,
+      weakest_skill: weakest?.skill_type || "grammar",
+      strongest_skill: strongest?.skill_type || "reading",
+      next_recommended_module: weakest?.skill_type || "grammar",
+      last_activity_at: ""
+    },
+    skills,
+    continue_learning: {
+      recommended_module: weakest?.skill_type || "grammar",
+      next_action: localNextAction(weakest?.skill_type || "grammar"),
+      message: `Lanjutkan ${skillLabel(weakest?.skill_type || "grammar")}: ${localNextAction(weakest?.skill_type || "grammar")}`
+    },
+    daily_plan: [
+      { skill_type: weakest?.skill_type || "grammar", task: localNextAction(weakest?.skill_type || "grammar"), duration: "10 menit" },
+      { skill_type: "vocabulary", task: "Review 10 kata yang sering salah.", duration: "10 menit" },
+      { skill_type: "listening", task: "Short dialogue level 1.", duration: "10 menit" }
+    ],
+    review_list: { weak_vocabulary: [], weak_grammar_topics: [], due_for_review: [] },
+    mentor_message: `Progress lokal tersimpan. Hari ini fokus ke ${skillLabel(weakest?.skill_type || "grammar")}.`
+  };
+}
+
+function scoreLevel(score) {
+  if (score < 40) return "Beginner 1";
+  if (score < 60) return "Beginner 2";
+  if (score < 75) return "Intermediate 1";
+  if (score < 90) return "Intermediate 2";
+  return "Advanced";
+}
+
+function localNextAction(skillType) {
+  const actions = {
+    reading: "Lanjutkan latihan mencari main idea dalam passage Business Analyst.",
+    grammar: "Latihan menemukan subject dan verb dalam kalimat panjang.",
+    vocabulary: "Ulangi 10 kata yang paling sering salah.",
+    writing: "Tulis paragraf pendek dengan struktur subject + verb yang jelas.",
+    listening: "Dengarkan short dialogue dan jawab pertanyaan detail.",
+    scenario: "Latihan menganalisis kebutuhan stakeholder dalam case BA."
+  };
+  return actions[skillType] || actions.grammar;
 }
 
 function metricTemplate(skill, score) {
@@ -1191,6 +1454,7 @@ function renderReading() {
         const response = await apiRequest("/reading/submit-answer", {
           method: "POST",
           body: {
+            user_id: state.user?.id || "default-user",
             lessonId: selectedLesson.id,
             answers: state.readingAnswers
           }
@@ -1205,6 +1469,7 @@ function renderReading() {
     state.completedExercises += 1;
     addActivity("Reading", selectedLesson.title, score);
     saveState();
+    await refreshIntegratedJourney();
     document.getElementById("readingResult").innerHTML = resultTemplate(
       score >= 70 ? "success" : "warning",
       `Skor Reading: ${score}`,
@@ -1213,6 +1478,7 @@ function renderReading() {
         : "Ulangi passage dan perhatikan kata kunci seperti analyst, stakeholder, dan outcome."
     ) + (details.length ? `<div class="lesson-list compact-list">${details.map((detail) => `<p class="muted">${detail.questionId}: ${detail.isCorrect ? "Correct" : "Review"} - ${detail.explanation}</p>`).join("")}</div>` : "");
     renderDashboard();
+    renderJourney();
   });
 }
 
@@ -1284,7 +1550,7 @@ function renderGrammar() {
       try {
         const response = await apiRequest("/grammar/breakdown", {
           method: "POST",
-          body: { sentence }
+          body: { sentence, user_id: state.user?.id || "default-user" }
         });
         analysisHtml = grammarApiTemplate(response.analysis);
       } catch (error) {
@@ -1292,7 +1558,9 @@ function renderGrammar() {
       }
     }
     document.getElementById("grammarResult").innerHTML = analysisHtml;
+    await refreshIntegratedJourney();
     renderDashboard();
+    renderJourney();
   });
 }
 
@@ -1414,6 +1682,7 @@ function renderVocabulary() {
           const response = await apiRequest("/vocabulary/submit-answer", {
             method: "POST",
             body: {
+              user_id: state.user?.id || "default-user",
               itemId: item.id,
               answer: button.dataset.answer
             }
@@ -1434,8 +1703,10 @@ function renderVocabulary() {
       state.completedExercises += 1;
       addActivity("Vocabulary", item.word, score);
       saveState();
+      await refreshIntegratedJourney();
       renderVocabulary();
       renderDashboard();
+      renderJourney();
     });
   });
 }
@@ -1660,7 +1931,7 @@ function renderWriting() {
       try {
         feedback = await apiRequest("/writing/evaluate", {
           method: "POST",
-          body: { text }
+          body: { text, user_id: state.user?.id || "default-user" }
         });
       } catch (error) {
         apiOnline = false;
@@ -1670,6 +1941,7 @@ function renderWriting() {
     state.completedExercises += 1;
     addActivity("Writing", "Requirement statement feedback", feedback.score);
     saveState();
+    await refreshIntegratedJourney();
     document.getElementById("writingResult").innerHTML = `
       <h3>Score: ${feedback.score}</h3>
       <p><strong>Main issue:</strong> ${feedback.issues.join(" ")}</p>
@@ -1677,6 +1949,7 @@ function renderWriting() {
       <p><strong>Next practice:</strong> ${feedback.recommendation}</p>
     `;
     renderDashboard();
+    renderJourney();
   });
 }
 
@@ -1725,7 +1998,7 @@ function renderListening() {
       try {
         result = await apiRequest("/listening/submit-answer", {
           method: "POST",
-          body: { answer }
+          body: { answer, user_id: state.user?.id || "default-user" }
         });
       } catch (error) {
         apiOnline = false;
@@ -1735,12 +2008,14 @@ function renderListening() {
     state.completedExercises += 1;
     addActivity("Listening", listeningScenario.title, result.score);
     saveState();
+    await refreshIntegratedJourney();
     document.getElementById("listeningResult").innerHTML = resultTemplate(
       result.isCorrect ? "success" : "warning",
       result.isCorrect ? "Jawaban sesuai" : "Perlu diperjelas",
       `${result.explanation} Jawaban ideal: ${result.idealAnswer}`
     );
     renderDashboard();
+    renderJourney();
   });
 }
 
@@ -1775,6 +2050,7 @@ function renderScenario() {
           const response = await apiRequest("/scenario/submit-answer", {
             method: "POST",
             body: {
+              user_id: state.user?.id || "default-user",
               questionId: scenario.id,
               selected
             }
@@ -1788,8 +2064,10 @@ function renderScenario() {
       state.completedExercises += 1;
       addActivity("Scenario", scenario.title, score);
       saveState();
+      await refreshIntegratedJourney();
       renderScenario();
       renderDashboard();
+      renderJourney();
     });
   });
 }

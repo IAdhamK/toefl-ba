@@ -80,3 +80,32 @@ Compatibility endpoint lama:
 - `POST /api/admin/content`
 - `PUT /api/admin/content/{content_id}`
 - `DELETE /api/admin/content/{content_id}`
+
+## Integrated Journey
+
+- `GET /api/journey/summary`
+- `GET /api/journey/skills`
+- `GET /api/journey/skills/{skill_type}`
+- `POST /api/journey/attempt`
+- `GET /api/journey/continue`
+- `GET /api/journey/recommendations`
+- `GET /api/journey/daily-plan`
+- `GET /api/journey/review-list`
+- `POST /api/journey/reset?dev=true`
+
+Valid `skill_type`: `reading`, `grammar`, `vocabulary`, `writing`, `listening`, `scenario`.
+
+Example attempt:
+
+```json
+{
+  "user_id": "default-user",
+  "skill_type": "reading",
+  "activity_id": "lesson-001",
+  "activity_type": "reading_quiz",
+  "score": 8,
+  "max_score": 10,
+  "mistakes": [],
+  "feedback": "Good progress."
+}
+```
