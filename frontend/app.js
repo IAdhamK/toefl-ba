@@ -843,97 +843,91 @@ function renderDashboard() {
   const recommendation = state.latestRecommendation?.recommendation || recommendationText();
   const analytics = state.latestAnalytics || localAnalytics();
   document.getElementById("dashboardView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Beranda Belajar</p>
-        <h2>Halo, ${escapeHtml(state.user.name)}. Hari ini cukup fokus ke ${weakest}.</h2>
-        <p>Ikuti langkah kecil: pahami arti umum, cari kata kerja utama, lalu jawab latihan. Kamu bisa membuka Bantuan ID kapan pun.</p>
-      </div>
-      <div class="top-actions">
-        <button class="primary-button" data-go="help">Saya butuh bantuan</button>
-        <button class="secondary-button" data-go="reading">Mulai Reading</button>
+    <header class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+      <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div class="max-w-3xl">
+          <div class="mb-3 flex flex-wrap items-center gap-2">
+            <span class="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-cyan-700">Beranda Belajar</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">${apiStatus}</span>
+            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Tailwind UI</span>
+          </div>
+          <h2 class="mb-3 text-2xl font-black leading-tight text-slate-900 lg:text-4xl">Halo, ${escapeHtml(state.user.name)}. Fokus hari ini: ${escapeHtml(weakest)}.</h2>
+          <p class="max-w-2xl text-sm leading-6 text-slate-600 lg:text-base">Ikuti alur kecil yang jelas: pahami arti umum, cari subject dan verb utama, lalu lanjutkan latihan dari rekomendasi journey.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button class="rounded-xl bg-cyan-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800" data-go="journey">Lihat Perjalanan</button>
+          <button class="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-700" data-go="reading">Mulai Reading</button>
+          <button class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50" data-go="help">Bantuan ID</button>
+        </div>
       </div>
     </header>
-    <div class="pill-row"><span class="pill">${apiStatus}</span><span class="pill">REST-ready MVP</span></div>
 
     ${integratedJourneySection()}
 
-    <section class="learning-steps">
-      <article>
-        <span>Langkah 1</span>
-        <strong>Pahami arti umum</strong>
-        <p>Jangan langsung panik dengan grammar. Cari dulu siapa melakukan apa.</p>
-      </article>
-      <article>
-        <span>Langkah 2</span>
-        <strong>Temukan subject dan verb</strong>
-        <p>Subject adalah pelaku. Verb adalah aksi utama dalam kalimat.</p>
-      </article>
-      <article>
-        <span>Langkah 3</span>
-        <strong>Kerjakan latihan kecil</strong>
-        <p>Skor bukan tujuan utama; yang penting tahu letak bingungnya.</p>
-      </article>
+    <section class="grid gap-4 md:grid-cols-3">
+      ${[
+        ["1", "Pahami arti umum", "Cari dulu siapa melakukan apa. Jangan langsung terjebak grammar panjang."],
+        ["2", "Temukan subject dan verb", "Subject adalah pelaku. Verb adalah aksi utama yang membawa makna."],
+        ["3", "Kerjakan latihan kecil", "Skor membantu arah belajar, bukan untuk membuat panik."]
+      ].map(([number, title, body]) => `
+        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <span class="mb-4 grid h-9 w-9 place-items-center rounded-full bg-cyan-700 text-sm font-black text-white">${number}</span>
+          <h3 class="mb-2 text-base font-extrabold text-slate-900">${title}</h3>
+          <p class="text-sm leading-6 text-slate-600">${body}</p>
+        </article>
+      `).join("")}
     </section>
 
-    <section class="metrics-grid">
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
       ${Object.entries(state.progress).map(([skill, score]) => metricTemplate(skill, score)).join("")}
     </section>
 
-    <section class="content-grid">
-      <div class="panel">
-        <h3>Learning Path</h3>
-        <div class="ba-map" aria-label="Business analyst learning path">
-          <div class="map-node">Stakeholder Need</div>
-          <div class="map-node">Requirement Clarity</div>
-          <div class="map-node">Strategy Alignment</div>
+    <section class="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 class="text-lg font-extrabold text-slate-900">Learning Path</h3>
+            <p class="text-sm text-slate-500">Alur Business Analyst yang sedang dilatih.</p>
+          </div>
+          <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">BA Context</span>
+        </div>
+        <div class="grid gap-3 md:grid-cols-3">
+          ${["Stakeholder Need", "Requirement Clarity", "Strategy Alignment"].map((item, index) => `
+            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <span class="mb-3 block text-xs font-bold text-cyan-700">Step ${index + 1}</span>
+              <strong class="block text-sm text-slate-900">${item}</strong>
+            </div>
+          `).join("")}
         </div>
       </div>
-      <div class="panel">
-        <h3>Rekomendasi AI Tutor</h3>
-        <p class="muted">${recommendation}</p>
-        ${state.latestRecommendation?.target ? `<p><strong>Target:</strong> ${state.latestRecommendation.target}</p>` : ""}
-        <div class="progress-bar"><span style="width:${overallProgress()}%"></span></div>
-        <p class="muted">Total latihan selesai: ${state.completedExercises}</p>
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h3 class="mb-2 text-lg font-extrabold text-slate-900">Rekomendasi AI Tutor</h3>
+        <p class="mb-4 text-sm leading-6 text-slate-600">${recommendation}</p>
+        ${state.latestRecommendation?.target ? `<p class="mb-4 text-sm"><strong>Target:</strong> ${state.latestRecommendation.target}</p>` : ""}
+        <div class="mb-2 h-2 overflow-hidden rounded-full bg-slate-100"><span class="block h-full rounded-full bg-cyan-700" style="width:${overallProgress()}%"></span></div>
+        <p class="text-xs font-semibold text-slate-500">Total latihan selesai: ${state.completedExercises}</p>
       </div>
     </section>
 
-    <section class="metrics-grid">
-      <div class="metric">
-        <span class="muted">Average</span>
-        <strong>${analytics.averageScore}</strong>
-        <div class="progress-bar"><span style="width:${analytics.averageScore}%"></span></div>
-      </div>
-      <div class="metric">
-        <span class="muted">Weakest</span>
-        <strong class="metric-word">${analytics.weakestSkill}</strong>
-        <small>${analytics.status}</small>
-      </div>
-      <div class="metric">
-        <span class="muted">Strongest</span>
-        <strong class="metric-word">${analytics.strongestSkill}</strong>
-        <small>Skill paling stabil saat ini.</small>
-      </div>
-      <div class="metric">
-        <span class="muted">Exercises</span>
-        <strong>${analytics.completedExercises}</strong>
-        <small>Total latihan selesai.</small>
-      </div>
-      <div class="metric">
-        <span class="muted">Activity</span>
-        <strong>${analytics.activityCount}</strong>
-        <small>Log aktivitas tersimpan.</small>
-      </div>
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      ${dashboardAnalyticsCard("Average", analytics.averageScore, `${analytics.averageScore}%`, analytics.status)}
+      ${dashboardAnalyticsCard("Weakest", analytics.weakestSkill, analytics.weakestSkill, "Skill prioritas hari ini.")}
+      ${dashboardAnalyticsCard("Strongest", analytics.strongestSkill, analytics.strongestSkill, "Skill paling stabil.")}
+      ${dashboardAnalyticsCard("Exercises", analytics.completedExercises, analytics.completedExercises, "Total latihan selesai.")}
+      ${dashboardAnalyticsCard("Activity", analytics.activityCount, analytics.activityCount, "Log aktivitas tersimpan.")}
     </section>
 
-    <section class="panel">
-      <h3>Recent Activity</h3>
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <h3 class="text-lg font-extrabold text-slate-900">Recent Activity</h3>
+        <span class="text-xs font-bold text-slate-500">${recentActivity.length} aktivitas</span>
+      </div>
       ${
         recentActivity.length
-          ? `<div class="activity-list">${recentActivity
-              .map((item) => `<div class="activity-row"><strong>${item.module}</strong><span>${item.summary}</span><small>${item.score}</small></div>`)
+          ? `<div class="grid gap-2">${recentActivity
+              .map((item) => `<div class="grid gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-[140px_1fr_90px] md:items-center"><strong class="text-sm text-slate-900">${item.module}</strong><span class="min-w-0 truncate text-sm text-slate-600">${item.summary}</span><small class="text-sm font-bold text-cyan-700 md:text-right">${item.score}</small></div>`)
               .join("")}</div>`
-          : `<p class="muted">Belum ada aktivitas. Mulai satu latihan untuk mengisi progress.</p>`
+          : `<p class="text-sm text-slate-500">Belum ada aktivitas. Mulai satu latihan untuk mengisi progress.</p>`
       }
     </section>
   `;
@@ -973,15 +967,17 @@ function renderJourney() {
   const summary = state.integratedJourney || localJourneySummary();
   const adaptive = state.adaptivePractice || summary.adaptive_practice || localAdaptivePractice(summary);
   document.getElementById("journeyView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Perjalanan Belajar Saya</p>
-        <h2>Satu peta belajar untuk Reading, Grammar, Vocabulary, Writing, Listening, dan Scenario BA.</h2>
-        <p>Progress ini tersimpan di backend jika API aktif, jadi kamu tidak mulai dari nol saat membuka aplikasi lagi.</p>
-      </div>
-      <div class="top-actions">
-        <button id="refreshJourneyButton" class="secondary-button">Refresh Progress</button>
-        <button class="primary-button" data-journey-continue>Lanjutkan Belajar</button>
+    <header class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+      <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+        <div class="max-w-4xl">
+          <span class="mb-3 inline-flex rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-cyan-700">Perjalanan Belajar Saya</span>
+          <h2 class="mb-3 text-2xl font-black leading-tight text-slate-900 lg:text-4xl">Satu peta belajar untuk semua skill TOEFL + Business Analyst.</h2>
+          <p class="max-w-3xl text-sm leading-6 text-slate-600 lg:text-base">Progress tersimpan di backend jika API aktif. Kamu bisa lanjut dari aktivitas terakhir, melihat skill lemah, dan mengambil latihan adaptif tanpa mulai dari nol.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button id="refreshJourneyButton" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Refresh Progress</button>
+          <button class="rounded-xl bg-cyan-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800" data-journey-continue>Lanjutkan Belajar</button>
+        </div>
       </div>
     </header>
     ${integratedJourneySection(true)}
@@ -1004,16 +1000,16 @@ function integratedJourneySection(expanded = false) {
   const dailyPlan = summary.daily_plan || [];
   const adaptive = state.adaptivePractice || summary.adaptive_practice || localAdaptivePractice(summary);
   return `
-    <section class="journey-hub">
-      <div class="journey-hub-header">
-        <div>
-          <p class="eyebrow">Perjalanan Belajar Saya</p>
-          <h3>${journey.current_level} - skor keseluruhan ${Math.round(journey.overall_score || 0)}%</h3>
-          <p>${summary.mentor_message || "Progress Anda tersimpan. Hari ini cukup fokus ke satu langkah kecil dulu."}</p>
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+      <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div class="max-w-3xl">
+          <span class="mb-3 inline-flex rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-cyan-700">Perjalanan Belajar Saya</span>
+          <h3 class="mb-2 text-xl font-black text-slate-900 lg:text-2xl">${journey.current_level} - skor keseluruhan ${Math.round(journey.overall_score || 0)}%</h3>
+          <p class="text-sm leading-6 text-slate-600">${summary.mentor_message || "Progress Anda tersimpan. Hari ini cukup fokus ke satu langkah kecil dulu."}</p>
         </div>
-        <button class="primary-button" data-journey-continue>Lanjutkan Belajar</button>
+        <button class="rounded-xl bg-cyan-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800" data-journey-continue>Lanjutkan Belajar</button>
       </div>
-      <div class="journey-overview-grid">
+      <div class="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
         ${journeyMetric("Level", journey.current_level)}
         ${journeyMetric("Overall", `${Math.round(journey.overall_score || 0)}%`)}
         ${journeyMetric("Streak", `${journey.learning_streak || 0} hari`)}
@@ -1021,27 +1017,27 @@ function integratedJourneySection(expanded = false) {
         ${journeyMetric("Terkuat", skillLabel(journey.strongest_skill))}
         ${journeyMetric("Terlemah", skillLabel(journey.weakest_skill))}
       </div>
-      <div class="content-grid">
-        <div class="panel">
-          <h3>Continue Learning</h3>
-          <p><strong>${skillLabel(continueState.recommended_module || journey.next_recommended_module)}</strong></p>
-          <p class="muted">${continueState.message || continueState.next_action || "Mulai dari modul yang paling lemah dulu."}</p>
-          <small>Aktivitas terakhir: ${formatDate(journey.last_activity_at) || "Belum ada aktivitas tersimpan"}</small>
+      <div class="mb-5 grid gap-4 xl:grid-cols-3">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <h3 class="mb-2 text-base font-extrabold text-slate-900">Continue Learning</h3>
+          <p class="mb-2 text-lg font-black text-cyan-700">${skillLabel(continueState.recommended_module || journey.next_recommended_module)}</p>
+          <p class="mb-3 text-sm leading-6 text-slate-600">${continueState.message || continueState.next_action || "Mulai dari modul yang paling lemah dulu."}</p>
+          <small class="text-xs font-semibold text-slate-500">Aktivitas terakhir: ${formatDate(journey.last_activity_at) || "Belum ada aktivitas tersimpan"}</small>
         </div>
-        <div class="panel adaptive-mini">
-          <h3>Latihan Adaptif Hari Ini</h3>
-          <p><strong>${escapeHtml(adaptive.title)}</strong></p>
-          <p class="muted">${escapeHtml(adaptive.reason)}</p>
-          <button class="secondary-button" data-open-journey>Detail latihan</button>
+        <div class="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
+          <h3 class="mb-2 text-base font-extrabold text-slate-900">Latihan Adaptif Hari Ini</h3>
+          <p class="mb-2 font-black text-slate-900">${escapeHtml(adaptive.title)}</p>
+          <p class="mb-4 text-sm leading-6 text-slate-600">${escapeHtml(adaptive.reason)}</p>
+          <button class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700" data-open-journey>Detail latihan</button>
         </div>
-        <div class="panel">
-          <h3>Daily Study Plan</h3>
-          <div class="activity-list">
-            ${dailyPlan.map((item) => `<div class="activity-row"><strong>${skillLabel(item.skill_type)}</strong><span>${item.task}</span><small>${item.duration}</small></div>`).join("")}
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <h3 class="mb-3 text-base font-extrabold text-slate-900">Daily Study Plan</h3>
+          <div class="grid gap-2">
+            ${dailyPlan.map((item) => `<div class="rounded-xl bg-white p-3"><div class="flex items-center justify-between gap-3"><strong class="text-sm text-slate-900">${skillLabel(item.skill_type)}</strong><small class="font-bold text-cyan-700">${item.duration}</small></div><p class="mt-1 text-sm leading-5 text-slate-600">${item.task}</p></div>`).join("")}
           </div>
         </div>
       </div>
-      <section class="skill-card-grid">
+      <section class="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
         ${skills.map(skillJourneyCard).join("")}
       </section>
       ${expanded ? reviewListTemplate(reviewList) : ""}
@@ -1051,41 +1047,41 @@ function integratedJourneySection(expanded = false) {
 
 function adaptivePracticeSection(adaptive) {
   return `
-    <section class="adaptive-practice-panel">
-      <div class="journey-hub-header">
+    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
+      <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p class="eyebrow">AI Mentor Adaptif</p>
-          <h3>${escapeHtml(adaptive.title)}</h3>
-          <p>${escapeHtml(adaptive.mentor_message)}</p>
+          <span class="mb-3 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700">AI Mentor Adaptif</span>
+          <h3 class="mb-2 text-xl font-black text-slate-900 lg:text-2xl">${escapeHtml(adaptive.title)}</h3>
+          <p class="max-w-3xl text-sm leading-6 text-slate-600">${escapeHtml(adaptive.mentor_message)}</p>
         </div>
-        <div class="adaptive-score-actions">
-          <button class="secondary-button" data-adaptive-refresh>Ambil Latihan Baru</button>
-          <button class="primary-button" data-adaptive-complete>Saya Selesai</button>
+        <div class="flex flex-wrap gap-3">
+          <button class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50" data-adaptive-refresh>Ambil Latihan Baru</button>
+          <button class="rounded-xl bg-cyan-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800" data-adaptive-complete>Saya Selesai</button>
         </div>
       </div>
-      <div class="adaptive-prompt">
-        <strong>Prompt latihan</strong>
-        <p>${escapeHtml(adaptive.practice_prompt)}</p>
+      <div class="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <strong class="mb-2 block text-sm text-slate-900">Prompt latihan</strong>
+        <p class="text-sm leading-6 text-slate-700">${escapeHtml(adaptive.practice_prompt)}</p>
       </div>
-      <div class="adaptive-task-grid">
+      <div class="mb-5 grid gap-4 md:grid-cols-3">
         ${(adaptive.tasks || []).map((task, index) => `
-          <article>
-            <span class="pill">Step ${index + 1}</span>
-            <strong>${escapeHtml(task.title)}</strong>
-            <p>${escapeHtml(task.instruction)}</p>
+          <article class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <span class="mb-3 inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-cyan-700">Step ${index + 1}</span>
+            <strong class="mb-2 block text-base text-slate-900">${escapeHtml(task.title)}</strong>
+            <p class="text-sm leading-6 text-slate-600">${escapeHtml(task.instruction)}</p>
           </article>
         `).join("")}
       </div>
-      <div class="content-grid">
-        <div class="panel no-shadow">
-          <h3>Kenapa ini dipilih?</h3>
-          <p class="muted">${escapeHtml(adaptive.reason)}</p>
+      <div class="grid gap-4 xl:grid-cols-2">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <h3 class="mb-2 text-base font-extrabold text-slate-900">Kenapa ini dipilih?</h3>
+          <p class="text-sm leading-6 text-slate-600">${escapeHtml(adaptive.reason)}</p>
         </div>
-        <div class="panel no-shadow">
-          <h3>Recent Attempts</h3>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <h3 class="mb-3 text-base font-extrabold text-slate-900">Recent Attempts</h3>
           ${adaptive.recent_attempts?.length
-            ? adaptive.recent_attempts.map((item) => `<p><strong>${skillLabel(item.skill_type)}</strong> - ${Math.round(item.accuracy || 0)}% <small>${formatDate(item.created_at)}</small></p>`).join("")
-            : `<p class="muted">Belum ada attempt untuk skill ini. Latihan pertama akan mulai membentuk rekomendasi.</p>`}
+            ? `<div class="grid gap-2">${adaptive.recent_attempts.map((item) => `<p class="rounded-xl bg-white p-3 text-sm text-slate-600"><strong class="text-slate-900">${skillLabel(item.skill_type)}</strong> - ${Math.round(item.accuracy || 0)}% <small class="ml-2 text-slate-500">${formatDate(item.created_at)}</small></p>`).join("")}</div>`
+            : `<p class="text-sm leading-6 text-slate-500">Belum ada attempt untuk skill ini. Latihan pertama akan mulai membentuk rekomendasi.</p>`}
         </div>
       </div>
     </section>
@@ -1094,9 +1090,9 @@ function adaptivePracticeSection(adaptive) {
 
 function journeyMetric(label, value) {
   return `
-    <div class="metric compact-metric">
-      <span class="muted">${label}</span>
-      <strong class="metric-word">${escapeHtml(String(value ?? "-"))}</strong>
+    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <span class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">${label}</span>
+      <strong class="block break-words text-lg font-black text-slate-900">${escapeHtml(String(value ?? "-"))}</strong>
     </div>
   `;
 }
@@ -1104,19 +1100,19 @@ function journeyMetric(label, value) {
 function skillJourneyCard(skill) {
   const score = Math.round(skill.average_score || 0);
   return `
-    <article class="skill-journey-card">
-      <div>
-        <span class="pill">${skillLabel(skill.skill_type)}</span>
-        <strong>${skill.current_level}</strong>
+    <article class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <span class="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700">${skillLabel(skill.skill_type)}</span>
+        <strong class="text-sm text-slate-900">${skill.current_level}</strong>
       </div>
-      <div class="progress-bar"><span style="width:${score}%"></span></div>
-      <div class="skill-card-meta">
+      <div class="mb-3 h-2 overflow-hidden rounded-full bg-slate-100"><span class="block h-full rounded-full bg-cyan-700" style="width:${score}%"></span></div>
+      <div class="mb-3 flex flex-wrap items-center gap-3 text-xs font-bold text-slate-500">
         <span>${score}%</span>
         <span>${skill.completed_count || 0} latihan</span>
         <span>${statusLabel(skill.status)}</span>
       </div>
-      <p>${skill.next_action || "Lanjutkan satu latihan pendek hari ini."}</p>
-      <small>Terakhir: ${formatDate(skill.last_activity_at) || "Belum pernah"}</small>
+      <p class="mb-3 text-sm leading-6 text-slate-600">${skill.next_action || "Lanjutkan satu latihan pendek hari ini."}</p>
+      <small class="text-xs font-semibold text-slate-500">Terakhir: ${formatDate(skill.last_activity_at) || "Belum pernah"}</small>
     </article>
   `;
 }
@@ -1126,18 +1122,18 @@ function reviewListTemplate(reviewList) {
   const weakGrammar = reviewList.weak_grammar_topics || [];
   const dueItems = reviewList.due_for_review || [];
   return `
-    <section class="content-grid">
-      <div class="panel">
-        <h3>Review Vocabulary</h3>
-        ${weakVocabulary.length ? weakVocabulary.map((item) => `<p><strong>${escapeHtml(item.word)}</strong> - ${escapeHtml(item.meaning || "review meaning")} <small>${item.status}</small></p>`).join("") : `<p class="muted">Belum ada vocabulary lemah. Nanti akan muncul setelah drill.</p>`}
+    <section class="mt-5 grid gap-4 xl:grid-cols-3">
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <h3 class="mb-3 text-base font-extrabold text-slate-900">Review Vocabulary</h3>
+        ${weakVocabulary.length ? weakVocabulary.map((item) => `<p class="rounded-xl bg-white p-3 text-sm text-slate-600"><strong class="text-slate-900">${escapeHtml(item.word)}</strong> - ${escapeHtml(item.meaning || "review meaning")} <small class="ml-2 font-bold text-cyan-700">${item.status}</small></p>`).join("") : `<p class="text-sm leading-6 text-slate-500">Belum ada vocabulary lemah. Nanti akan muncul setelah drill.</p>`}
       </div>
-      <div class="panel">
-        <h3>Review Grammar</h3>
-        ${weakGrammar.length ? weakGrammar.map((item) => `<p><strong>${escapeHtml(item.topic)}</strong> - mastery ${Math.round(item.mastery_score || 0)}%</p>`).join("") : `<p class="muted">Belum ada topik grammar yang perlu review.</p>`}
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <h3 class="mb-3 text-base font-extrabold text-slate-900">Review Grammar</h3>
+        ${weakGrammar.length ? weakGrammar.map((item) => `<p class="rounded-xl bg-white p-3 text-sm text-slate-600"><strong class="text-slate-900">${escapeHtml(item.topic)}</strong> - mastery ${Math.round(item.mastery_score || 0)}%</p>`).join("") : `<p class="text-sm leading-6 text-slate-500">Belum ada topik grammar yang perlu review.</p>`}
       </div>
-      <div class="panel">
-        <h3>Due Review</h3>
-        ${dueItems.length ? dueItems.map((item) => `<p><strong>${escapeHtml(item.item)}</strong><br><small>${formatDate(item.next_review_at)}</small></p>`).join("") : `<p class="muted">Belum ada item yang jatuh tempo.</p>`}
+      <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <h3 class="mb-3 text-base font-extrabold text-slate-900">Due Review</h3>
+        ${dueItems.length ? dueItems.map((item) => `<p class="rounded-xl bg-white p-3 text-sm text-slate-600"><strong class="text-slate-900">${escapeHtml(item.item)}</strong><br><small class="text-slate-500">${formatDate(item.next_review_at)}</small></p>`).join("") : `<p class="text-sm leading-6 text-slate-500">Belum ada item yang jatuh tempo.</p>`}
       </div>
     </section>
   `;
@@ -1363,10 +1359,26 @@ function localNextAction(skillType) {
 
 function metricTemplate(skill, score) {
   return `
-    <div class="metric">
-      <span class="muted">${skill}</span>
-      <strong>${score}</strong>
-      <div class="progress-bar"><span style="width:${score}%"></span></div>
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <span class="text-xs font-bold uppercase tracking-wide text-slate-500">${skill}</span>
+        <strong class="text-lg font-black text-slate-900">${score}%</strong>
+      </div>
+      <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+        <span class="block h-full rounded-full bg-cyan-700" style="width:${score}%"></span>
+      </div>
+    </div>
+  `;
+}
+
+function dashboardAnalyticsCard(label, rawValue, displayValue, note) {
+  const numeric = typeof rawValue === "number" ? rawValue : null;
+  return `
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <span class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">${label}</span>
+      <strong class="block break-words text-2xl font-black text-slate-900">${escapeHtml(String(displayValue ?? "-"))}</strong>
+      ${numeric !== null ? `<div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><span class="block h-full rounded-full bg-cyan-700" style="width:${Math.min(Math.max(numeric, 0), 100)}%"></span></div>` : ""}
+      <small class="mt-3 block text-xs leading-5 text-slate-500">${escapeHtml(String(note || ""))}</small>
     </div>
   `;
 }
