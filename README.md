@@ -123,7 +123,9 @@ POST /api/journey/adaptive-practice/complete
 
 ## Bantuan ID Kontekstual
 
-Bantuan ID sekarang muncul langsung di dekat konten Inggris yang sedang dipelajari, bukan hanya sebagai halaman/sidebar terpisah. Tombol kecil `Bantuan ID` tersedia di Reading passage, pertanyaan, opsi jawaban, kalimat Grammar, kartu Vocabulary, pesan AI Tutor, prompt Writing, transcript Listening, dan Scenario BA.
+Bantuan ID sekarang muncul langsung di dekat konten Inggris yang sedang dipelajari, bukan hanya sebagai halaman/sidebar terpisah. Tombol kecil `Bantuan ID` tersedia di Reading passage, pertanyaan, opsi jawaban, kalimat Grammar, kartu Vocabulary, pesan AI Tutor, prompt Writing, transcript Listening, dan Scenario BA. Hasil penjelasannya tampil sebagai panel melayang yang bisa digeser dan ditutup, sehingga tidak mendorong atau merusak layout modul.
+
+Untuk vocabulary, Bantuan ID membedakan `arti singkat satu kata`, `arti umum`, dan `arti dalam contoh kalimat`. Ini membantu pemula melihat bahwa satu kata bahasa Inggris bisa berubah rasa maknanya tergantung konteks TOEFL atau Business Analyst.
 
 Endpoint utama:
 

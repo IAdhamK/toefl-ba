@@ -119,10 +119,17 @@ class AIService:
 
         if module == "vocabulary" or context_type.startswith("vocabulary"):
             first_word = text.split()[0].strip(".,:;!?\"'") if text else "word"
-            vocab_info = words[0] if words else {"word": first_word, "meaning_id": "makna perlu dilihat dari konteks"}
+            vocab_info = words[0] if words else {
+                "word": first_word,
+                "meaning_id": "makna perlu dilihat dari konteks",
+                "one_word_meaning_id": "konteks",
+                "contextual_meaning_id": "arti kata ini berubah sesuai contoh kalimat",
+            }
             base.update(
                 {
                     "word_meaning_id": vocab_info["meaning_id"],
+                    "word_one_word_meaning_id": vocab_info.get("one_word_meaning_id", self._one_word_meaning(first_word)),
+                    "word_contextual_meaning_id": vocab_info.get("contextual_meaning_id", self._contextual_word_meaning(first_word, text)),
                     "word_class": self._guess_word_class(first_word),
                     "pronunciation_hint": f"Baca pelan: {first_word.lower()}",
                     "memory_tip": f"Ingat {first_word} lewat contoh kerja Business Analyst, bukan hanya hafalan kamus.",
@@ -191,15 +198,86 @@ class AIService:
         seen = set()
         for token in tokens:
             if token in glossary and token not in seen:
-                found.append({"word": token, "meaning_id": glossary[token]})
+                found.append(
+                    {
+                        "word": token,
+                        "meaning_id": glossary[token],
+                        "one_word_meaning_id": self._one_word_meaning(token),
+                        "contextual_meaning_id": self._contextual_word_meaning(token, text),
+                    }
+                )
                 seen.add(token)
         if not found and text:
             candidate = tokens[0] if tokens else text[:24]
-            found.append({"word": candidate, "meaning_id": "makna perlu dipahami dari konteks kalimat"})
+            found.append(
+                {
+                    "word": candidate,
+                    "meaning_id": "makna perlu dipahami dari konteks kalimat",
+                    "one_word_meaning_id": self._one_word_meaning(candidate),
+                    "contextual_meaning_id": self._contextual_word_meaning(candidate, text),
+                }
+            )
         return found[:6]
+
+    def _one_word_meaning(self, word: str) -> str:
+        one_word_map = {
+            "elicit": "menggali",
+            "elicits": "menggali",
+            "requirement": "kebutuhan",
+            "requirements": "kebutuhan",
+            "stakeholder": "pemangku-kepentingan",
+            "stakeholders": "pemangku-kepentingan",
+            "align": "menyelaraskan",
+            "alignment": "keselarasan",
+            "strategy": "strategi",
+            "maintain": "menjaga",
+            "approval": "persetujuan",
+            "workflow": "alur",
+            "delay": "tertunda",
+            "delays": "keterlambatan",
+            "analyst": "analis",
+            "clarify": "memperjelas",
+            "validate": "memvalidasi",
+            "prioritize": "memprioritaskan",
+            "assess": "menilai",
+            "purpose": "tujuan",
+            "conversation": "percakapan",
+        }
+        return one_word_map.get((word or "").lower(), "konteks")
+
+    def _contextual_word_meaning(self, word: str, text: str) -> str:
+        lowered_word = (word or "").lower()
+        lowered_text = (text or "").lower()
+        if lowered_word in {"elicit", "elicits"} and "requirements" in lowered_text:
+            return "Dalam kalimat ini, elicit berarti menggali requirement dari stakeholder lewat pertanyaan atau diskusi."
+        if lowered_word in {"requirement", "requirements"}:
+            return "Dalam konteks BA, requirement berarti kebutuhan bisnis atau sistem yang harus dipahami dan didokumentasikan."
+        if lowered_word in {"stakeholder", "stakeholders"}:
+            return "Dalam konteks BA, stakeholder adalah pihak yang memberi kebutuhan, terkena dampak, atau mengambil keputusan."
+        if lowered_word in {"maintain"}:
+            return "Dalam contoh kalimat tertentu, maintain bisa berarti menjaga proses, sistem, atau kualitas agar tetap berjalan baik."
+        if lowered_word in {"approval"}:
+            return "Dalam konteks workflow, approval berarti tahap persetujuan sebelum proses bisa lanjut."
+        if lowered_word in {"workflow"}:
+            return "Dalam konteks bisnis, workflow berarti rangkaian langkah kerja dari awal sampai selesai."
+        if lowered_word in {"delay", "delays"}:
+            return "Dalam kalimat ini, delay/delays menunjukkan proses menjadi lambat atau terlambat."
+        if lowered_word in {"purpose"} and "conversation" in lowered_text:
+            return "Dalam pertanyaan listening, purpose berarti tujuan utama percakapan."
+        return "Dalam contoh kalimat ini, arti kata perlu disesuaikan dengan topik, subject, verb, dan tujuan kalimat."
 
     def _simple_structure(self, text: str) -> dict[str, str]:
         lowered = text.lower()
+        if self._is_question_text(text):
+            return self._question_structure(text)
+        if self._is_short_option(text):
+            return {
+                "sentence_structure": "Pilihan jawaban pendek. Fokus pada arti pilihan ini, bukan bedah grammar panjang.",
+                "subject": "",
+                "verb": "",
+                "object_or_complement": "",
+                "grammar_pattern": "Answer option / phrase",
+            }
         if "business analyst" in lowered:
             subject = "A business analyst / the analyst"
         elif "stakeholder" in lowered:
@@ -239,6 +317,9 @@ class AIService:
         return "belum jelas dari teks pendek ini"
 
     def _simple_meaning(self, text: str, module: str, context_type: str) -> str:
+        direct_meaning = self._direct_indonesian_meaning(text)
+        if direct_meaning:
+            return direct_meaning
         lowered = text.lower()
         if "business analyst" in lowered and "requirements" in lowered:
             return "Seorang Business Analyst menggali kebutuhan dan menghubungkannya dengan tujuan bisnis atau stakeholder."
@@ -248,7 +329,7 @@ class AIService:
             return "Pertanyaan ini menanyakan tujuan utama percakapan."
         if module == "vocabulary":
             return f"Kata atau frasa '{text}' perlu dipahami dari konteks kalimat, bukan diterjemahkan satu per satu."
-        return "Teks ini berisi informasi bahasa Inggris yang perlu dipahami melalui makna umum, struktur kalimat, dan kata kunci."
+        return self._basic_contextual_translation(text)
 
     def _beginner_context(self, text: str, module: str, context_type: str) -> str:
         module_notes = {
@@ -264,9 +345,9 @@ class AIService:
 
     def _context_tip(self, module: str, context_type: str) -> str:
         if context_type.endswith("_option"):
-            return "Bandingkan pilihan ini dengan pertanyaan. Jangan pilih hanya karena ada kata yang sama."
+            return "Pahami arti pilihan ini dulu, lalu cocokkan dengan pertanyaan. Jangan pilih hanya karena ada kata yang sama."
         if context_type.endswith("_question"):
-            return "Cari dulu apa yang diminta pertanyaan: main idea, detail, vocabulary, atau inference."
+            return "Cari kata tanya seperti what atau which. Itu menunjukkan hal apa yang harus dijawab."
         return {
             "reading": "Baca kalimat pertama dan terakhir untuk menemukan arah ide.",
             "grammar": "Tandai subject dan verb utama sebelum menerjemahkan seluruh kalimat.",
@@ -275,6 +356,88 @@ class AIService:
             "listening": "Dengarkan kata yang berulang karena biasanya itu inti masalah.",
             "scenario": "Dalam BA, langkah aman biasanya klarifikasi dulu sebelum solusi.",
         }.get(module, "Pahami konteks sebelum menerjemahkan kata per kata.")
+
+    def _is_question_text(self, text: str) -> bool:
+        lowered = (text or "").strip().lower()
+        return lowered.endswith("?") or lowered.startswith(("what ", "which ", "why ", "how ", "when ", "where ", "who ", "can "))
+
+    def _is_short_option(self, text: str) -> bool:
+        words = (text or "").split()
+        return 0 < len(words) <= 10
+
+    def _question_structure(self, text: str) -> dict[str, str]:
+        lowered = text.lower()
+        if "business outcome" in lowered and "solution" in lowered:
+            return {
+                "sentence_structure": "What + business outcome + should + subject + verb",
+                "subject": "this solution",
+                "verb": "should improve",
+                "object_or_complement": "business outcome",
+                "grammar_pattern": "Question asking expected business result",
+            }
+        if "ba action" in lowered and "alignment" in lowered:
+            return {
+                "sentence_structure": "Which + noun phrase + best supports + object",
+                "subject": "BA action",
+                "verb": "supports",
+                "object_or_complement": "alignment",
+                "grammar_pattern": "Question asking best action",
+            }
+        if "main purpose" in lowered and "conversation" in lowered:
+            return {
+                "sentence_structure": "What + is + subject/complement",
+                "subject": "main purpose of the conversation",
+                "verb": "is",
+                "object_or_complement": "the answer should explain the purpose",
+                "grammar_pattern": "Question asking purpose",
+            }
+        return {
+            "sentence_structure": "Kalimat ini adalah pertanyaan. Fokus pada apa yang diminta, bukan hanya subject/verb.",
+            "subject": "",
+            "verb": "",
+            "object_or_complement": "",
+            "grammar_pattern": "Question",
+        }
+
+    def _direct_indonesian_meaning(self, text: str) -> str:
+        key = re.sub(r"\s+", " ", (text or "").strip().lower().strip(".?"))
+        meanings = {
+            "what business outcome should this solution improve": "Pertanyaan ini berarti: hasil bisnis apa yang harus diperbaiki oleh solusi ini?",
+            "which ba action best supports alignment": "Pertanyaan ini berarti: tindakan Business Analyst mana yang paling membantu menyelaraskan tujuan atau kebutuhan stakeholder?",
+            "what is the best first question": "Pertanyaan ini berarti: pertanyaan pertama apa yang paling tepat untuk diajukan?",
+            "what is the main purpose of the conversation": "Pertanyaan ini berarti: apa tujuan utama dari percakapan tersebut?",
+            "ask the developer to build the feature immediately": "Pilihan ini berarti: langsung meminta developer membuat fitur saat itu juga.",
+            "clarify what flexible means through elicitation": "Pilihan ini berarti: memperjelas arti kata flexible dengan menggali kebutuhan dari stakeholder.",
+            "ignore the stakeholder because the statement is vague": "Pilihan ini berarti: mengabaikan stakeholder karena pernyataannya masih tidak jelas.",
+            "write the requirement exactly as spoken": "Pilihan ini berarti: menulis requirement persis seperti ucapan stakeholder tanpa memperjelasnya.",
+            "which color should the mobile app use": "Pilihan ini berarti: menanyakan warna apa yang harus dipakai aplikasi mobile.",
+            "which developer is available this week": "Pilihan ini berarti: menanyakan developer mana yang tersedia minggu ini.",
+            "can we skip user research": "Pilihan ini berarti: menanyakan apakah riset user bisa dilewati.",
+            "the stakeholder reports that the current approval workflow causes delays": "Kalimat ini berarti: stakeholder melaporkan bahwa alur persetujuan saat ini menyebabkan keterlambatan.",
+            "the finance team wants strict approval controls, while sales wants a faster checkout process": "Kalimat ini berarti: tim finance ingin kontrol approval yang ketat, sedangkan tim sales ingin proses checkout yang lebih cepat.",
+            "a manager says, \"we need a mobile app,\" but cannot explain the business problem": "Kalimat ini berarti: seorang manager meminta mobile app, tetapi belum bisa menjelaskan masalah bisnis yang ingin diselesaikan.",
+        }
+        return meanings.get(key, "")
+
+    def _basic_contextual_translation(self, text: str) -> str:
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return "Teks kosong, belum ada yang bisa dijelaskan."
+        replacements = {
+            "business outcome": "hasil bisnis",
+            "solution": "solusi",
+            "improve": "memperbaiki",
+            "stakeholder": "stakeholder",
+            "approval workflow": "alur persetujuan",
+            "causes delays": "menyebabkan keterlambatan",
+            "requirements": "kebutuhan",
+            "main purpose": "tujuan utama",
+            "conversation": "percakapan",
+        }
+        translated = cleaned
+        for source, target in replacements.items():
+            translated = re.sub(source, target, translated, flags=re.IGNORECASE)
+        return f"Maksud teks ini: {translated}"
 
     def _guess_word_class(self, word: str) -> str:
         lowered = word.lower()

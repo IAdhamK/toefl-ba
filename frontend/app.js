@@ -33,7 +33,11 @@ const defaultState = {
   helpHistory: [],
   helpInput: "",
   contextualHelp: {
-    cache: {}
+    cache: {},
+    position: {
+      x: null,
+      y: null
+    }
   },
   remoteContent: {
     lessons: null,
@@ -675,7 +679,10 @@ function loadState() {
     ...parsed,
     progress: { ...defaultState.progress, ...(parsed.progress || {}) },
     adminContent: { ...defaultState.adminContent, ...(parsed.adminContent || {}) },
-    contextualHelp: { cache: { ...(parsed.contextualHelp?.cache || {}) } },
+    contextualHelp: {
+      cache: { ...(parsed.contextualHelp?.cache || {}) },
+      position: { ...defaultState.contextualHelp.position, ...(parsed.contextualHelp?.position || {}) }
+    },
     chat: parsed.chat || structuredClone(defaultState.chat)
   };
 }
@@ -707,7 +714,10 @@ async function hydrateFromApi() {
         ...stateResponse.state,
         progress: { ...defaultState.progress, ...(stateResponse.state.progress || state.progress) },
         adminContent: { ...defaultState.adminContent, ...(stateResponse.state.adminContent || state.adminContent) },
-        contextualHelp: { cache: { ...(stateResponse.state.contextualHelp?.cache || state.contextualHelp?.cache || {}) } }
+        contextualHelp: {
+          cache: { ...(stateResponse.state.contextualHelp?.cache || state.contextualHelp?.cache || {}) },
+          position: { ...defaultState.contextualHelp.position, ...(stateResponse.state.contextualHelp?.position || state.contextualHelp?.position || {}) }
+        }
       };
     }
     state.remoteContent = {
@@ -1572,7 +1582,6 @@ function renderContextualHelpButton(module, contextType, text) {
         data-help-context-type="${escapeAttribute(contextType)}"
         data-help-text="${escapeAttribute(text)}"
       >Bantuan ID</button>
-      <div class="context-help-panel hidden" data-context-help-panel="${escapeAttribute(key)}"></div>
     </span>
   `;
 }
@@ -1592,35 +1601,141 @@ function bindContextualHelpButtons(root = document) {
       const module = button.dataset.helpModule || "general";
       const contextType = button.dataset.helpContextType || "general";
       const key = button.dataset.helpKey || contextualHelpKey(module, contextType, text);
-      const panel = document.querySelector(`[data-context-help-panel="${cssEscape(key)}"]`);
-      if (!panel) return;
-
-      if (panel.dataset.open === "true") {
-        panel.dataset.open = "false";
-        panel.classList.add("hidden");
-        return;
-      }
-
-      panel.dataset.open = "true";
-      panel.classList.remove("hidden");
+      const floatingPanel = showContextualHelpPanel({
+        title: helpContextLabel(module, contextType),
+        body: `<p class="muted">Sedang menjelaskan...</p>`,
+        trigger: button
+      });
       const cached = state.contextualHelp?.cache?.[key];
       if (cached) {
-        panel.innerHTML = renderContextualHelpResult(cached);
+        floatingPanel.content.innerHTML = renderContextualHelpResult(cached);
         return;
       }
 
-      panel.innerHTML = `<p class="muted">Sedang menjelaskan...</p>`;
       try {
         const result = await explainTextWithBantuanID(text, module, contextType);
         state.contextualHelp.cache[key] = result;
         saveState();
-        panel.innerHTML = renderContextualHelpResult(result);
+        floatingPanel.content.innerHTML = renderContextualHelpResult(result);
         logContextualHelpUsage(module, contextType, text);
       } catch (error) {
-        panel.innerHTML = `<p class="muted">Maaf, Bantuan ID belum dapat memproses teks ini. Coba lagi nanti.</p>`;
+        floatingPanel.content.innerHTML = `<p class="muted">Maaf, Bantuan ID belum dapat memproses teks ini. Coba lagi nanti.</p>`;
       }
     });
   });
+}
+
+function showContextualHelpPanel({ title, body, trigger }) {
+  const panel = ensureFloatingHelpPanel();
+  const content = panel.querySelector("[data-floating-help-content]");
+  const titleNode = panel.querySelector("[data-floating-help-title]");
+  titleNode.textContent = title || "Bantuan ID";
+  content.innerHTML = body || "";
+  panel.classList.remove("hidden");
+  panel.setAttribute("aria-hidden", "false");
+  placeFloatingHelpPanel(panel, trigger);
+  return { panel, content };
+}
+
+function ensureFloatingHelpPanel() {
+  let panel = document.getElementById("contextualHelpFloat");
+  if (panel) return panel;
+
+  panel = document.createElement("section");
+  panel.id = "contextualHelpFloat";
+  panel.className = "floating-help-panel hidden";
+  panel.setAttribute("aria-hidden", "true");
+  panel.innerHTML = `
+    <div class="floating-help-header" data-floating-help-handle>
+      <div>
+        <small>Bantuan Kontekstual</small>
+        <strong data-floating-help-title>Bantuan ID</strong>
+      </div>
+      <button type="button" class="floating-help-close" data-floating-help-close aria-label="Tutup Bantuan ID">×</button>
+    </div>
+    <div class="floating-help-content" data-floating-help-content></div>
+  `;
+  document.body.appendChild(panel);
+
+  panel.querySelector("[data-floating-help-close]").addEventListener("click", () => closeContextualHelpPanel());
+  enableFloatingHelpDrag(panel, panel.querySelector("[data-floating-help-handle]"));
+  return panel;
+}
+
+function closeContextualHelpPanel() {
+  const panel = document.getElementById("contextualHelpFloat");
+  if (!panel) return;
+  panel.classList.add("hidden");
+  panel.setAttribute("aria-hidden", "true");
+}
+
+function placeFloatingHelpPanel(panel, trigger) {
+  if (state.contextualHelp.position.x !== null && state.contextualHelp.position.y !== null) {
+    setFloatingHelpPosition(panel, state.contextualHelp.position.x, state.contextualHelp.position.y);
+    return;
+  }
+  const rect = trigger?.getBoundingClientRect();
+  const fallbackX = window.innerWidth - 440;
+  const fallbackY = 120;
+  const x = rect ? rect.left : fallbackX;
+  const y = rect ? rect.bottom + 10 : fallbackY;
+  setFloatingHelpPosition(panel, x, y);
+}
+
+function setFloatingHelpPosition(panel, x, y) {
+  const margin = 12;
+  const width = panel.offsetWidth || 390;
+  const height = panel.offsetHeight || 320;
+  const maxX = Math.max(margin, window.innerWidth - width - margin);
+  const maxY = Math.max(margin, window.innerHeight - height - margin);
+  const nextX = Math.min(Math.max(margin, x), maxX);
+  const nextY = Math.min(Math.max(margin, y), maxY);
+  panel.style.left = `${nextX}px`;
+  panel.style.top = `${nextY}px`;
+  state.contextualHelp.position = { x: Math.round(nextX), y: Math.round(nextY) };
+}
+
+function enableFloatingHelpDrag(panel, handle) {
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  handle.addEventListener("pointerdown", (event) => {
+    if (event.target.closest("[data-floating-help-close]")) return;
+    dragging = true;
+    const rect = panel.getBoundingClientRect();
+    offsetX = event.clientX - rect.left;
+    offsetY = event.clientY - rect.top;
+    handle.setPointerCapture(event.pointerId);
+    panel.classList.add("dragging");
+  });
+
+  handle.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    setFloatingHelpPosition(panel, event.clientX - offsetX, event.clientY - offsetY);
+  });
+
+  handle.addEventListener("pointerup", (event) => {
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove("dragging");
+    saveState();
+    handle.releasePointerCapture(event.pointerId);
+  });
+}
+
+function helpContextLabel(module, contextType) {
+  const moduleLabels = {
+    reading: "Reading",
+    grammar: "Grammar",
+    vocabulary: "Vocabulary",
+    tutor: "AI Tutor",
+    writing: "Writing",
+    listening: "Listening",
+    scenario: "Scenario BA"
+  };
+  const cleanedContext = String(contextType || "content").replaceAll("_", " ");
+  return `${moduleLabels[module] || "Bantuan ID"} · ${cleanedContext}`;
 }
 
 async function explainTextWithBantuanID(text, module, contextType) {
@@ -1647,6 +1762,8 @@ async function explainTextWithBantuanID(text, module, contextType) {
 
 function localContextualHelp(text, module, contextType) {
   const legacy = indonesianHelp(text, module === "grammar" ? "grammar" : "simple");
+  const directMeaning = localDirectMeaning(text);
+  const questionLike = isQuestionLike(text);
   return {
     text,
     module,
@@ -1654,18 +1771,23 @@ function localContextualHelp(text, module, contextType) {
     explanation_id: contextualHelpKey(module, contextType, text),
     source: "local",
     explanation: {
-      simple_meaning_id: legacy.simpleMeaning,
-      sentence_structure: legacy.structure,
-      subject: text.toLowerCase().includes("business analyst") ? "A business analyst" : "Cari noun sebelum verb utama.",
-      verb: text.toLowerCase().includes("must") ? "must + verb utama" : "Cari aksi utama dalam kalimat.",
-      object_or_complement: "Bagian setelah verb biasanya menjadi object atau informasi tambahan.",
-      grammar_pattern: legacy.structure,
+      simple_meaning_id: directMeaning || localBasicMeaning(text),
+      sentence_structure: questionLike ? "Ini adalah pertanyaan. Fokus pada apa yang ditanyakan." : legacy.structure,
+      subject: questionLike ? "" : (text.toLowerCase().includes("business analyst") ? "A business analyst" : ""),
+      verb: questionLike ? "" : (text.toLowerCase().includes("must") ? "must + verb utama" : ""),
+      object_or_complement: questionLike ? "" : "",
+      grammar_pattern: questionLike ? "Question" : legacy.structure,
       important_vocabulary: legacy.keywords.map((item) => {
         const [word, meaning] = item.split(" = ");
-        return { word, meaning_id: meaning || item };
+        return {
+          word,
+          meaning_id: meaning || item,
+          one_word_meaning_id: localOneWordMeaning(word),
+          contextual_meaning_id: `Dalam kalimat ini, ${word} perlu dipahami sesuai konteks TOEFL atau Business Analyst.`
+        };
       }),
-      beginner_explanation: legacy.explanation,
-      tips: "Baca pelan, cari subject dan verb, lalu baru pahami detail tambahan."
+      beginner_explanation: questionLike ? "Baca kata tanya seperti what atau which, lalu jawab hal yang diminta." : legacy.explanation,
+      tips: questionLike ? "Jangan bedah seperti kalimat biasa dulu. Cari maksud pertanyaannya." : "Baca pelan, cari subject dan verb, lalu baru pahami detail tambahan."
     }
   };
 }
@@ -1674,10 +1796,23 @@ function renderContextualHelpResult(result) {
   const explanation = result.explanation || {};
   const vocabulary = explanation.important_vocabulary || [];
   const vocabularyHtml = vocabulary.length
-    ? `<ul>${vocabulary.map((item) => `<li><strong>${escapeHtml(item.word || "")}</strong>: ${escapeHtml(item.meaning_id || "")}</li>`).join("")}</ul>`
+    ? `
+      <ul class="context-vocab-list">
+        ${vocabulary.map((item) => `
+          <li>
+            <strong>${escapeHtml(item.word || "")}</strong>
+            <span><b>Arti singkat:</b> ${escapeHtml(item.one_word_meaning_id || localOneWordMeaning(item.word || ""))}</span>
+            <span><b>Arti umum:</b> ${escapeHtml(item.meaning_id || "")}</span>
+            <span><b>Dalam contoh ini:</b> ${escapeHtml(item.contextual_meaning_id || "Artinya mengikuti konteks kalimat yang sedang dibaca.")}</span>
+          </li>
+        `).join("")}
+      </ul>
+    `
     : `<p class="muted">Belum ada kosakata khusus yang terdeteksi.</p>`;
   const extras = [
     ["Arti kata", explanation.word_meaning_id],
+    ["Arti satu kata", explanation.word_one_word_meaning_id],
+    ["Arti dalam contoh kalimat", explanation.word_contextual_meaning_id],
     ["Jenis kata", explanation.word_class],
     ["Cara mengingat", explanation.memory_tip],
     ["Contoh kalimat", explanation.example_sentence],
@@ -1702,10 +1837,10 @@ function renderContextualHelpResult(result) {
     <div class="context-help-card">
       <strong>Bantuan ID</strong>
       <p><strong>Arti sederhana:</strong> ${escapeHtml(explanation.simple_meaning_id || "Teks ini perlu dipahami dari konteksnya.")}</p>
-      <p><strong>Struktur kalimat:</strong> ${escapeHtml(explanation.sentence_structure || explanation.grammar_pattern || "Subject + Verb + Object/Complement")}</p>
-      <p><strong>Subject:</strong> ${escapeHtml(explanation.subject || "Belum terdeteksi")}</p>
-      <p><strong>Verb:</strong> ${escapeHtml(explanation.verb || "Belum terdeteksi")}</p>
-      <p><strong>Object/Complement:</strong> ${escapeHtml(explanation.object_or_complement || "Lihat bagian setelah verb utama.")}</p>
+      ${contextHelpLine("Struktur kalimat", explanation.sentence_structure || explanation.grammar_pattern)}
+      ${contextHelpLine("Subject", explanation.subject)}
+      ${contextHelpLine("Verb", explanation.verb)}
+      ${contextHelpLine("Object/Complement", explanation.object_or_complement)}
       <div><strong>Kosakata penting:</strong>${vocabularyHtml}</div>
       <p><strong>Penjelasan konteks:</strong> ${escapeHtml(explanation.beginner_explanation || "Pahami maksud umum dulu sebelum detail grammar.")}</p>
       <p><strong>Tips memahami:</strong> ${escapeHtml(explanation.tips || "Cari kata kunci, lalu cocokkan dengan konteks modul.")}</p>
@@ -1713,6 +1848,54 @@ function renderContextualHelpResult(result) {
       <small class="muted">Sumber: ${escapeHtml(result.source || "mock")}</small>
     </div>
   `;
+}
+
+function contextHelpLine(label, value) {
+  if (!value) return "";
+  return `<p><strong>${label}:</strong> ${escapeHtml(value)}</p>`;
+}
+
+function isQuestionLike(text) {
+  const lowered = String(text || "").trim().toLowerCase();
+  return lowered.endsWith("?") || ["what ", "which ", "why ", "how ", "when ", "where ", "who ", "can "].some((prefix) => lowered.startsWith(prefix));
+}
+
+function localDirectMeaning(text) {
+  const key = String(text || "").trim().toLowerCase().replace(/[.?]$/, "").replace(/\s+/g, " ");
+  const meanings = {
+    "what business outcome should this solution improve": "Pertanyaan ini berarti: hasil bisnis apa yang harus diperbaiki oleh solusi ini?",
+    "which ba action best supports alignment": "Pertanyaan ini berarti: tindakan Business Analyst mana yang paling membantu menyelaraskan tujuan atau kebutuhan stakeholder?",
+    "what is the best first question": "Pertanyaan ini berarti: pertanyaan pertama apa yang paling tepat untuk diajukan?",
+    "what is the main purpose of the conversation": "Pertanyaan ini berarti: apa tujuan utama dari percakapan tersebut?",
+    "which color should the mobile app use": "Pilihan ini berarti: menanyakan warna apa yang harus dipakai aplikasi mobile.",
+    "which developer is available this week": "Pilihan ini berarti: menanyakan developer mana yang tersedia minggu ini.",
+    "can we skip user research": "Pilihan ini berarti: menanyakan apakah riset user bisa dilewati."
+  };
+  return meanings[key] || "";
+}
+
+function localBasicMeaning(text) {
+  const cleaned = String(text || "").trim();
+  if (!cleaned) return "Teks kosong, belum ada yang bisa dijelaskan.";
+  return `Maksud teks ini: ${cleaned}`;
+}
+
+function localOneWordMeaning(word) {
+  const map = {
+    "elicit": "menggali",
+    "requirement": "kebutuhan",
+    "requirements": "kebutuhan",
+    "stakeholder": "pemangku-kepentingan",
+    "stakeholders": "pemangku-kepentingan",
+    "maintain": "menjaga",
+    "approval": "persetujuan",
+    "workflow": "alur",
+    "delay": "tertunda",
+    "delays": "keterlambatan",
+    "purpose": "tujuan",
+    "conversation": "percakapan"
+  };
+  return map[String(word || "").toLowerCase()] || "konteks";
 }
 
 function logContextualHelpUsage(module, contextType, text) {
@@ -2696,11 +2879,6 @@ function dedupeById(items) {
     seen.add(item.id);
     return true;
   });
-}
-
-function cssEscape(value) {
-  if (window.CSS?.escape) return window.CSS.escape(value);
-  return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
 }
 
 function escapeAttribute(value) {

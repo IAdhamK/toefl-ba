@@ -111,6 +111,10 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - masih rule-based, belum LLM asli
 - Bantuan ID kontekstual:
   - tombol kecil muncul langsung di konten Reading, Grammar, Vocabulary, AI Tutor, Writing, Listening, dan Scenario BA
+  - hasil penjelasan sekarang muncul sebagai panel melayang agar tidak mengubah layout modul
+  - panel Bantuan ID dapat digeser oleh user dan ditutup kapan saja
+  - kosakata penting sekarang menampilkan arti singkat satu kata, arti umum, dan arti dalam contoh kalimat tertentu
+  - penjelasan pertanyaan/opsi jawaban dibuat lebih langsung ke arti teks yang diklik, tidak lagi memakai fallback generik yang membingungkan
   - endpoint baru `POST /api/ai/contextual-help`
   - endpoint lama `POST /api/help/indonesian` tetap dipertahankan
   - respons mock fallback berisi arti sederhana, struktur kalimat, subject, verb, object/complement, kosakata penting, konteks, dan tips

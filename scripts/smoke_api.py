@@ -175,6 +175,41 @@ def main():
         explanation = contextual.get("explanation", {})
         assert_ok(name, status == 200 and contextual["module"] == payload["module"] and "simple_meaning_id" in explanation)
 
+    status, vocab_context = call(
+        "/ai/contextual-help",
+        {
+            "text": "The analyst must maintain the approval workflow.",
+            "module": "vocabulary",
+            "context_type": "vocabulary_example",
+        },
+    )
+    vocab_explanation = vocab_context.get("explanation", {})
+    first_vocab = (vocab_explanation.get("important_vocabulary") or [{}])[0]
+    assert_ok(
+        "bantuan id word context meaning",
+        status == 200
+        and "one_word_meaning_id" in first_vocab
+        and "contextual_meaning_id" in first_vocab
+        and "word_contextual_meaning_id" in vocab_explanation,
+    )
+
+    status, question_context = call(
+        "/ai/contextual-help",
+        {
+            "text": "What business outcome should this solution improve?",
+            "module": "scenario",
+            "context_type": "scenario_option",
+        },
+    )
+    question_explanation = question_context.get("explanation", {})
+    assert_ok(
+        "bantuan id direct question meaning",
+        status == 200
+        and "hasil bisnis apa" in question_explanation.get("simple_meaning_id", "").lower()
+        and question_explanation.get("subject") == "this solution"
+        and question_explanation.get("verb") == "should improve",
+    )
+
     print("Selesai. API utama berjalan baik.")
 
 

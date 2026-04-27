@@ -109,6 +109,17 @@ Expected response shape:
 }
 ```
 
+For vocabulary help, each `important_vocabulary` item may include:
+
+```json
+{
+  "word": "maintain",
+  "meaning_id": "menjaga atau merawat agar tetap berjalan",
+  "one_word_meaning_id": "menjaga",
+  "contextual_meaning_id": "Dalam contoh kalimat tertentu, maintain bisa berarti menjaga proses, sistem, atau kualitas agar tetap berjalan baik."
+}
+```
+
 Valid contextual `module`: `reading`, `grammar`, `vocabulary`, `tutor`, `writing`, `listening`, `scenario`.
 
 ## Admin

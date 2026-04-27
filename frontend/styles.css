@@ -884,10 +884,7 @@ textarea {
 
 .context-help-wrap {
   display: inline-flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
-  max-width: 100%;
+  align-items: center;
   vertical-align: middle;
 }
 
@@ -909,25 +906,10 @@ textarea {
   border-color: rgba(8, 127, 140, 0.45);
 }
 
-.context-help-panel {
-  width: min(100%, 720px);
-  flex-basis: 100%;
-  margin-top: 8px;
-}
-
-.context-help-panel.hidden {
-  display: none;
-}
-
 .context-help-card {
-  border: 1px solid rgba(8, 127, 140, 0.2);
-  border-radius: 8px;
-  background: #f8feff;
-  box-shadow: 0 14px 30px rgba(33, 53, 71, 0.08);
   color: var(--ink);
   display: grid;
   gap: 7px;
-  padding: 12px;
 }
 
 .context-help-card p {
@@ -939,11 +921,109 @@ textarea {
   padding-left: 18px;
 }
 
+.context-vocab-list {
+  display: grid;
+  gap: 10px;
+  padding-left: 0 !important;
+}
+
+.context-vocab-list li {
+  border: 1px solid rgba(33, 53, 71, 0.1);
+  border-radius: 8px;
+  background: #f8fafc;
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  padding: 10px;
+}
+
+.context-vocab-list li strong {
+  color: var(--teal);
+}
+
+.context-vocab-list li span {
+  display: block;
+}
+
 .option-help-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: start;
+}
+
+.floating-help-panel {
+  position: fixed;
+  z-index: 80;
+  width: min(390px, calc(100vw - 24px));
+  max-height: min(620px, calc(100vh - 24px));
+  border: 1px solid rgba(8, 127, 140, 0.22);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(33, 53, 71, 0.22);
+  overflow: hidden;
+}
+
+.floating-help-panel.hidden {
+  display: none;
+}
+
+.floating-help-panel.dragging {
+  user-select: none;
+}
+
+.floating-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, #ecfeff, #f8fafc);
+  cursor: grab;
+}
+
+.floating-help-panel.dragging .floating-help-header {
+  cursor: grabbing;
+}
+
+.floating-help-header small {
+  display: block;
+  color: var(--teal);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.floating-help-header strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.floating-help-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(33, 53, 71, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.floating-help-close:hover {
+  background: #f1f5f9;
+}
+
+.floating-help-content {
+  max-height: calc(min(620px, 100vh - 24px) - 68px);
+  overflow: auto;
+  padding: 14px;
 }
 
 .ba-map {
