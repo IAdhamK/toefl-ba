@@ -32,6 +32,9 @@ const defaultState = {
   },
   helpHistory: [],
   helpInput: "",
+  contextualHelp: {
+    cache: {}
+  },
   remoteContent: {
     lessons: null,
     vocabulary: null
@@ -672,6 +675,7 @@ function loadState() {
     ...parsed,
     progress: { ...defaultState.progress, ...(parsed.progress || {}) },
     adminContent: { ...defaultState.adminContent, ...(parsed.adminContent || {}) },
+    contextualHelp: { cache: { ...(parsed.contextualHelp?.cache || {}) } },
     chat: parsed.chat || structuredClone(defaultState.chat)
   };
 }
@@ -702,7 +706,8 @@ async function hydrateFromApi() {
         ...state,
         ...stateResponse.state,
         progress: { ...defaultState.progress, ...(stateResponse.state.progress || state.progress) },
-        adminContent: { ...defaultState.adminContent, ...(stateResponse.state.adminContent || state.adminContent) }
+        adminContent: { ...defaultState.adminContent, ...(stateResponse.state.adminContent || state.adminContent) },
+        contextualHelp: { cache: { ...(stateResponse.state.contextualHelp?.cache || state.contextualHelp?.cache || {}) } }
       };
     }
     state.remoteContent = {
@@ -1554,6 +1559,167 @@ function indonesianHelp(text, type) {
   };
 }
 
+function renderContextualHelpButton(module, contextType, text) {
+  const key = contextualHelpKey(module, contextType, text);
+  return `
+    <span class="context-help-wrap">
+      <button
+        type="button"
+        class="context-help-button"
+        data-context-help="true"
+        data-help-key="${escapeAttribute(key)}"
+        data-help-module="${escapeAttribute(module)}"
+        data-help-context-type="${escapeAttribute(contextType)}"
+        data-help-text="${escapeAttribute(text)}"
+      >Bantuan ID</button>
+      <div class="context-help-panel hidden" data-context-help-panel="${escapeAttribute(key)}"></div>
+    </span>
+  `;
+}
+
+function contextualHelpKey(module, contextType, text) {
+  return `${module}:${contextType}:${hashText(String(text || ""))}`;
+}
+
+function bindContextualHelpButtons(root = document) {
+  root.querySelectorAll("[data-context-help]").forEach((button) => {
+    if (button.dataset.boundContextHelp) return;
+    button.dataset.boundContextHelp = "true";
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const text = button.dataset.helpText || "";
+      const module = button.dataset.helpModule || "general";
+      const contextType = button.dataset.helpContextType || "general";
+      const key = button.dataset.helpKey || contextualHelpKey(module, contextType, text);
+      const panel = document.querySelector(`[data-context-help-panel="${cssEscape(key)}"]`);
+      if (!panel) return;
+
+      if (panel.dataset.open === "true") {
+        panel.dataset.open = "false";
+        panel.classList.add("hidden");
+        return;
+      }
+
+      panel.dataset.open = "true";
+      panel.classList.remove("hidden");
+      const cached = state.contextualHelp?.cache?.[key];
+      if (cached) {
+        panel.innerHTML = renderContextualHelpResult(cached);
+        return;
+      }
+
+      panel.innerHTML = `<p class="muted">Sedang menjelaskan...</p>`;
+      try {
+        const result = await explainTextWithBantuanID(text, module, contextType);
+        state.contextualHelp.cache[key] = result;
+        saveState();
+        panel.innerHTML = renderContextualHelpResult(result);
+        logContextualHelpUsage(module, contextType, text);
+      } catch (error) {
+        panel.innerHTML = `<p class="muted">Maaf, Bantuan ID belum dapat memproses teks ini. Coba lagi nanti.</p>`;
+      }
+    });
+  });
+}
+
+async function explainTextWithBantuanID(text, module, contextType) {
+  if (apiOnline) {
+    try {
+      return await apiRequest("/ai/contextual-help", {
+        method: "POST",
+        body: {
+          text,
+          module,
+          context_type: contextType,
+          user_level: "beginner",
+          extra_context: {
+            user_id: state.user?.id || "default-user"
+          }
+        }
+      });
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  return localContextualHelp(text, module, contextType);
+}
+
+function localContextualHelp(text, module, contextType) {
+  const legacy = indonesianHelp(text, module === "grammar" ? "grammar" : "simple");
+  return {
+    text,
+    module,
+    context_type: contextType,
+    explanation_id: contextualHelpKey(module, contextType, text),
+    source: "local",
+    explanation: {
+      simple_meaning_id: legacy.simpleMeaning,
+      sentence_structure: legacy.structure,
+      subject: text.toLowerCase().includes("business analyst") ? "A business analyst" : "Cari noun sebelum verb utama.",
+      verb: text.toLowerCase().includes("must") ? "must + verb utama" : "Cari aksi utama dalam kalimat.",
+      object_or_complement: "Bagian setelah verb biasanya menjadi object atau informasi tambahan.",
+      grammar_pattern: legacy.structure,
+      important_vocabulary: legacy.keywords.map((item) => {
+        const [word, meaning] = item.split(" = ");
+        return { word, meaning_id: meaning || item };
+      }),
+      beginner_explanation: legacy.explanation,
+      tips: "Baca pelan, cari subject dan verb, lalu baru pahami detail tambahan."
+    }
+  };
+}
+
+function renderContextualHelpResult(result) {
+  const explanation = result.explanation || {};
+  const vocabulary = explanation.important_vocabulary || [];
+  const vocabularyHtml = vocabulary.length
+    ? `<ul>${vocabulary.map((item) => `<li><strong>${escapeHtml(item.word || "")}</strong>: ${escapeHtml(item.meaning_id || "")}</li>`).join("")}</ul>`
+    : `<p class="muted">Belum ada kosakata khusus yang terdeteksi.</p>`;
+  const extras = [
+    ["Arti kata", explanation.word_meaning_id],
+    ["Jenis kata", explanation.word_class],
+    ["Cara mengingat", explanation.memory_tip],
+    ["Contoh kalimat", explanation.example_sentence],
+    ["Makna BA / TOEFL", explanation.ba_toefl_context],
+    ["Maksud kalimat", explanation.writing_meaning],
+    ["Masalah grammar", explanation.grammar_issue],
+    ["Versi lebih baik", explanation.better_sentence],
+    ["Alasan perbaikan", explanation.improvement_reason],
+    ["Kata kunci listening", Array.isArray(explanation.listening_keywords) ? explanation.listening_keywords.join(", ") : explanation.listening_keywords],
+    ["Maksud pembicara", explanation.speaker_intent],
+    ["Tips listening", explanation.listening_tip],
+    ["Konteks Business Analyst", explanation.ba_context],
+    ["Masalah bisnis", explanation.business_problem],
+    ["Stakeholder terlibat", explanation.stakeholders],
+    ["Petunjuk memilih jawaban", explanation.answer_hint]
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `<p><strong>${label}:</strong> ${escapeHtml(value)}</p>`)
+    .join("");
+
+  return `
+    <div class="context-help-card">
+      <strong>Bantuan ID</strong>
+      <p><strong>Arti sederhana:</strong> ${escapeHtml(explanation.simple_meaning_id || "Teks ini perlu dipahami dari konteksnya.")}</p>
+      <p><strong>Struktur kalimat:</strong> ${escapeHtml(explanation.sentence_structure || explanation.grammar_pattern || "Subject + Verb + Object/Complement")}</p>
+      <p><strong>Subject:</strong> ${escapeHtml(explanation.subject || "Belum terdeteksi")}</p>
+      <p><strong>Verb:</strong> ${escapeHtml(explanation.verb || "Belum terdeteksi")}</p>
+      <p><strong>Object/Complement:</strong> ${escapeHtml(explanation.object_or_complement || "Lihat bagian setelah verb utama.")}</p>
+      <div><strong>Kosakata penting:</strong>${vocabularyHtml}</div>
+      <p><strong>Penjelasan konteks:</strong> ${escapeHtml(explanation.beginner_explanation || "Pahami maksud umum dulu sebelum detail grammar.")}</p>
+      <p><strong>Tips memahami:</strong> ${escapeHtml(explanation.tips || "Cari kata kunci, lalu cocokkan dengan konteks modul.")}</p>
+      ${extras}
+      <small class="muted">Sumber: ${escapeHtml(result.source || "mock")}</small>
+    </div>
+  `;
+}
+
+function logContextualHelpUsage(module, contextType, text) {
+  addActivity("Bantuan ID", `${module}: ${String(text || "").slice(0, 42)}`, 100);
+  saveState();
+}
+
 function renderReading() {
   const allLessons = getLessons();
   const selectedLesson = allLessons.find((lesson) => lesson.id === state.selectedReadingLessonId) || allLessons[0];
@@ -1562,7 +1728,7 @@ function renderReading() {
       <div>
         <p class="eyebrow">Reading Analyzer</p>
         <h2>${selectedLesson.title}</h2>
-        <p>${selectedLesson.passage}</p>
+        <p>${selectedLesson.passage} ${renderContextualHelpButton("reading", "reading_passage", selectedLesson.passage)}</p>
         <div class="pill-row">
           <span class="pill">${selectedLesson.level}</span>
           <span class="pill">${selectedLesson.context}</span>
@@ -1586,9 +1752,9 @@ function renderReading() {
           ${allLessons.map((lesson) => `<button class="ghost-button ${lesson.id === selectedLesson.id ? "selected-control" : ""}" data-lesson="${lesson.id}">${lesson.title}</button>`).join("")}
         </div>
         <h3>Grammar Insight</h3>
-        <p>${selectedLesson.grammar}</p>
+        <p>${selectedLesson.grammar} ${renderContextualHelpButton("grammar", "grammar_explanation", selectedLesson.grammar)}</p>
         <h3>Vocabulary</h3>
-        <div class="pill-row">${selectedLesson.vocabulary.map((word) => `<span class="pill">${word}</span>`).join("")}</div>
+        <div class="pill-row">${selectedLesson.vocabulary.map((word) => `<span class="pill">${word} ${renderContextualHelpButton("vocabulary", "vocabulary_word", word)}</span>`).join("")}</div>
       </aside>
     </section>
   `;
@@ -1646,20 +1812,24 @@ function renderReading() {
     renderDashboard();
     renderJourney();
   });
+  bindContextualHelpButtons(document.getElementById("readingView"));
 }
 
 function readingQuestionTemplate(question, index) {
   const selected = state.readingAnswers[question.id];
   return `
     <div class="question">
-      <h3>${index + 1}. ${question.text}</h3>
+      <h3>${index + 1}. ${question.text} ${renderContextualHelpButton("reading", "reading_question", question.text)}</h3>
       <div class="question-options">
         ${question.options
           .map(
             (option, optionIndex) => `
-              <button class="option-button ${selected === optionIndex ? "selected" : ""}" data-reading-question="${question.id}" data-option="${optionIndex}">
-                ${String.fromCharCode(65 + optionIndex)}. ${option}
-              </button>
+              <div class="option-help-row">
+                <button class="option-button ${selected === optionIndex ? "selected" : ""}" data-reading-question="${question.id}" data-option="${optionIndex}">
+                  ${String.fromCharCode(65 + optionIndex)}. ${option}
+                </button>
+                ${renderContextualHelpButton("reading", "reading_option", option)}
+              </div>
             `
           )
           .join("")}
@@ -1675,6 +1845,7 @@ function scoreReading(lesson) {
 }
 
 function renderGrammar() {
+  const grammarSample = "A business analyst operating within a complex enterprise environment must not only elicit requirements but also ensure alignment between stakeholder needs and organizational strategy.";
   document.getElementById("grammarView").innerHTML = `
     <header class="topbar">
       <div>
@@ -1690,8 +1861,9 @@ function renderGrammar() {
         ${beginnerTip("Cara membaca grammar", "Cari subject dulu, lalu verb utama. Abaikan sementara phrase panjang yang hanya menambahkan informasi.")}
         <label>
           Kalimat
-          <textarea id="grammarInput">A business analyst operating within a complex enterprise environment must not only elicit requirements but also ensure alignment between stakeholder needs and organizational strategy.</textarea>
+          <textarea id="grammarInput">${grammarSample}</textarea>
         </label>
+        ${renderContextualHelpButton("grammar", "grammar_sentence", grammarSample)}
         <button class="primary-button" type="submit">Analyze Grammar</button>
       </form>
       <div id="grammarResult" class="panel">
@@ -1724,10 +1896,12 @@ function renderGrammar() {
       }
     }
     document.getElementById("grammarResult").innerHTML = analysisHtml;
+    bindContextualHelpButtons(document.getElementById("grammarResult"));
     await refreshIntegratedJourney();
     renderDashboard();
     renderJourney();
   });
+  bindContextualHelpButtons(document.getElementById("grammarView"));
 }
 
 function grammarAnalysis(sentence) {
@@ -1744,7 +1918,7 @@ function grammarAnalysis(sentence) {
     <h3>Terjemahan natural</h3>
     <p>Seorang business analyst yang bekerja dalam lingkungan enterprise kompleks harus menggali requirement dan memastikan keselarasan antara kebutuhan stakeholder dan strategi organisasi.</p>
     <h3>Latihan serupa</h3>
-    <p>The analyst working with multiple stakeholders must clarify priorities and document agreed requirements.</p>
+    <p>The analyst working with multiple stakeholders must clarify priorities and document agreed requirements. ${renderContextualHelpButton("grammar", "grammar_sentence", "The analyst working with multiple stakeholders must clarify priorities and document agreed requirements.")}</p>
   `;
 }
 
@@ -1756,7 +1930,7 @@ function grammarApiTemplate(analysis) {
     <p><strong>Phrase:</strong> ${analysis.phrase}</p>
     <p><strong>Pattern:</strong> ${analysis.pattern}</p>
     <h3>Penjelasan sederhana</h3>
-    <p>${analysis.explanation}</p>
+    <p>${analysis.explanation} ${renderContextualHelpButton("grammar", "grammar_explanation", analysis.explanation)}</p>
     <h3>Terjemahan natural</h3>
     <p>${analysis.translation}</p>
   `;
@@ -1822,7 +1996,7 @@ function renderVocabulary() {
       <h3>Bank Kosakata</h3>
       <p class="muted">Total kosakata tersedia: ${vocabularyItems.length}. Drill harian mengambil 25 kata secara acak setiap hari.</p>
       <div class="vocab-bank">
-        ${vocabularyItems.map((item) => `<span class="pill">${item.word} = ${item.meaningId}</span>`).join("")}
+        ${vocabularyItems.map((item) => `<span class="pill">${item.word} = ${item.meaningId} ${renderContextualHelpButton("vocabulary", "vocabulary_word", item.word)}</span>`).join("")}
       </div>
     </section>
   `;
@@ -1875,6 +2049,7 @@ function renderVocabulary() {
       renderJourney();
     });
   });
+  bindContextualHelpButtons(document.getElementById("vocabularyView"));
 }
 
 function vocabularyDrillTemplate(item, index, allItems) {
@@ -1887,12 +2062,17 @@ function vocabularyDrillTemplate(item, index, allItems) {
         <span class="pill">${item.part}</span>
         <span class="pill">BA Context</span>
       </div>
-      <h3>${item.word}</h3>
-      <p>${item.example}</p>
+      <h3>${item.word} ${renderContextualHelpButton("vocabulary", "vocabulary_word", item.word)}</h3>
+      <p>${item.example} ${renderContextualHelpButton("vocabulary", "vocabulary_example", item.example)}</p>
       <p class="muted">${item.meaningEn}</p>
       <div class="question-options">
         ${options
-          .map((option) => `<button class="option-button ${answered?.selected === option ? "selected" : ""}" data-vocab-drill="${item.id}" data-answer="${option}">${option}</button>`)
+          .map((option) => `
+            <div class="option-help-row">
+              <button class="option-button ${answered?.selected === option ? "selected" : ""}" data-vocab-drill="${item.id}" data-answer="${option}">${option}</button>
+              ${renderContextualHelpButton("vocabulary", "vocabulary_option", option)}
+            </div>
+          `)
           .join("")}
       </div>
       ${answered === undefined ? "" : resultTemplate(answered.isCorrect ? "success" : "danger", answered.isCorrect ? "Benar" : "Belum tepat", answered.isCorrect ? "Makna sudah sesuai konteks." : `Jawaban benar: ${item.meaningId}`)}
@@ -2005,7 +2185,12 @@ function renderTutor() {
     <section class="content-grid">
       <div class="panel">
         <div id="chatLog" class="chat-log">
-          ${state.chat.map((message) => `<div class="chat-message ${message.role}">${escapeHtml(message.text)}</div>`).join("")}
+          ${state.chat.map((message) => `
+            <div class="chat-message ${message.role}">
+              <p>${escapeHtml(message.text)}</p>
+              ${renderContextualHelpButton("tutor", message.role === "assistant" ? "tutor_message" : "user_sentence", message.text)}
+            </div>
+          `).join("")}
         </div>
       </div>
       <form id="chatForm" class="panel form-grid">
@@ -2040,6 +2225,7 @@ function renderTutor() {
     saveState();
     renderTutor();
   });
+  bindContextualHelpButtons(document.getElementById("tutorView"));
 }
 
 function tutorReply(input) {
@@ -2057,6 +2243,8 @@ function tutorReply(input) {
 }
 
 function renderWriting() {
+  const writingPrompt = "Write a clear Business Analyst requirement statement. Use: The system must + verb + object + condition.";
+  const writingSample = "The system must flexible for all user and make report faster.";
   document.getElementById("writingView").innerHTML = `
     <header class="topbar">
       <div>
@@ -2070,10 +2258,15 @@ function renderWriting() {
     <section class="content-grid">
       <form id="writingForm" class="panel form-grid">
         ${beginnerTip("Formula writing basic", "Gunakan pola: The system must + verb + object + condition. Tambahkan ukuran agar requirement jelas.")}
+        <div class="helper-banner">
+          <strong>Prompt writing</strong>
+          <p>${writingPrompt} ${renderContextualHelpButton("writing", "writing_prompt", writingPrompt)}</p>
+        </div>
         <label>
           Tulisan user
-          <textarea id="writingInput">The system must flexible for all user and make report faster.</textarea>
+          <textarea id="writingInput">${writingSample}</textarea>
         </label>
+        ${renderContextualHelpButton("writing", "writing_sentence", writingSample)}
         <button class="primary-button" type="submit">Evaluate Writing</button>
       </form>
       <div id="writingResult" class="panel"><p class="muted">Feedback akan muncul di sini.</p></div>
@@ -2111,12 +2304,14 @@ function renderWriting() {
     document.getElementById("writingResult").innerHTML = `
       <h3>Score: ${feedback.score}</h3>
       <p><strong>Main issue:</strong> ${feedback.issues.join(" ")}</p>
-      <p><strong>Revised:</strong> ${feedback.revised}</p>
+      <p><strong>Revised:</strong> ${feedback.revised} ${renderContextualHelpButton("writing", "writing_feedback", feedback.revised)}</p>
       <p><strong>Next practice:</strong> ${feedback.recommendation}</p>
     `;
+    bindContextualHelpButtons(document.getElementById("writingResult"));
     renderDashboard();
     renderJourney();
   });
+  bindContextualHelpButtons(document.getElementById("writingView"));
 }
 
 function renderListening() {
@@ -2134,11 +2329,11 @@ function renderListening() {
       <div class="panel">
         ${beginnerTip("Cara memahami listening", "Cari kata yang diulang atau ditekankan: late, delay, data, different formats. Biasanya itu petunjuk masalah utama.")}
         <h3>Transcript</h3>
-        <p>${listeningScenario.transcript}</p>
+        <p>${listeningScenario.transcript} ${renderContextualHelpButton("listening", "listening_transcript", listeningScenario.transcript)}</p>
       </div>
       <form id="listeningForm" class="panel form-grid">
         <label>
-          ${listeningScenario.question}
+          ${listeningScenario.question} ${renderContextualHelpButton("listening", "listening_question", listeningScenario.question)}
           <textarea id="listeningInput"></textarea>
         </label>
         <button class="primary-button" type="submit">Submit Listening</button>
@@ -2183,6 +2378,7 @@ function renderListening() {
     renderDashboard();
     renderJourney();
   });
+  bindContextualHelpButtons(document.getElementById("listeningView"));
 }
 
 function renderScenario() {
@@ -2236,6 +2432,7 @@ function renderScenario() {
       renderJourney();
     });
   });
+  bindContextualHelpButtons(document.getElementById("scenarioView"));
 }
 
 function scenarioTemplate(item) {
@@ -2249,15 +2446,18 @@ function scenarioTemplate(item) {
         <span class="pill">Scenario</span>
       </div>
       <h3>${item.title}</h3>
-      <p>${item.context}</p>
-      <p><strong>${item.question}</strong></p>
+      <p>${item.context} ${renderContextualHelpButton("scenario", "scenario_case", item.context)}</p>
+      <p><strong>${item.question}</strong> ${renderContextualHelpButton("scenario", "scenario_question", item.question)}</p>
       <div class="question-options">
         ${item.options
           .map(
             (option, index) => `
-              <button class="option-button ${selected === index ? "selected" : ""}" data-scenario="${item.id}" data-option="${index}">
-                ${String.fromCharCode(65 + index)}. ${option}
-              </button>
+              <div class="option-help-row">
+                <button class="option-button ${selected === index ? "selected" : ""}" data-scenario="${item.id}" data-option="${index}">
+                  ${String.fromCharCode(65 + index)}. ${option}
+                </button>
+                ${renderContextualHelpButton("scenario", "scenario_option", option)}
+              </div>
             `
           )
           .join("")}
@@ -2498,8 +2698,17 @@ function dedupeById(items) {
   });
 }
 
+function cssEscape(value) {
+  if (window.CSS?.escape) return window.CSS.escape(value);
+  return String(value).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replaceAll("\n", "&#10;").replaceAll("\r", "");
+}
+
 function escapeHtml(value) {
-  return value
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")

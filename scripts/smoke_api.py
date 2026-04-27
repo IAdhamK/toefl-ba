@@ -128,6 +128,53 @@ def main():
     )
     assert_ok("indonesian help", status == 200 and "simpleMeaning" in help_result)
 
+    contextual_samples = [
+        (
+            "bantuan id reading context",
+            {
+                "text": "A business analyst elicits requirements from stakeholders.",
+                "module": "reading",
+                "context_type": "reading_paragraph",
+            },
+        ),
+        (
+            "bantuan id grammar context",
+            {
+                "text": "Operating within a complex enterprise environment, the analyst must align stakeholder needs with strategy.",
+                "module": "grammar",
+                "context_type": "grammar_sentence",
+            },
+        ),
+        (
+            "bantuan id vocabulary context",
+            {
+                "text": "maintain",
+                "module": "vocabulary",
+                "context_type": "vocabulary_word",
+            },
+        ),
+        (
+            "bantuan id listening context",
+            {
+                "text": "What is the main purpose of the conversation?",
+                "module": "listening",
+                "context_type": "listening_question",
+            },
+        ),
+        (
+            "bantuan id scenario context",
+            {
+                "text": "The stakeholder reports that the current approval workflow causes delays.",
+                "module": "scenario",
+                "context_type": "scenario_case",
+            },
+        ),
+    ]
+    for name, payload in contextual_samples:
+        status, contextual = call("/ai/contextual-help", payload)
+        explanation = contextual.get("explanation", {})
+        assert_ok(name, status == 200 and contextual["module"] == payload["module"] and "simple_meaning_id" in explanation)
+
     print("Selesai. API utama berjalan baik.")
 
 

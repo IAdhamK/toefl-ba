@@ -109,6 +109,12 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - endpoint complete adaptive practice
   - UI latihan adaptif di halaman Perjalanan
   - masih rule-based, belum LLM asli
+- Bantuan ID kontekstual:
+  - tombol kecil muncul langsung di konten Reading, Grammar, Vocabulary, AI Tutor, Writing, Listening, dan Scenario BA
+  - endpoint baru `POST /api/ai/contextual-help`
+  - endpoint lama `POST /api/help/indonesian` tetap dipertahankan
+  - respons mock fallback berisi arti sederhana, struktur kalimat, subject, verb, object/complement, kosakata penting, konteks, dan tips
+  - penggunaan Bantuan ID dicatat sebagai aktivitas lokal belajar pendukung tanpa menurunkan skor journey
 
 ## Verifikasi
 
@@ -122,6 +128,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - `.venv/bin/python scripts/smoke_api.py` berhasil terhadap FastAPI di port 8001.
 - Smoke test diperluas untuk journey summary, skill journeys, attempt, continue learning, daily plan, dan review list.
 - Smoke test diperluas lagi untuk adaptive practice, mentor summary, dan complete adaptive practice.
+- Smoke test diperluas untuk Bantuan ID kontekstual di Reading, Grammar, Vocabulary, Listening, dan Scenario.
 
 ## Cara Menjalankan Saat Ini
 
@@ -144,6 +151,8 @@ python3 scripts/smoke_api.py
 
 ## Belum Dikerjakan
 
+- Bantuan ID untuk kalimat yang dipilih manual di dalam textarea masih sederhana; saat ini tombol membaca contoh/prompt yang terlihat.
+- Integrasi penggunaan Bantuan ID ke tabel journey perlu desain khusus agar tidak menaikkan atau menurunkan skor latihan.
 - UI edit/delete Admin CMS di frontend.
 - Browser end-to-end tests.
 - API unit tests dengan test database terpisah.

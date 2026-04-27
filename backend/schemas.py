@@ -54,3 +54,11 @@ class TextPayload(BaseModel):
 class ChatPayload(BaseModel):
     message: str = ""
     context: dict[str, Any] = Field(default_factory=dict)
+
+
+class ContextualHelpPayload(BaseModel):
+    text: str = ""
+    module: str = "general"
+    context_type: str = "general"
+    user_level: str = "beginner"
+    extra_context: dict[str, Any] = Field(default_factory=dict)

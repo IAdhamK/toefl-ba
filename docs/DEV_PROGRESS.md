@@ -14,6 +14,8 @@
 - Basic Docker support added for local development.
 - Integrated User Learning Journey added with database tables, service layer, router, scoring integration, frontend journey UI, and smoke checks.
 - Adaptive mentor phase added: journey memory now produces short practice tasks, mentor summary, and completion tracking.
+- Contextual Bantuan ID added across learning modules. The old Indonesian helper page remains available, but the primary UX is now small inline help buttons beside actual English content.
+- New `POST /api/ai/contextual-help` endpoint returns predictable JSON with mock fallback for Reading, Grammar, Vocabulary, AI Tutor, Writing, Listening, and Scenario contexts.
 
 ## Verified
 
@@ -21,9 +23,12 @@
 - Frontend JavaScript syntax check passed.
 - JSON to SQLite migration completed.
 - Smoke API test passed against FastAPI on port 8001.
+- Smoke API test now covers contextual Bantuan ID samples for reading, grammar, vocabulary, listening, and scenario.
 
 ## Notes
 
 The frontend remains intentionally simple and build-free. Admin CMS UI still focuses on create operations, while backend CRUD support is now ready for edit/delete UI in the next phase.
 
 Journey calculation is intentionally simple for this phase: score averages, score-based levels, basic review status, and mock AI-style recommendations. Adaptive practice is rule-based for now; later phases can make mastery, spaced repetition, and adaptive difficulty smarter with real LLM support.
+
+Contextual Bantuan ID is also intentionally simple in this phase. It uses rule-based fallback unless an LLM key is configured, and it focuses on beginner-friendly Indonesian explanations rather than perfect linguistic parsing.

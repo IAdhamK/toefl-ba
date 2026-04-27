@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from backend.schemas import ChatPayload, TextPayload
+from backend.schemas import ChatPayload, ContextualHelpPayload, TextPayload
 from backend.services.ai_service import ai_service
 from backend.services.grammar_service import grammar_breakdown, indonesian_help
 from backend.services.journey_service import save_learning_attempt, update_skill_mastery
@@ -20,6 +20,17 @@ def ai_chat(payload: ChatPayload) -> dict:
 @router.post("/api/help/indonesian")
 def explain_sentence(payload: TextPayload) -> dict:
     return ai_service.explain_sentence(payload.text, payload.type)
+
+
+@router.post("/api/ai/contextual-help")
+def contextual_help(payload: ContextualHelpPayload) -> dict:
+    return ai_service.contextual_help(
+        payload.text,
+        payload.module,
+        payload.context_type,
+        payload.user_level,
+        payload.extra_context,
+    )
 
 
 @router.post("/api/ai/grammar-breakdown")

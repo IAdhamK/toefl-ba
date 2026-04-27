@@ -15,6 +15,22 @@
 3. Add structured AI feedback for writing, grammar, and next-step recommendation.
 4. Add rate limiting and safer error handling before production use.
 
+## Bantuan ID Roadmap
+
+Phase 1:
+- Contextual Bantuan ID inside Reading, Grammar, Vocabulary, AI Tutor, Writing, Listening, and Scenario BA.
+- Mock-safe `/api/ai/contextual-help` endpoint.
+- Inline explanation cards in Indonesian.
+
+Phase 2:
+- Explain user-selected text inside textarea and chat messages.
+- Store helper usage more deeply in journey memory.
+- Improve vocabulary pronunciation and memory tips.
+
+Phase 3:
+- Let real AI mentor read journey history before explaining.
+- Adapt explanation depth to user level and common mistakes.
+
 ## Listening Roadmap
 
 1. Add TTS provider integration to generate audio from transcript.

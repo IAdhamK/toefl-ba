@@ -66,6 +66,7 @@ Compatibility endpoint lama tetap tersedia:
 - `POST /api/ai/grammar-breakdown`
 - `POST /api/ai/writing-feedback`
 - `POST /api/ai/recommend-next-step`
+- `POST /api/ai/contextual-help`
 
 Compatibility endpoint lama:
 
@@ -73,6 +74,42 @@ Compatibility endpoint lama:
 - `POST /api/ai-tutor/recommendation`
 - `POST /api/help/indonesian`
 - `POST /api/grammar/breakdown`
+
+Example contextual Bantuan ID request:
+
+```json
+{
+  "text": "A business analyst elicits requirements from stakeholders.",
+  "module": "reading",
+  "context_type": "reading_paragraph",
+  "user_level": "beginner",
+  "extra_context": {
+    "activity_id": "lesson-001"
+  }
+}
+```
+
+Expected response shape:
+
+```json
+{
+  "text": "A business analyst elicits requirements from stakeholders.",
+  "module": "reading",
+  "context_type": "reading_paragraph",
+  "explanation_id": "help-123",
+  "explanation": {
+    "simple_meaning_id": "Seorang Business Analyst menggali kebutuhan dari stakeholder.",
+    "subject": "A business analyst",
+    "verb": "elicit / elicits",
+    "object_or_complement": "requirements / stakeholder needs",
+    "grammar_pattern": "Subject + Verb + Object/Complement",
+    "important_vocabulary": []
+  },
+  "source": "mock"
+}
+```
+
+Valid contextual `module`: `reading`, `grammar`, `vocabulary`, `tutor`, `writing`, `listening`, `scenario`.
 
 ## Admin
 

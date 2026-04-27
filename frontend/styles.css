@@ -882,6 +882,70 @@ textarea {
   text-align: right;
 }
 
+.context-help-wrap {
+  display: inline-flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.context-help-button {
+  border: 1px solid rgba(8, 127, 140, 0.28);
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0f766e;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 7px 10px;
+}
+
+.context-help-button:hover {
+  background: #cffafe;
+  border-color: rgba(8, 127, 140, 0.45);
+}
+
+.context-help-panel {
+  width: min(100%, 720px);
+  flex-basis: 100%;
+  margin-top: 8px;
+}
+
+.context-help-panel.hidden {
+  display: none;
+}
+
+.context-help-card {
+  border: 1px solid rgba(8, 127, 140, 0.2);
+  border-radius: 8px;
+  background: #f8feff;
+  box-shadow: 0 14px 30px rgba(33, 53, 71, 0.08);
+  color: var(--ink);
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+}
+
+.context-help-card p {
+  margin: 0;
+}
+
+.context-help-card ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.option-help-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
 .ba-map {
   min-height: 190px;
   border: 1px solid var(--line);
@@ -975,6 +1039,10 @@ textarea {
   }
 
   .activity-row {
+    grid-template-columns: 1fr;
+  }
+
+  .option-help-row {
     grid-template-columns: 1fr;
   }
 

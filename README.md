@@ -8,7 +8,7 @@ TOEFL Analyst AI adalah aplikasi belajar TOEFL dengan konteks kerja Business Ana
 - FastAPI backend di `backend/` dengan pola endpoint `/api/*`.
 - SQLite foundation di `data/toefl_ba.sqlite3` yang dibuat otomatis saat backend berjalan.
 - Migrasi data lama dari `data/app_data.json` ke SQLite.
-- Reading Analyzer, Grammar Breakdown, Vocabulary Drill 25 kata/hari, Writing Evaluator, Listening scenario, Scenario BA, AI Tutor mock, Bantuan ID, Admin CMS dasar.
+- Reading Analyzer, Grammar Breakdown, Vocabulary Drill 25 kata/hari, Writing Evaluator, Listening scenario, Scenario BA, AI Tutor mock, Bantuan ID kontekstual, Admin CMS dasar.
 - Safe AI fallback: tanpa API key, aplikasi tetap menjawab memakai mock rule-based.
 - Integrated User Learning Journey: satu progress terpadu untuk Reading, Grammar, Vocabulary, Writing, Listening, dan Scenario BA.
 
@@ -120,6 +120,24 @@ Adaptive mentor sederhana juga tersedia. Ia membaca weakest skill, recent attemp
 GET /api/journey/adaptive-practice
 POST /api/journey/adaptive-practice/complete
 ```
+
+## Bantuan ID Kontekstual
+
+Bantuan ID sekarang muncul langsung di dekat konten Inggris yang sedang dipelajari, bukan hanya sebagai halaman/sidebar terpisah. Tombol kecil `Bantuan ID` tersedia di Reading passage, pertanyaan, opsi jawaban, kalimat Grammar, kartu Vocabulary, pesan AI Tutor, prompt Writing, transcript Listening, dan Scenario BA.
+
+Endpoint utama:
+
+```text
+POST /api/ai/contextual-help
+```
+
+Endpoint lama tetap ada untuk kompatibilitas:
+
+```text
+POST /api/help/indonesian
+```
+
+Jika tidak ada API key LLM, aplikasi memakai mock fallback yang tetap memberi arti sederhana, subject, verb, object/complement, kosakata penting, konteks BA/TOEFL, dan tips belajar dalam Bahasa Indonesia.
 
 ## Docker Opsional
 
