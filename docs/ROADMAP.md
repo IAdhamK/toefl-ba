@@ -2,11 +2,38 @@
 
 ## Next Short-Term Work
 
-1. Add edit/delete controls to the Admin CMS frontend.
-2. Add browser end-to-end tests for main learner journeys.
-3. Add API unit tests with an isolated test database.
-4. Improve auth with password or magic-link style login for real users.
-5. Add richer lesson/question schema and validation.
+1. Implement Reading Journey Foundation from `docs/READING_PROGRESS.md` and `docs/READING_SPEC.md`.
+2. Add edit/delete controls to the Admin CMS frontend.
+3. Add browser end-to-end tests for main learner journeys.
+4. Add API unit tests with an isolated test database.
+5. Improve auth with password or magic-link style login for real users.
+
+## Reading Roadmap
+
+Phase 1:
+- Reading Journey Foundation.
+- Reading level, score, sub-skill mastery, and next action.
+- Initial sub-skills: `general_meaning`, `main_idea`, `detail_information`, `vocabulary_context`.
+
+Phase 2:
+- Reading Sub-skill Trainer.
+- Main idea, detail, vocabulary, reference, inference, and purpose practice.
+
+Phase 3:
+- Guided Reading Mode.
+- Title understanding, sentence breakdown, main idea detection, and vocabulary context.
+
+Phase 4:
+- Answer Review.
+- Correct/wrong explanation, evidence sentence, and distractor analysis.
+
+Phase 5:
+- Reading Review.
+- Weakness report, mistake pattern, and recommended practice.
+
+Phase 6:
+- TOEFL Simulation.
+- Timer, full set, and final report.
 
 ## AI Roadmap
 

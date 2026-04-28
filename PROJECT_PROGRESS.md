@@ -121,6 +121,9 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - endpoint lama `POST /api/help/indonesian` tetap dipertahankan
   - respons mock fallback berisi arti sederhana, struktur kalimat, subject, verb, object/complement, kosakata penting, konteks, dan tips
   - penggunaan Bantuan ID dicatat sebagai aktivitas lokal belajar pendukung tanpa menurunkan skor journey
+- Reading documentation foundation:
+  - `docs/READING_PROGRESS.md` untuk melacak vision, fase implementasi, status, deliverables, testing checklist, dan prompt Codex berikutnya
+  - `docs/READING_SPEC.md` untuk mendefinisikan target Reading Journey, Guided Reading, Question Trainer, Answer Review, Reading Review, dan TOEFL Simulation
 
 ## Verifikasi
 
@@ -135,6 +138,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Smoke test diperluas untuk journey summary, skill journeys, attempt, continue learning, daily plan, dan review list.
 - Smoke test diperluas lagi untuk adaptive practice, mentor summary, dan complete adaptive practice.
 - Smoke test diperluas untuk Bantuan ID kontekstual di Reading, Grammar, Vocabulary, Listening, Scenario, reading main idea question, reading correct/wrong/contradictory option, dan scenario problem statement.
+- Dokumentasi Reading foundation dibuat tanpa mengubah behavior frontend/backend.
 
 ## Cara Menjalankan Saat Ini
 
@@ -168,11 +172,12 @@ python3 scripts/smoke_api.py
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
 - Auth production-grade dan role-based access control.
+- Implementasi Phase 1 Reading Journey Foundation berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
 
 ## Rekomendasi Step Berikutnya
 
-1. Tambahkan edit/delete di Admin CMS frontend.
-2. Tambahkan E2E browser tests untuk alur utama.
-3. Tambahkan API tests dengan SQLite test database.
-4. Matangkan mastery calculation dan spaced repetition.
-5. Hubungkan AI service ke provider asli setelah API key tersedia.
+1. Implementasikan Phase 1 Reading Journey Foundation.
+2. Tambahkan edit/delete di Admin CMS frontend.
+3. Tambahkan E2E browser tests untuk alur utama.
+4. Tambahkan API tests dengan SQLite test database.
+5. Matangkan mastery calculation dan spaced repetition.
