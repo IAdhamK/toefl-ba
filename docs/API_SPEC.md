@@ -67,8 +67,12 @@ Compatibility endpoint lama tetap tersedia:
 - `GET /api/reading/review`
 - `GET /api/reading/mistake-patterns`
 - `GET /api/reading/review-queue`
+- `GET /api/reading/simulation/history`
+- `GET /api/reading/simulation/result/{session_id}`
 - `GET /api/reading/subskills`
 - `GET /api/reading/trainer/{sub_skill}`
+- `POST /api/reading/simulation/start`
+- `POST /api/reading/simulation/submit`
 - `POST /api/reading/guided-steps`
 - `POST /api/reading/passage-map`
 - `POST /api/reading/review-answer`
@@ -235,6 +239,51 @@ Example Answer Review request:
 - `priority`
 - `reason`
 - `action`
+
+TOEFL Reading Simulation modes:
+
+- `short`: 1 passage, 5 questions, 10 minutes
+- `medium`: 2 passages, 10 questions, 20 minutes
+- `full`: 3 passages, 15 questions, 30 minutes
+
+Example simulation start:
+
+```json
+{
+  "user_id": "default-user",
+  "mode": "short"
+}
+```
+
+`POST /api/reading/simulation/start` returns a `session_id`, timer metadata, passages, questions, and Bantuan ID policy.
+
+Example simulation submit:
+
+```json
+{
+  "user_id": "default-user",
+  "session_id": "reading-sim-short-123",
+  "mode": "short",
+  "session": {},
+  "answers": {
+    "sim-p1-q1": 1
+  },
+  "time_spent_seconds": 120
+}
+```
+
+Simulation result includes:
+
+- `total_score`
+- `accuracy`
+- `time_spent_seconds`
+- `sub_skill_breakdown`
+- `strongest_sub_skill`
+- `weakest_sub_skill`
+- `recommended_next_practice`
+- `answer_review_summary`
+
+Simulation submit saves a Reading attempt with `activity_type = reading_simulation`, so it updates the Reading Journey and simulation history.
 
 Reading Journey response includes:
 

@@ -246,6 +246,46 @@ def main():
         and len(review_queue["review_items"]) >= 1,
     )
 
+    status, simulation = call("/reading/simulation/start", {"mode": "short", "user_id": "default-user"})
+    assert_ok(
+        "reading simulation start",
+        status == 200
+        and simulation["mode"] == "short"
+        and simulation["duration_minutes"] == 10
+        and simulation["question_count"] == 5,
+    )
+
+    simulation_answers = {}
+    for passage in simulation["passages"]:
+        for question in passage["questions"]:
+            simulation_answers[question["id"]] = question["answer"]
+    status, simulation_result = call(
+        "/reading/simulation/submit",
+        {
+            "user_id": "default-user",
+            "session_id": simulation["session_id"],
+            "mode": simulation["mode"],
+            "session": simulation,
+            "answers": simulation_answers,
+            "time_spent_seconds": 120,
+        },
+    )
+    assert_ok(
+        "reading simulation submit",
+        status == 200
+        and simulation_result["total_score"] == 100
+        and "sub_skill_breakdown" in simulation_result
+        and "answer_review_summary" in simulation_result,
+    )
+
+    status, simulation_history = call("/reading/simulation/history?user_id=default-user")
+    assert_ok(
+        "reading simulation history",
+        status == 200
+        and "history" in simulation_history
+        and any(item["session_id"] == simulation["session_id"] for item in simulation_history["history"]),
+    )
+
     first_vocab = daily_vocab["items"][0]
     status, vocab_score = call("/scoring/vocabulary", {"itemId": first_vocab["id"], "answer": first_vocab["answer"]})
     assert_ok("vocabulary scoring", status == 200 and vocab_score["isCorrect"])

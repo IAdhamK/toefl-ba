@@ -3,6 +3,7 @@ const API_BASE = window.location.origin.includes("8001")
   ? `${window.location.origin}/api`
   : "http://127.0.0.1:8001/api";
 let apiOnline = false;
+let readingSimulationTimer = null;
 
 const defaultState = {
   user: null,
@@ -61,6 +62,14 @@ const defaultState = {
     steps: [],
     passageMap: [],
     completed: false
+  },
+  readingSimulation: {
+    mode: "short",
+    session: null,
+    answers: {},
+    result: null,
+    startedAtMs: null,
+    history: []
   },
   adaptivePractice: null,
   chat: [
@@ -704,6 +713,7 @@ function loadState() {
     readingReview: parsed.readingReview || null,
     readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(parsed.readingTrainer || {}) },
     guidedReading: { ...structuredClone(defaultState.guidedReading), ...(parsed.guidedReading || {}) },
+    readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(parsed.readingSimulation || {}) },
     chat: parsed.chat || structuredClone(defaultState.chat)
   };
 }
@@ -741,7 +751,8 @@ async function hydrateFromApi() {
         },
         readingReview: stateResponse.state.readingReview || state.readingReview || null,
         readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(stateResponse.state.readingTrainer || state.readingTrainer || {}) },
-        guidedReading: { ...structuredClone(defaultState.guidedReading), ...(stateResponse.state.guidedReading || state.guidedReading || {}) }
+        guidedReading: { ...structuredClone(defaultState.guidedReading), ...(stateResponse.state.guidedReading || state.guidedReading || {}) },
+        readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(stateResponse.state.readingSimulation || state.readingSimulation || {}) }
       };
     }
     state.remoteContent = {
@@ -792,12 +803,24 @@ async function refreshReadingJourney() {
     state.readingJourney = response.reading_journey;
     await refreshReadingTrainer(state.readingTrainer?.selectedSubSkill || "main_idea");
     await refreshReadingReview();
+    await refreshReadingSimulationHistory();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     apiOnline = false;
     state.readingJourney = localReadingJourney();
     state.readingReview = localReadingReview();
     state.readingTrainer = localReadingTrainerState();
+  }
+}
+
+async function refreshReadingSimulationHistory() {
+  if (!apiOnline) return;
+  try {
+    const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
+    const response = await apiRequest(`/reading/simulation/history${query}`);
+    state.readingSimulation.history = response.history || [];
+  } catch (error) {
+    state.readingSimulation.history = state.readingSimulation.history || [];
   }
 }
 
@@ -2357,6 +2380,7 @@ function renderReading() {
     ${journeyPanel("Reading")}
     ${readingJourneySummary()}
     ${readingReviewPanel()}
+    ${readingSimulationPanel()}
     ${guidedReadingPanel(selectedLesson)}
     ${readingSubskillProgress()}
     ${readingTrainerPanel()}
@@ -2462,6 +2486,30 @@ function renderReading() {
     document.getElementById("readingTrainerPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
+  document.querySelectorAll("[data-simulation-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.readingSimulation.mode = button.dataset.simulationMode;
+      saveState();
+      renderReading();
+    });
+  });
+
+  document.getElementById("startReadingSimulationButton")?.addEventListener("click", async () => {
+    await startReadingSimulation();
+  });
+
+  document.querySelectorAll("[data-simulation-question]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.readingSimulation.answers[button.dataset.simulationQuestion] = Number(button.dataset.simulationOption);
+      saveState();
+      renderReading();
+    });
+  });
+
+  document.getElementById("submitReadingSimulationButton")?.addEventListener("click", async () => {
+    await submitReadingSimulation();
+  });
+
   document.getElementById("startGuidedReadingButton")?.addEventListener("click", async () => {
     await startGuidedReading(selectedLesson);
   });
@@ -2491,6 +2539,7 @@ function renderReading() {
     });
   });
   bindContextualHelpButtons(document.getElementById("readingView"));
+  setupReadingSimulationTimer();
 }
 
 function readingJourneySummary() {
@@ -2614,6 +2663,316 @@ function readingReviewPanel() {
       ` : ""}
     </section>
   `;
+}
+
+function readingSimulationPanel() {
+  const simulation = state.readingSimulation || structuredClone(defaultState.readingSimulation);
+  const session = simulation.session;
+  const result = simulation.result;
+  const modes = [
+    ["short", "Short", "1 passage · 5 soal · 10 menit"],
+    ["medium", "Medium", "2 passage · 10 soal · 20 menit"],
+    ["full", "Full Practice", "3 passage · 15 soal · 30 menit"]
+  ];
+  return `
+    <section class="panel" id="readingSimulationPanel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">TOEFL Reading Simulation</p>
+          <h3>Latihan Reading dengan timer</h3>
+          <p>Mode simulasi melatih fokus seperti TOEFL. Bantuan ID dibatasi supaya hasil lebih mirip ujian.</p>
+        </div>
+        ${session && !result ? `<div class="journey-score"><span>Sisa waktu</span><strong id="readingSimulationTimer">${formatSimulationTime(remainingSimulationSeconds())}</strong></div>` : ""}
+      </div>
+      <div class="drill-result-grid">
+        ${modes.map(([mode, label, description]) => `
+          <button class="metric ghost-button ${simulation.mode === mode ? "selected-control" : ""}" type="button" data-simulation-mode="${mode}">
+            <span class="muted">${label}</span>
+            <strong class="metric-word">${description}</strong>
+          </button>
+        `).join("")}
+      </div>
+      <p class="muted"><strong>Catatan:</strong> Bantuan ID tidak ditampilkan di dalam soal simulasi. Setelah submit, gunakan Answer Review dan rekomendasi practice untuk belajar ulang.</p>
+      ${!session ? `
+        <button id="startReadingSimulationButton" class="primary-button" type="button">Mulai Simulasi</button>
+      ` : ""}
+      ${session && !result ? readingSimulationSessionTemplate(session, simulation.answers || {}) : ""}
+      ${result ? readingSimulationResultTemplate(result) : ""}
+      ${simulation.history?.length ? `
+        <h3>Riwayat simulasi</h3>
+        <div class="lesson-list compact-list">
+          ${simulation.history.slice(0, 3).map((item) => `<p><strong>${escapeHtml(item.mode || "")}</strong> · score ${Math.round(item.total_score || 0)}<br><span class="muted">${escapeHtml(item.recommended_next_practice || "")}</span></p>`).join("")}
+        </div>
+      ` : ""}
+    </section>
+  `;
+}
+
+function readingSimulationSessionTemplate(session, answers) {
+  return `
+    <div class="lesson-list">
+      ${(session.passages || []).map((passage, passageIndex) => `
+        <div class="question">
+          <p class="eyebrow">Passage ${passageIndex + 1}</p>
+          <h3>${escapeHtml(passage.title || "")}</h3>
+          <p>${escapeHtml(passage.text || "")}</p>
+          ${(passage.questions || []).map((question, questionIndex) => readingSimulationQuestionTemplate(question, answers, questionIndex)).join("")}
+        </div>
+      `).join("")}
+    </div>
+    <button id="submitReadingSimulationButton" class="primary-button" type="button">Submit Simulasi</button>
+  `;
+}
+
+function readingSimulationQuestionTemplate(question, answers, questionIndex) {
+  const selected = answers[question.id];
+  return `
+    <div class="question">
+      <h3>${questionIndex + 1}. ${escapeHtml(question.text || "")}</h3>
+      <div class="question-options">
+        ${(question.options || []).map((option, optionIndex) => `
+          <button class="option-button ${selected === optionIndex ? "selected" : ""}" type="button" data-simulation-question="${question.id}" data-simulation-option="${optionIndex}">
+            ${String.fromCharCode(65 + optionIndex)}. ${escapeHtml(option)}
+          </button>
+        `).join("")}
+      </div>
+      <p class="muted">Sub-skill: ${escapeHtml(readingSubskillLabel(question.sub_skill))}</p>
+    </div>
+  `;
+}
+
+function readingSimulationResultTemplate(result) {
+  const weakest = result.weakest_sub_skill || {};
+  const strongest = result.strongest_sub_skill || {};
+  return `
+    ${resultTemplate(result.accuracy >= 70 ? "success" : "warning", `Final Score: ${Math.round(result.total_score || 0)}`, `Accuracy ${Math.round(result.accuracy || 0)}% · waktu ${formatSimulationTime(result.time_spent_seconds || 0)}`)}
+    <div class="drill-result-grid">
+      <div class="metric">
+        <span class="muted">Strongest sub-skill</span>
+        <strong class="metric-word">${escapeHtml(strongest.label || "-")}</strong>
+        <small>${Math.round(strongest.accuracy || 0)}%</small>
+      </div>
+      <div class="metric">
+        <span class="muted">Weakest sub-skill</span>
+        <strong class="metric-word">${escapeHtml(weakest.label || "-")}</strong>
+        <small>${Math.round(weakest.accuracy || 0)}%</small>
+      </div>
+      <div class="metric">
+        <span class="muted">Recommended next practice</span>
+        <strong class="metric-word">${escapeHtml(result.recommended_next_practice || "")}</strong>
+      </div>
+    </div>
+    <h3>Sub-skill breakdown</h3>
+    <div class="drill-result-grid">
+      ${(result.sub_skill_breakdown || []).map((item) => `
+        <div class="metric">
+          <span class="muted">${escapeHtml(item.label || readingSubskillLabel(item.sub_skill))}</span>
+          <strong>${Math.round(item.accuracy || 0)}%</strong>
+          <small>${item.correct || 0}/${item.total || 0} benar</small>
+        </div>
+      `).join("")}
+    </div>
+    <h3>Answer review summary</h3>
+    <div class="lesson-list compact-list">
+      ${(result.answer_review_summary || []).slice(0, 5).map((review) => `
+        <p><strong>${escapeHtml(review.question_text || "")}</strong><br>
+        ${review.is_correct ? "Benar" : "Review"} · ${escapeHtml(review.direct_explanation || "")}<br>
+        <span class="muted">Evidence: ${escapeHtml(review.evidence_sentence || "-")}</span></p>
+      `).join("")}
+    </div>
+    <button id="startReadingSimulationButton" class="ghost-button" type="button">Mulai Simulasi Baru</button>
+  `;
+}
+
+async function startReadingSimulation() {
+  let session = localReadingSimulationSession(state.readingSimulation.mode || "short");
+  if (apiOnline) {
+    try {
+      session = await apiRequest("/reading/simulation/start", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          mode: state.readingSimulation.mode || "short"
+        }
+      });
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.readingSimulation = {
+    ...state.readingSimulation,
+    mode: session.mode,
+    session,
+    answers: {},
+    result: null,
+    startedAtMs: Date.now()
+  };
+  saveState();
+  renderReading();
+}
+
+async function submitReadingSimulation() {
+  const simulation = state.readingSimulation;
+  if (!simulation?.session) return;
+  let result = localReadingSimulationResult(simulation);
+  if (apiOnline) {
+    try {
+      result = await apiRequest("/reading/simulation/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          session_id: simulation.session.session_id,
+          mode: simulation.session.mode,
+          session: simulation.session,
+          answers: simulation.answers || {},
+          time_spent_seconds: simulationElapsedSeconds()
+        }
+      });
+      state.readingJourney = result.reading_journey || state.readingJourney;
+      await refreshReadingSimulationHistory();
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.readingSimulation = {
+    ...simulation,
+    result
+  };
+  state.progress.Reading = Math.max(state.progress.Reading, result.total_score || 0);
+  addActivity("Reading", `TOEFL Simulation ${simulation.session.mode}`, result.total_score || 0);
+  saveState();
+  await refreshIntegratedJourney();
+  await refreshReadingJourney();
+  renderReading();
+  renderDashboard();
+  renderJourney();
+}
+
+function setupReadingSimulationTimer() {
+  if (readingSimulationTimer) {
+    clearInterval(readingSimulationTimer);
+    readingSimulationTimer = null;
+  }
+  if (!state.readingSimulation?.session || state.readingSimulation?.result) return;
+  readingSimulationTimer = setInterval(() => {
+    const target = document.getElementById("readingSimulationTimer");
+    if (!target) {
+      clearInterval(readingSimulationTimer);
+      readingSimulationTimer = null;
+      return;
+    }
+    target.textContent = formatSimulationTime(remainingSimulationSeconds());
+  }, 1000);
+}
+
+function remainingSimulationSeconds() {
+  const simulation = state.readingSimulation || {};
+  const duration = Number(simulation.session?.duration_seconds || 0);
+  const elapsed = simulationElapsedSeconds();
+  return Math.max(0, duration - elapsed);
+}
+
+function simulationElapsedSeconds() {
+  const started = state.readingSimulation?.startedAtMs;
+  if (!started) return 0;
+  return Math.max(0, Math.round((Date.now() - started) / 1000));
+}
+
+function formatSimulationTime(totalSeconds) {
+  const seconds = Math.max(0, Number(totalSeconds || 0));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
+}
+
+function localReadingSimulationSession(mode = "short") {
+  const durationMap = { short: 600, medium: 1200, full: 1800 };
+  const passageCount = mode === "short" ? 1 : mode === "medium" ? 2 : 2;
+  const passages = localSimulationPassages().slice(0, passageCount);
+  return {
+    session_id: `local-sim-${mode}-${Date.now()}`,
+    mode,
+    label: mode === "short" ? "Short simulation" : mode === "medium" ? "Medium simulation" : "Full practice simulation",
+    duration_minutes: Math.round((durationMap[mode] || 600) / 60),
+    duration_seconds: durationMap[mode] || 600,
+    started_at: new Date().toISOString(),
+    bantuan_id_policy: "Bantuan ID dibatasi dalam simulation mode.",
+    passages,
+    question_count: passages.reduce((total, passage) => total + passage.questions.length, 0)
+  };
+}
+
+function localSimulationPassages() {
+  const baseLessons = getLessons();
+  return baseLessons.map((lesson) => ({
+    id: `local-${lesson.id}`,
+    title: lesson.title,
+    text: lesson.passage,
+    questions: [
+      ...lesson.questions.map((question) => ({
+        ...question,
+        sub_skill: inferLocalQuestionSubskill(question)
+      })),
+      {
+        id: `${lesson.id}-sim-extra-1`,
+        text: "What can be inferred from the passage?",
+        options: ["The analyst should clarify before solving.", "Coding is the first step.", "Stakeholders are unrelated.", "Strategy should be ignored."],
+        answer: 0,
+        sub_skill: "inference",
+        explanation: "The passage implies clarification and alignment come before solution work."
+      },
+      {
+        id: `${lesson.id}-sim-extra-2`,
+        text: "Which sentence best summarizes the passage?",
+        options: ["A BA connects needs, requirements, and outcomes.", "A BA ignores the process.", "A BA only writes code.", "A BA avoids questions."],
+        answer: 0,
+        sub_skill: "sentence_simplification",
+        explanation: "The summary preserves the main meaning of the passage."
+      }
+    ].slice(0, 5)
+  }));
+}
+
+function localReadingSimulationResult(simulation) {
+  const answers = simulation.answers || {};
+  const flat = [];
+  (simulation.session.passages || []).forEach((passage) => {
+    (passage.questions || []).forEach((question) => flat.push({ passage, question }));
+  });
+  let correct = 0;
+  const buckets = {};
+  const reviews = [];
+  flat.forEach(({ passage, question }) => {
+    const selected = answers[question.id];
+    const isCorrect = selected === question.answer;
+    correct += isCorrect ? 1 : 0;
+    const subSkill = question.sub_skill || inferLocalQuestionSubskill(question);
+    buckets[subSkill] = buckets[subSkill] || { sub_skill: subSkill, label: readingSubskillLabel(subSkill), correct: 0, total: 0 };
+    buckets[subSkill].total += 1;
+    buckets[subSkill].correct += isCorrect ? 1 : 0;
+    if (selected !== undefined) {
+      reviews.push(localReadingAnswerReview({ id: passage.id, passage: passage.text, questions: [question] }, question, selected));
+    }
+  });
+  const total = flat.length || 1;
+  const accuracy = Math.round((correct / total) * 100);
+  const breakdown = Object.values(buckets).map((item) => ({ ...item, accuracy: Math.round((item.correct / Math.max(item.total, 1)) * 100) }));
+  const strongest = [...breakdown].sort((a, b) => b.accuracy - a.accuracy)[0] || null;
+  const weakest = [...breakdown].sort((a, b) => a.accuracy - b.accuracy)[0] || null;
+  return {
+    session_id: simulation.session.session_id,
+    mode: simulation.session.mode,
+    total_score: accuracy,
+    accuracy,
+    correct,
+    total_questions: total,
+    time_spent_seconds: simulationElapsedSeconds(),
+    sub_skill_breakdown: breakdown,
+    strongest_sub_skill: strongest,
+    weakest_sub_skill: weakest,
+    recommended_next_practice: localReadingAction(weakest?.sub_skill || "main_idea"),
+    answer_review_summary: reviews
+  };
 }
 
 function guidedReadingPanel(lesson) {

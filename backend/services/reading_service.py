@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
-from backend.database import decode_json, get_connection
+from backend.database import decode_json, encode_json, get_connection, now_iso
 from backend.services.journey_service import (
     get_default_user_id,
     get_or_create_skill_journey,
@@ -215,6 +216,223 @@ READING_TRAINER_CONTENT = {
         },
     },
 }
+
+READING_SIMULATION_MODES = {
+    "short": {"label": "Short simulation", "passage_count": 1, "question_count": 5, "duration_minutes": 10},
+    "medium": {"label": "Medium simulation", "passage_count": 2, "question_count": 10, "duration_minutes": 20},
+    "full": {"label": "Full practice simulation", "passage_count": 3, "question_count": 15, "duration_minutes": 30},
+}
+
+READING_SIMULATION_BANK = [
+    {
+        "id": "sim-passage-1",
+        "title": "Stakeholder Alignment",
+        "text": (
+            "A business analyst must connect stakeholder needs with business requirements and organizational strategy. "
+            "When a problem is described vaguely, the analyst clarifies the expected outcome before proposing a solution. "
+            "This work helps teams avoid building features that do not support the business goal."
+        ),
+        "questions": [
+            {
+                "id": "sim-p1-q1",
+                "text": "What is the main idea of the passage?",
+                "options": [
+                    "Business analysts should write code immediately.",
+                    "Business analysts connect stakeholder needs, requirements, and strategy.",
+                    "Stakeholders should avoid all discussions.",
+                    "Strategy is unrelated to requirements.",
+                ],
+                "answer": 1,
+                "sub_skill": "main_idea",
+                "explanation": "The passage focuses on connecting needs, requirements, and strategy.",
+            },
+            {
+                "id": "sim-p1-q2",
+                "text": "The word 'clarifies' is closest in meaning to:",
+                "options": ["makes clearer", "deletes", "delays", "approves"],
+                "answer": 0,
+                "sub_skill": "vocabulary_context",
+                "explanation": "Clarifies means making unclear information easier to understand.",
+            },
+            {
+                "id": "sim-p1-q3",
+                "text": "What should the analyst clarify before proposing a solution?",
+                "options": ["The expected outcome.", "The code style.", "The office schedule.", "The final contract."],
+                "answer": 0,
+                "sub_skill": "detail_information",
+                "explanation": "The passage says the analyst clarifies the expected outcome.",
+            },
+            {
+                "id": "sim-p1-q4",
+                "text": "What can be inferred about vague problems?",
+                "options": [
+                    "They should be clarified before solution design.",
+                    "They are always ready for development.",
+                    "They should be ignored.",
+                    "They are unrelated to stakeholders.",
+                ],
+                "answer": 0,
+                "sub_skill": "inference",
+                "explanation": "The passage implies unclear problems need clarification first.",
+            },
+            {
+                "id": "sim-p1-q5",
+                "text": "Which sentence best simplifies the first sentence?",
+                "options": [
+                    "A BA links stakeholder needs, requirements, and strategy.",
+                    "A BA avoids business strategy.",
+                    "Stakeholders write all requirements alone.",
+                    "Requirements replace stakeholder needs.",
+                ],
+                "answer": 0,
+                "sub_skill": "sentence_simplification",
+                "explanation": "The simplified sentence keeps the same core meaning.",
+            },
+        ],
+    },
+    {
+        "id": "sim-passage-2",
+        "title": "Process Improvement Before Automation",
+        "text": (
+            "Before recommending automation, a business analyst evaluates the current process to identify delays, duplicate work, "
+            "and unclear responsibilities. This analysis helps the organization decide whether technology is the right solution "
+            "or whether the process itself must be redesigned."
+        ),
+        "questions": [
+            {
+                "id": "sim-p2-q1",
+                "text": "Why does the analyst evaluate the current process?",
+                "options": [
+                    "To identify delays and unclear responsibilities.",
+                    "To replace all employees.",
+                    "To avoid speaking with stakeholders.",
+                    "To approve every request automatically.",
+                ],
+                "answer": 0,
+                "sub_skill": "detail_information",
+                "explanation": "The first sentence states the analyst identifies delays, duplicate work, and unclear responsibilities.",
+            },
+            {
+                "id": "sim-p2-q2",
+                "text": "What is the main idea of the passage?",
+                "options": [
+                    "Automation should always be implemented first.",
+                    "A process should be evaluated before choosing automation.",
+                    "Technology removes the need for analysis.",
+                    "Duplicate work is always useful.",
+                ],
+                "answer": 1,
+                "sub_skill": "main_idea",
+                "explanation": "The passage explains why process evaluation comes before automation decisions.",
+            },
+            {
+                "id": "sim-p2-q3",
+                "text": "The word 'redesigned' is closest in meaning to:",
+                "options": ["designed again", "ignored", "approved", "measured"],
+                "answer": 0,
+                "sub_skill": "vocabulary_context",
+                "explanation": "Redesigned means designed again or changed in structure.",
+            },
+            {
+                "id": "sim-p2-q4",
+                "text": "What can be inferred from the passage?",
+                "options": [
+                    "Technology is not always the best first answer.",
+                    "Automation always solves unclear responsibilities.",
+                    "The analyst should skip process review.",
+                    "Duplicate work cannot be detected.",
+                ],
+                "answer": 0,
+                "sub_skill": "inference",
+                "explanation": "The passage implies analysis may show process redesign is better than technology.",
+            },
+            {
+                "id": "sim-p2-q5",
+                "text": "What does 'This analysis' refer to?",
+                "options": [
+                    "Evaluating the current process.",
+                    "Writing code.",
+                    "Approving a contract.",
+                    "Replacing the team.",
+                ],
+                "answer": 0,
+                "sub_skill": "reference",
+                "explanation": "This analysis refers to evaluating the current process.",
+            },
+        ],
+    },
+    {
+        "id": "sim-passage-3",
+        "title": "Reliable Reporting",
+        "text": (
+            "Two departments enter customer data into separate systems, so weekly reports often show different totals. "
+            "The analyst traces the discrepancy to timing differences and proposes a shared data validation step. "
+            "The goal is to make decisions based on consistent information."
+        ),
+        "questions": [
+            {
+                "id": "sim-p3-q1",
+                "text": "What problem is described in the passage?",
+                "options": [
+                    "Reports show different totals.",
+                    "Customers refuse to share data.",
+                    "The analyst removes validation.",
+                    "Both systems are already identical.",
+                ],
+                "answer": 0,
+                "sub_skill": "detail_information",
+                "explanation": "The passage says weekly reports often show different totals.",
+            },
+            {
+                "id": "sim-p3-q2",
+                "text": "What is the purpose of the shared validation step?",
+                "options": [
+                    "To support decisions with consistent information.",
+                    "To make reports less reliable.",
+                    "To stop departments from using data.",
+                    "To create duplicate work.",
+                ],
+                "answer": 0,
+                "sub_skill": "author_purpose",
+                "explanation": "The final sentence explains the goal of consistent decision-making information.",
+            },
+            {
+                "id": "sim-p3-q3",
+                "text": "The word 'discrepancy' is closest in meaning to:",
+                "options": ["difference", "approval", "strategy", "outcome"],
+                "answer": 0,
+                "sub_skill": "vocabulary_context",
+                "explanation": "Discrepancy means a difference between two things that should match.",
+            },
+            {
+                "id": "sim-p3-q4",
+                "text": "What can be inferred about the reports?",
+                "options": [
+                    "They may be unreliable without validation.",
+                    "They are always correct.",
+                    "They do not use customer data.",
+                    "They should never be reviewed.",
+                ],
+                "answer": 0,
+                "sub_skill": "inference",
+                "explanation": "Different totals imply the reports need validation before decision-making.",
+            },
+            {
+                "id": "sim-p3-q5",
+                "text": "What is the function of the last sentence?",
+                "options": [
+                    "It explains the business goal of the proposed step.",
+                    "It introduces an unrelated topic.",
+                    "It rejects consistent information.",
+                    "It lists every stakeholder.",
+                ],
+                "answer": 0,
+                "sub_skill": "paragraph_function",
+                "explanation": "The last sentence explains why the validation step matters.",
+            },
+        ],
+    },
+]
 
 
 def reading_score_to_level(score: float) -> dict[str, Any]:
@@ -624,6 +842,172 @@ def get_reading_review_queue(user_id: str | None = None) -> dict[str, Any]:
             }
         )
     return {"user_id": user_id, "review_items": items[:8]}
+
+
+def start_reading_simulation(payload: dict[str, Any]) -> dict[str, Any]:
+    mode = normalize_simulation_mode(payload.get("mode", "short"))
+    config = READING_SIMULATION_MODES[mode]
+    session_id = f"reading-sim-{mode}-{int(time.time() * 1000)}"
+    passages = build_simulation_passages(mode)
+    return {
+        "session_id": session_id,
+        "mode": mode,
+        "label": config["label"],
+        "duration_minutes": config["duration_minutes"],
+        "duration_seconds": config["duration_minutes"] * 60,
+        "started_at": now_iso(),
+        "bantuan_id_policy": "Bantuan ID dibatasi dalam simulation mode. Gunakan hanya setelah selesai untuk review.",
+        "passages": passages,
+        "question_count": sum(len(passage["questions"]) for passage in passages),
+    }
+
+
+def submit_reading_simulation(payload: dict[str, Any]) -> dict[str, Any]:
+    user_id = get_default_user_id(payload.get("user_id") or payload.get("userId"))
+    session = payload.get("session") or {}
+    mode = normalize_simulation_mode(payload.get("mode") or session.get("mode") or "short")
+    session_id = payload.get("session_id") or session.get("session_id") or f"reading-sim-{mode}-{int(time.time() * 1000)}"
+    passages = session.get("passages") or build_simulation_passages(mode)
+    answers = payload.get("answers") or {}
+    time_spent_seconds = int(payload.get("time_spent_seconds") or payload.get("timeSpentSeconds") or 0)
+    flat_questions = []
+    for passage in passages:
+        for question in passage.get("questions", []):
+            flat_questions.append((passage, question))
+    correct = 0
+    details = []
+    subskill_totals: dict[str, dict[str, Any]] = {}
+    mistakes = []
+    answer_reviews = []
+    for passage, question in flat_questions:
+        qid = question["id"]
+        selected = answers.get(qid)
+        if isinstance(selected, str) and selected.isdigit():
+            selected = int(selected)
+        is_correct = selected == question.get("answer")
+        correct += 1 if is_correct else 0
+        sub_skill = normalize_subskill(question.get("sub_skill") or infer_question_subskill(question))
+        bucket = subskill_totals.setdefault(sub_skill, {"sub_skill": sub_skill, "label": label_subskill(sub_skill), "correct": 0, "total": 0})
+        bucket["total"] += 1
+        bucket["correct"] += 1 if is_correct else 0
+        if selected is not None:
+            review = generate_answer_review(
+                {
+                    "passage": passage.get("text", ""),
+                    "question": question,
+                    "selected": selected,
+                    "correct_answer": question.get("answer"),
+                    "explanation": question.get("explanation", ""),
+                    "sub_skill": sub_skill,
+                }
+            )
+            answer_reviews.append(review)
+        if not is_correct:
+            mistakes.append({"question_id": qid, "selected": selected, "correct_answer": question.get("answer"), "sub_skill": sub_skill})
+        details.append(
+            {
+                "question_id": qid,
+                "passage_id": passage.get("id"),
+                "selected": selected,
+                "correct_answer": question.get("answer"),
+                "is_correct": is_correct,
+                "sub_skill": sub_skill,
+            }
+        )
+    total = len(flat_questions) or 1
+    accuracy = round((correct / total) * 100, 1)
+    subskill_breakdown = []
+    for item in subskill_totals.values():
+        item["accuracy"] = round((item["correct"] / max(item["total"], 1)) * 100, 1)
+        subskill_breakdown.append(item)
+        update_skill_mastery(
+            user_id=user_id,
+            skill_type="reading",
+            topic=item["sub_skill"],
+            is_correct=item["accuracy"] >= 70,
+            score=item["accuracy"],
+        )
+    strongest = max(subskill_breakdown, key=lambda item: item["accuracy"]) if subskill_breakdown else None
+    weakest = min(subskill_breakdown, key=lambda item: item["accuracy"]) if subskill_breakdown else None
+    recommended_subskill = next_trainable_subskill((weakest or {}).get("sub_skill", "main_idea"))
+    result = {
+        "session_id": session_id,
+        "mode": mode,
+        "total_score": round(accuracy),
+        "accuracy": accuracy,
+        "correct": correct,
+        "total_questions": total,
+        "time_spent_seconds": time_spent_seconds,
+        "sub_skill_breakdown": subskill_breakdown,
+        "strongest_sub_skill": strongest,
+        "weakest_sub_skill": weakest,
+        "recommended_next_practice": READING_ACTIONS.get(recommended_subskill, READING_ACTIONS["main_idea"]),
+        "answer_review_summary": answer_reviews,
+        "details": details,
+        "submitted_at": now_iso(),
+    }
+    update = save_learning_attempt(
+        user_id=user_id,
+        skill_type="reading",
+        activity_id=session_id,
+        activity_type="reading_simulation",
+        score=accuracy,
+        max_score=100,
+        mistakes=mistakes,
+        feedback=f"SIMULATION_RESULT:{encode_json(result)}",
+    )
+    result["journey_update"] = update
+    result["reading_journey"] = get_reading_journey(user_id)
+    return result
+
+
+def get_reading_simulation_result(session_id: str, user_id: str | None = None) -> dict[str, Any]:
+    user_id = get_default_user_id(user_id)
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM learning_attempts
+            WHERE user_id = ? AND skill_type = 'reading' AND activity_type = 'reading_simulation' AND activity_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (user_id, session_id),
+        ).fetchone()
+    if not row:
+        raise ValueError("Simulation result tidak ditemukan.")
+    return parse_simulation_result_from_attempt(dict(row))
+
+
+def get_reading_simulation_history(user_id: str | None = None) -> dict[str, Any]:
+    user_id = get_default_user_id(user_id)
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM learning_attempts
+            WHERE user_id = ? AND skill_type = 'reading' AND activity_type = 'reading_simulation'
+            ORDER BY created_at DESC
+            LIMIT 10
+            """,
+            (user_id,),
+        ).fetchall()
+    history = []
+    for row in rows:
+        result = parse_simulation_result_from_attempt(dict(row))
+        history.append(
+            {
+                "session_id": result["session_id"],
+                "mode": result["mode"],
+                "total_score": result["total_score"],
+                "accuracy": result["accuracy"],
+                "time_spent_seconds": result.get("time_spent_seconds", 0),
+                "submitted_at": result.get("submitted_at") or row["created_at"],
+                "weakest_sub_skill": result.get("weakest_sub_skill"),
+                "recommended_next_practice": result.get("recommended_next_practice"),
+            }
+        )
+    return {"user_id": user_id, "history": history}
 
 
 def save_reading_attempt(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1142,6 +1526,52 @@ def reading_mentor_message(weakness_summary: dict[str, Any], recommended_sub_ski
     return (
         f"Fokus Reading berikutnya adalah {label}. Kerjakan latihan pendek, lalu cek Answer Review untuk melihat pola salah."
     )
+
+
+def normalize_simulation_mode(mode: Any) -> str:
+    normalized = str(mode or "short").strip().lower()
+    if normalized in {"full_practice", "full-practice"}:
+        normalized = "full"
+    if normalized not in READING_SIMULATION_MODES:
+        raise ValueError("Mode simulation harus short, medium, atau full.")
+    return normalized
+
+
+def build_simulation_passages(mode: str) -> list[dict[str, Any]]:
+    config = READING_SIMULATION_MODES[mode]
+    passages = []
+    for passage in READING_SIMULATION_BANK[: config["passage_count"]]:
+        copied = {
+            "id": passage["id"],
+            "title": passage["title"],
+            "text": passage["text"],
+            "questions": [dict(question) for question in passage["questions"]],
+        }
+        passages.append(copied)
+    return passages
+
+
+def parse_simulation_result_from_attempt(attempt: dict[str, Any]) -> dict[str, Any]:
+    feedback = str(attempt.get("feedback") or "")
+    if feedback.startswith("SIMULATION_RESULT:"):
+        parsed = decode_json(feedback.removeprefix("SIMULATION_RESULT:"), {})
+        if parsed:
+            return parsed
+    return {
+        "session_id": attempt.get("activity_id"),
+        "mode": "unknown",
+        "total_score": round(float(attempt.get("accuracy") or 0)),
+        "accuracy": float(attempt.get("accuracy") or 0),
+        "correct": 0,
+        "total_questions": 0,
+        "time_spent_seconds": 0,
+        "sub_skill_breakdown": [],
+        "strongest_sub_skill": None,
+        "weakest_sub_skill": None,
+        "recommended_next_practice": READING_ACTIONS["main_idea"],
+        "answer_review_summary": [],
+        "submitted_at": attempt.get("created_at"),
+    }
 
 
 def split_paragraphs(passage: str) -> list[str]:

@@ -160,6 +160,14 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - backend menganalisis weak sub-skills, repeated wrong question types, low score passages, vocabulary yang sering salah, dan indikasi penggunaan Bantuan ID jika tercatat
   - UI menampilkan weakness report, mistake pattern, review queue, recommended practice, dan mentor message
   - tombol "Latihan Ulang Skill Lemah" mengarahkan user ke Reading Trainer sub-skill yang direkomendasikan
+- TOEFL Reading Simulation:
+  - endpoint `POST /api/reading/simulation/start`
+  - endpoint `POST /api/reading/simulation/submit`
+  - endpoint `GET /api/reading/simulation/result/{session_id}`
+  - endpoint `GET /api/reading/simulation/history`
+  - mode short, medium, dan full practice
+  - UI Reading menampilkan timer, warning Bantuan ID dibatasi, soal simulasi, submit, final report, sub-skill breakdown, dan history
+  - submit simulasi menyimpan progress ke Reading Journey melalui `learning_attempts`
 
 ## Verifikasi
 
@@ -180,6 +188,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Smoke test diperluas untuk Guided Reading steps dan passage map.
 - Smoke test diperluas untuk Reading answer review dan distractor analysis.
 - Smoke test diperluas untuk Reading review, mistake patterns, dan review queue.
+- Smoke test diperluas untuk TOEFL Reading Simulation start, submit, dan history.
 
 ## Cara Menjalankan Saat Ini
 
@@ -213,11 +222,11 @@ python3 scripts/smoke_api.py
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
 - Auth production-grade dan role-based access control.
-- TOEFL Reading Simulation Phase 6 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
+- Bank soal Reading yang lebih besar dan test coverage browser untuk semua mode Reading.
 
 ## Rekomendasi Step Berikutnya
 
-1. Implementasikan Phase 6 TOEFL Reading Simulation.
+1. Tambahkan bank soal Reading yang lebih besar dan simpan di database.
 2. Tambahkan edit/delete di Admin CMS frontend.
 3. Tambahkan E2E browser tests untuk alur utama.
 4. Tambahkan API tests dengan SQLite test database.

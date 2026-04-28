@@ -58,10 +58,16 @@ Yang sudah tersedia:
   - endpoint `GET /api/reading/review-queue`
   - UI Reading Review menampilkan weakness report, mistake pattern, review queue, recommended practice, dan mentor message
   - tombol "Latihan Ulang Skill Lemah" mengarahkan user ke trainer sub-skill yang direkomendasikan
+- TOEFL Reading Simulation Phase 6:
+  - endpoint `POST /api/reading/simulation/start`
+  - endpoint `POST /api/reading/simulation/submit`
+  - endpoint `GET /api/reading/simulation/result/{session_id}`
+  - endpoint `GET /api/reading/simulation/history`
+  - mode `short`, `medium`, dan `full`
+  - UI simulasi dengan timer, warning Bantuan ID dibatasi, submit, final report, sub-skill breakdown, dan history
 
 Yang belum tersedia:
 
-- TOEFL Reading simulation dengan timer.
 - Reading-specific review history.
 
 ## Implementation Phases
@@ -269,20 +275,28 @@ Deliverables:
 
 Completed:
 
-- Belum dimulai.
+- Service Reading menghasilkan simulation session untuk mode short, medium, dan full.
+- Submit simulation menghitung total score, accuracy, time spent, sub-skill breakdown, strongest/weakest sub-skill, recommended next practice, dan answer review summary.
+- Simulation submit menyimpan attempt dengan `activity_type = reading_simulation`, sehingga progress masuk Reading Journey.
+- Endpoint `POST /api/reading/simulation/start` tersedia.
+- Endpoint `POST /api/reading/simulation/submit` tersedia.
+- Endpoint `GET /api/reading/simulation/result/{session_id}` tersedia.
+- Endpoint `GET /api/reading/simulation/history` tersedia.
+- UI Reading menampilkan TOEFL Simulation Mode sebagai mode tambahan.
+- Timer berjalan di frontend dan tidak menghapus mode Reading lain.
+- Smoke test mencakup start, submit, dan history simulation.
 
 Pending:
 
-- Simulation state.
-- Timer UI.
-- Full set data.
-- Final report generation.
+- Full practice masih memakai bank soal internal kecil, belum bank soal TOEFL besar.
+- Timer belum auto-submit saat waktu habis.
+- Result history masih disimpan lewat `learning_attempts`, belum tabel `reading_simulations` khusus.
 
 Testing checklist:
 
-- Timer berjalan dan tidak reset saat pindah soal.
-- User bisa submit full set.
-- Final report menampilkan score dan sub-skill.
+- Timer berjalan dan tidak reset saat menjawab soal. Done.
+- User bisa submit simulation set. Done.
+- Final report menampilkan score dan sub-skill. Done.
 
 ## Completed Items
 

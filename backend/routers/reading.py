@@ -10,9 +10,13 @@ from backend.services.reading_service import (
     get_reading_recommendation,
     get_reading_review,
     get_reading_review_queue,
+    get_reading_simulation_history,
+    get_reading_simulation_result,
     get_reading_subskills,
     get_reading_trainer,
     save_reading_attempt,
+    start_reading_simulation,
+    submit_reading_simulation,
 )
 
 
@@ -47,6 +51,35 @@ def reading_mistake_patterns(user_id: str | None = None) -> dict:
 @router.get("/review-queue")
 def reading_review_queue(user_id: str | None = None) -> dict:
     return get_reading_review_queue(user_id)
+
+
+@router.post("/simulation/start")
+def reading_simulation_start(payload: dict) -> dict:
+    try:
+        return start_reading_simulation(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/simulation/submit")
+def reading_simulation_submit(payload: dict) -> dict:
+    try:
+        return submit_reading_simulation(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.get("/simulation/result/{session_id}")
+def reading_simulation_result(session_id: str, user_id: str | None = None) -> dict:
+    try:
+        return get_reading_simulation_result(session_id, user_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/simulation/history")
+def reading_simulation_history(user_id: str | None = None) -> dict:
+    return get_reading_simulation_history(user_id)
 
 
 @router.get("/subskills")
