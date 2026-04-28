@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
 from backend.services.reading_service import (
+    generate_guided_reading_steps,
+    generate_passage_map,
     get_reading_journey,
     get_reading_levels,
     get_reading_recommendation,
@@ -37,6 +39,22 @@ def reading_subskills(user_id: str | None = None) -> dict:
 def reading_trainer(sub_skill: str, user_id: str | None = None) -> dict:
     try:
         return get_reading_trainer(sub_skill, user_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/guided-steps")
+def reading_guided_steps(payload: dict) -> dict:
+    try:
+        return generate_guided_reading_steps(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/passage-map")
+def reading_passage_map(payload: dict) -> dict:
+    try:
+        return generate_passage_map(payload)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

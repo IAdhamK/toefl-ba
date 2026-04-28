@@ -175,6 +175,31 @@ def main():
         and reading_vocab_attempt["reading_journey"]["sub_skill_mastery"],
     )
 
+    guided_payload = {
+        "lesson_id": lesson["id"],
+        "title": lesson["title"],
+        "passage": lesson["passage"],
+        "vocabulary": lesson.get("vocabulary", []),
+        "question_text": lesson["questions"][0]["text"],
+    }
+    status, guided_steps = call("/reading/guided-steps", guided_payload)
+    assert_ok(
+        "reading guided steps",
+        status == 200
+        and guided_steps["total_steps"] == 7
+        and guided_steps["steps"][0]["id"] == "title"
+        and guided_steps["steps"][2]["subject"],
+    )
+
+    status, passage_map = call("/reading/passage-map", guided_payload)
+    assert_ok(
+        "reading passage map",
+        status == 200
+        and len(passage_map["paragraphs"]) >= 1
+        and "simple_meaning" in passage_map["paragraphs"][0]
+        and "beginner_tip" in passage_map["paragraphs"][0],
+    )
+
     first_vocab = daily_vocab["items"][0]
     status, vocab_score = call("/scoring/vocabulary", {"itemId": first_vocab["id"], "answer": first_vocab["answer"]})
     assert_ok("vocabulary scoring", status == 200 and vocab_score["isCorrect"])

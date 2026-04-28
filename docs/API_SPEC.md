@@ -66,6 +66,8 @@ Compatibility endpoint lama tetap tersedia:
 - `GET /api/reading/recommendation`
 - `GET /api/reading/subskills`
 - `GET /api/reading/trainer/{sub_skill}`
+- `POST /api/reading/guided-steps`
+- `POST /api/reading/passage-map`
 - `POST /api/reading/attempt`
 
 Example Reading attempt:
@@ -131,6 +133,45 @@ Trainer response includes:
 - `guidance`
 
 Trainer attempt response includes `answer_feedback`, `reading_journey`, and `next_recommended_subskill`.
+
+Example Guided Reading request:
+
+```json
+{
+  "lesson_id": "reading-1",
+  "title": "Stakeholder Needs and Strategy Alignment",
+  "passage": "A business analyst ... proposing a solution.",
+  "vocabulary": ["elicit", "alignment", "stakeholder"],
+  "question_text": "What is the main idea of the passage?"
+}
+```
+
+`POST /api/reading/guided-steps` returns:
+
+- `steps`
+- `total_steps`
+- `support_activity`
+
+Guided steps currently cover:
+
+1. title understanding
+2. first sentence
+3. subject and main verb
+4. important vocabulary
+5. paragraph map
+6. main idea
+7. answer the question
+
+`POST /api/reading/passage-map` returns:
+
+- paragraph number
+- simple meaning
+- key vocabulary
+- main point
+- possible reading skill
+- beginner tip
+
+Guided Reading is rule-based for now and beginner-friendly in Indonesian. The frontend records completion as a support activity without lowering the Reading score.
 
 Reading Journey response includes:
 

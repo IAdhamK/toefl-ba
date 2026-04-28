@@ -42,10 +42,14 @@ Yang sudah tersedia:
   - `POST /api/reading/attempt` menerima `sub_skill`
   - trainer awal untuk `main_idea`, `detail_information`, `vocabulary_context`, `inference`, dan `sentence_simplification`
   - halaman Reading menampilkan progress 10 sub-skill dan selector trainer
+- Guided Reading Mode Phase 3:
+  - endpoint `POST /api/reading/guided-steps`
+  - endpoint `POST /api/reading/passage-map`
+  - UI Guided Reading di halaman Reading
+  - step-by-step cards untuk judul, kalimat pertama, subject/verb, vocabulary, paragraph map, main idea, dan siap menjawab soal
 
 Yang belum tersedia:
 
-- Guided Reading mode.
 - Evidence sentence per jawaban.
 - Distractor analysis lengkap.
 - Reading weakness report.
@@ -150,18 +154,26 @@ Deliverables:
 Completed:
 
 - Bantuan ID sudah kontekstual.
+- Service Reading menghasilkan guided steps untuk passage yang dipilih.
+- Passage map menghasilkan simple meaning, key vocabulary, main point, possible reading skill, dan beginner tip per paragraf.
+- Endpoint `POST /api/reading/guided-steps` tersedia.
+- Endpoint `POST /api/reading/passage-map` tersedia.
+- UI Reading memiliki Guided Reading Mode dengan tombol "Mulai Guided Reading" dan "Lanjut ke Langkah Berikutnya".
+- Guided Reading mencatat aktivitas pendukung lokal saat selesai tanpa menurunkan skor latihan.
+- Bantuan ID tetap tersedia pada teks guided step dan paragraph map.
+- Smoke test mencakup guided steps dan passage map.
 
 Pending:
 
-- UI Guided Reading.
-- Segmentasi passage per paragraph/sentence.
-- Step-by-step reading guidance.
+- Guided Reading dengan multi-paragraph passage yang lebih panjang.
+- Integrasi LLM opsional untuk penjelasan passage yang lebih natural.
+- Penyimpanan completion guided reading di backend journey tanpa memengaruhi average score.
 
 Testing checklist:
 
-- Passage dapat dibaca dalam langkah kecil.
-- User bisa melihat arti kalimat dan vocabulary context.
-- Guided mode tidak mengganggu mode quiz.
+- Passage dapat dibaca dalam langkah kecil. Done.
+- User bisa melihat arti kalimat dan vocabulary context. Done.
+- Guided mode tidak mengganggu mode quiz. Done.
 
 ### Phase 4 — Answer Review
 

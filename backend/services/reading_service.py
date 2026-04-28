@@ -65,6 +65,34 @@ READING_ACTIONS = {
     "ba_case_analysis": "Latihan BA case reading: hubungkan masalah, stakeholder, requirement, dan business outcome.",
 }
 
+READING_VOCABULARY_MEANINGS = {
+    "analyst": "orang yang menganalisis kebutuhan atau masalah",
+    "business": "bisnis",
+    "stakeholder": "pihak yang berkepentingan",
+    "stakeholders": "pihak-pihak yang berkepentingan",
+    "requirement": "kebutuhan sistem atau bisnis",
+    "requirements": "kebutuhan sistem atau bisnis",
+    "elicit": "menggali informasi",
+    "elicits": "menggali informasi",
+    "alignment": "keselarasan",
+    "strategy": "strategi atau arah organisasi",
+    "organizational": "berhubungan dengan organisasi",
+    "vague": "samar atau belum jelas",
+    "vaguely": "dengan cara yang samar",
+    "clarify": "membuat lebih jelas",
+    "clarifies": "membuat lebih jelas",
+    "outcome": "hasil yang diharapkan",
+    "process": "alur kerja",
+    "automation": "otomatisasi",
+    "evaluate": "menilai atau memeriksa",
+    "delays": "keterlambatan",
+    "duplicate": "ganda atau berulang",
+    "responsibilities": "tanggung jawab",
+    "redesigned": "dirancang ulang",
+    "workflow": "alur kerja",
+    "approval": "persetujuan",
+}
+
 READING_TRAINER_CONTENT = {
     "main_idea": {
         "passage": {
@@ -290,6 +318,127 @@ def get_reading_trainer(sub_skill: str, user_id: str | None = None) -> dict[str,
     }
 
 
+def generate_guided_reading_steps(payload: dict[str, Any]) -> dict[str, Any]:
+    title = str(payload.get("title") or payload.get("passage_title") or "Reading Passage").strip()
+    passage = str(payload.get("passage") or payload.get("passage_text") or "").strip()
+    if not passage:
+        raise ValueError("Passage wajib diisi untuk Guided Reading.")
+    lesson_id = payload.get("lesson_id") or payload.get("activity_id") or "guided-reading"
+    first_sentence = split_sentences(passage)[0] if split_sentences(passage) else passage
+    subject, verb = identify_subject_and_verb(first_sentence)
+    vocabulary = extract_key_vocabulary(passage, payload.get("vocabulary") or [])
+    passage_map = generate_passage_map({"title": title, "passage": passage, "vocabulary": payload.get("vocabulary") or []})
+    main_idea = infer_main_idea(title, passage)
+    steps = [
+        {
+            "step": 1,
+            "id": "title",
+            "title": "Pahami judul",
+            "focus_text": title,
+            "simple_explanation": f"Judul ini memberi sinyal bahwa bacaan membahas {title.lower()}.",
+            "learner_action": "Sebelum membaca detail, tebak dulu topik besarnya dari judul.",
+            "bantuan_context_type": "reading_passage",
+        },
+        {
+            "step": 2,
+            "id": "first_sentence",
+            "title": "Baca kalimat pertama",
+            "focus_text": first_sentence,
+            "simple_explanation": simple_sentence_meaning(first_sentence),
+            "learner_action": "Cari siapa pelakunya dan aksi utama yang dilakukan.",
+            "bantuan_context_type": "reading_paragraph",
+        },
+        {
+            "step": 3,
+            "id": "subject_verb",
+            "title": "Temukan subject dan main verb",
+            "focus_text": first_sentence,
+            "subject": subject,
+            "main_verb": verb,
+            "simple_explanation": f"Subject utamanya adalah '{subject}'. Aksi utamanya adalah '{verb}'.",
+            "learner_action": "Jangan fokus dulu pada semua kata. Pegang subject dan verb utama dulu.",
+            "bantuan_context_type": "grammar_sentence",
+        },
+        {
+            "step": 4,
+            "id": "vocabulary",
+            "title": "Kenali vocabulary penting",
+            "focus_text": ", ".join(item["word"] for item in vocabulary[:6]),
+            "key_vocabulary": vocabulary[:8],
+            "simple_explanation": "Kata-kata ini sering menentukan makna passage dan jawaban TOEFL.",
+            "learner_action": "Pahami arti kata dari konteks kalimat, bukan hanya dari hafalan kamus.",
+            "bantuan_context_type": "vocabulary_example",
+        },
+        {
+            "step": 5,
+            "id": "paragraph_map",
+            "title": "Pahami tiap paragraf",
+            "paragraph_map": passage_map["paragraphs"],
+            "simple_explanation": "Setiap paragraf punya satu pesan utama. Baca per bagian, bukan sekaligus.",
+            "learner_action": "Catat main point tiap paragraf sebelum melihat pertanyaan.",
+            "bantuan_context_type": "reading_paragraph",
+        },
+        {
+            "step": 6,
+            "id": "main_idea",
+            "title": "Temukan main idea",
+            "focus_text": passage,
+            "main_idea": main_idea,
+            "simple_explanation": main_idea,
+            "learner_action": "Pilih jawaban yang merangkum seluruh passage, bukan detail kecil.",
+            "bantuan_context_type": "reading_question",
+        },
+        {
+            "step": 7,
+            "id": "answer_question",
+            "title": "Siap jawab pertanyaan",
+            "focus_text": payload.get("question_text") or "TOEFL-style question",
+            "simple_explanation": "Sekarang kamu sudah punya bekal: topik, subject/verb, vocabulary, paragraf, dan main idea.",
+            "learner_action": "Jawab pertanyaan dengan mencocokkan opsi dengan main idea dan evidence passage.",
+            "bantuan_context_type": "reading_question",
+        },
+    ]
+    return {
+        "lesson_id": lesson_id,
+        "title": title,
+        "passage": passage,
+        "steps": steps,
+        "total_steps": len(steps),
+        "support_activity": {
+            "skill_type": "reading",
+            "activity_type": "guided_reading",
+            "feedback": "User menyelesaikan Guided Reading sebagai aktivitas pendukung. Aktivitas ini tidak menurunkan skor.",
+        },
+    }
+
+
+def generate_passage_map(payload: dict[str, Any]) -> dict[str, Any]:
+    title = str(payload.get("title") or payload.get("passage_title") or "Reading Passage").strip()
+    passage = str(payload.get("passage") or payload.get("passage_text") or "").strip()
+    if not passage:
+        raise ValueError("Passage wajib diisi untuk passage map.")
+    paragraphs = split_paragraphs(passage)
+    mapped = []
+    for index, paragraph in enumerate(paragraphs, start=1):
+        vocab = extract_key_vocabulary(paragraph, payload.get("vocabulary") or [])
+        mapped.append(
+            {
+                "paragraph_number": index,
+                "text": paragraph,
+                "simple_meaning": simple_paragraph_meaning(paragraph),
+                "key_vocabulary": vocab[:6],
+                "main_point": infer_paragraph_main_point(paragraph),
+                "possible_reading_skill": infer_paragraph_skill(paragraph),
+                "beginner_tip": paragraph_beginner_tip(paragraph),
+            }
+        )
+    return {
+        "title": title,
+        "paragraphs": mapped,
+        "main_idea": infer_main_idea(title, passage),
+    }
+
+
 def save_reading_attempt(payload: dict[str, Any]) -> dict[str, Any]:
     user_id = get_default_user_id(payload.get("user_id") or payload.get("userId"))
     passage_id = payload.get("passage_id") or payload.get("lesson_id") or payload.get("activity_id") or "reading-passage"
@@ -506,6 +655,146 @@ def parse_selected_index(selected: Any, options: list[str]) -> int | None:
         if option.lower() == lowered:
             return index
     return None
+
+
+def split_paragraphs(passage: str) -> list[str]:
+    chunks = [item.strip() for item in str(passage or "").split("\n") if item.strip()]
+    return chunks or [str(passage or "").strip()]
+
+
+def split_sentences(text: str) -> list[str]:
+    normalized = str(text or "").replace("?", ".").replace("!", ".")
+    sentences = [part.strip() for part in normalized.split(".") if part.strip()]
+    return sentences
+
+
+def identify_subject_and_verb(sentence: str) -> tuple[str, str]:
+    words = str(sentence or "").split()
+    lowered = [word.strip(",.").lower() for word in words]
+    verb_candidates = [
+        "must",
+        "should",
+        "can",
+        "helps",
+        "help",
+        "evaluates",
+        "evaluate",
+        "connects",
+        "connect",
+        "elicits",
+        "elicit",
+        "clarifies",
+        "clarify",
+        "identifies",
+        "identify",
+        "determine",
+        "determines",
+        "describes",
+        "proposing",
+        "recommending",
+    ]
+    verb_index = next((index for index, word in enumerate(lowered) if word in verb_candidates), 1 if len(words) > 1 else 0)
+    subject = " ".join(words[:verb_index]).strip(", ") or words[0] if words else "-"
+    verb = words[verb_index].strip(",.") if words and verb_index < len(words) else "-"
+    if verb.lower() == "must" and verb_index + 1 < len(words):
+        verb = f"must {words[verb_index + 1].strip(',.')}"
+    if subject.lower().startswith("when "):
+        subject = "the analyst" if "analyst" in lowered else subject
+    return subject, verb
+
+
+def extract_key_vocabulary(text: str, provided: list[Any] | tuple[Any, ...]) -> list[dict[str, str]]:
+    words = {str(word).strip(" ,.;:'\"()").lower() for word in str(text or "").split()}
+    for word in provided or []:
+        if word:
+            words.add(str(word).strip().lower())
+    items = []
+    for word in sorted(words):
+        if word in READING_VOCABULARY_MEANINGS:
+            items.append(
+                {
+                    "word": word,
+                    "meaning_id": READING_VOCABULARY_MEANINGS[word],
+                    "context_tip": vocabulary_context_tip(word),
+                }
+            )
+    return items
+
+
+def vocabulary_context_tip(word: str) -> str:
+    if word in {"requirement", "requirements"}:
+        return "Dalam konteks BA, ini biasanya berarti kebutuhan bisnis atau sistem yang harus dipahami."
+    if word in {"stakeholder", "stakeholders"}:
+        return "Dalam konteks BA, ini adalah orang atau pihak yang punya kebutuhan, masalah, atau pengaruh."
+    if word in {"elicit", "elicits"}:
+        return "Dalam konteks BA, ini berarti menggali kebutuhan lewat pertanyaan, interview, atau workshop."
+    if word in {"alignment"}:
+        return "Kata ini sering berarti mencocokkan requirement dengan tujuan bisnis."
+    return "Lihat kalimat sekitar kata ini untuk memahami arti yang paling tepat."
+
+
+def simple_sentence_meaning(sentence: str) -> str:
+    text = str(sentence or "")
+    if "business analyst" in text.lower() and "requirements" in text.lower():
+        return "Kalimat ini menjelaskan peran Business Analyst dalam memahami dan menghubungkan kebutuhan bisnis."
+    if "process" in text.lower() and ("delay" in text.lower() or "delays" in text.lower()):
+        return "Kalimat ini membahas pemeriksaan proses untuk menemukan penyebab keterlambatan."
+    return f"Kalimat ini berarti: {text}"
+
+
+def simple_paragraph_meaning(paragraph: str) -> str:
+    lower = paragraph.lower()
+    if "stakeholder" in lower and "strategy" in lower:
+        return "Paragraf ini menjelaskan bahwa kebutuhan stakeholder harus dihubungkan dengan strategi organisasi."
+    if "vague" in lower or "clarify" in lower:
+        return "Paragraf ini menekankan pentingnya memperjelas masalah sebelum memberi solusi."
+    if "automation" in lower or "process" in lower:
+        return "Paragraf ini menjelaskan bahwa proses harus dievaluasi sebelum menentukan solusi teknologi."
+    return f"Paragraf ini membahas: {paragraph[:140]}"
+
+
+def infer_paragraph_main_point(paragraph: str) -> str:
+    lower = paragraph.lower()
+    if "not only elicit requirements" in lower or "alignment" in lower:
+        return "Business Analyst perlu menggali requirement dan memastikan selaras dengan kebutuhan serta strategi."
+    if "clarify" in lower or "vague" in lower:
+        return "Masalah yang masih samar perlu diklarifikasi sebelum solusi dibuat."
+    if "automation" in lower or "current process" in lower:
+        return "Analyst mengevaluasi proses saat ini untuk mengetahui apakah automation benar-benar solusi yang tepat."
+    return "Cari kalimat yang paling umum dan mencakup isi paragraf ini."
+
+
+def infer_paragraph_skill(paragraph: str) -> str:
+    lower = paragraph.lower()
+    if "main idea" in lower or "must" in lower:
+        return "main_idea"
+    if "word" in lower or "means" in lower:
+        return "vocabulary_context"
+    if "because" in lower or "whether" in lower:
+        return "inference"
+    return "general_meaning"
+
+
+def paragraph_beginner_tip(paragraph: str) -> str:
+    lower = paragraph.lower()
+    if "before" in lower:
+        return "Perhatikan kata 'before' karena urutan tindakan sering menjadi jawaban detail."
+    if "not only" in lower and "but also" in lower:
+        return "Pola 'not only ... but also ...' berarti ada dua hal penting, bukan satu."
+    if "whether" in lower:
+        return "Kata 'whether' menunjukkan pilihan atau pengecekan apakah sesuatu benar."
+    return "Baca perlahan: cari pelaku, aksi utama, lalu informasi tambahan."
+
+
+def infer_main_idea(title: str, passage: str) -> str:
+    lower = passage.lower()
+    if "stakeholder" in lower and "strategy" in lower:
+        return "Main idea: Business Analyst harus menghubungkan requirement, kebutuhan stakeholder, dan strategi organisasi."
+    if "automation" in lower and "process" in lower:
+        return "Main idea: Business Analyst perlu mengevaluasi proses sebelum merekomendasikan automation."
+    if "approval" in lower and "delay" in lower:
+        return "Main idea: Analyst perlu menemukan penyebab delay dalam approval workflow sebelum memilih solusi."
+    return f"Main idea: bacaan ini membahas {title.lower()} dan informasi penting yang mendukung topik tersebut."
 
 
 def get_completed_passages_count(user_id: str) -> int:

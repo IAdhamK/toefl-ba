@@ -141,6 +141,12 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - trainer awal tersedia untuk `main_idea`, `detail_information`, `vocabulary_context`, `inference`, dan `sentence_simplification`
   - halaman Reading menampilkan progress per sub-skill dan selector trainer
   - Bantuan ID tetap tersedia di passage, question, dan option trainer
+- Guided Reading Mode:
+  - endpoint `POST /api/reading/guided-steps`
+  - endpoint `POST /api/reading/passage-map`
+  - halaman Reading memiliki mode step-by-step untuk memahami judul, kalimat pertama, subject/verb, vocabulary, paragraph map, main idea, dan kesiapan menjawab soal
+  - passage map menampilkan simple meaning, key vocabulary, main point, possible reading skill, dan beginner tip
+  - completion Guided Reading dicatat sebagai aktivitas pendukung lokal tanpa menurunkan skor
 
 ## Verifikasi
 
@@ -158,6 +164,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Dokumentasi Reading foundation dibuat tanpa mengubah behavior frontend/backend.
 - Smoke test diperluas untuk Reading Journey, Reading levels, Reading recommendation, dan save Reading attempt.
 - Smoke test diperluas untuk Reading subskills, Reading trainer main idea, attempt main idea, dan attempt vocabulary context.
+- Smoke test diperluas untuk Guided Reading steps dan passage map.
 
 ## Cara Menjalankan Saat Ini
 
@@ -191,11 +198,11 @@ python3 scripts/smoke_api.py
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
 - Auth production-grade dan role-based access control.
-- Guided Reading Mode Phase 3 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
+- Answer Review Phase 4 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
 
 ## Rekomendasi Step Berikutnya
 
-1. Implementasikan Phase 3 Guided Reading Mode.
+1. Implementasikan Phase 4 Answer Review.
 2. Tambahkan edit/delete di Admin CMS frontend.
 3. Tambahkan E2E browser tests untuk alur utama.
 4. Tambahkan API tests dengan SQLite test database.

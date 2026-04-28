@@ -52,6 +52,14 @@ const defaultState = {
     selectedAnswer: null,
     feedback: null
   },
+  guidedReading: {
+    lessonId: "",
+    started: false,
+    activeStep: 0,
+    steps: [],
+    passageMap: [],
+    completed: false
+  },
   adaptivePractice: null,
   chat: [
     {
@@ -692,6 +700,7 @@ function loadState() {
       position: { ...defaultState.contextualHelp.position, ...(parsed.contextualHelp?.position || {}) }
     },
     readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(parsed.readingTrainer || {}) },
+    guidedReading: { ...structuredClone(defaultState.guidedReading), ...(parsed.guidedReading || {}) },
     chat: parsed.chat || structuredClone(defaultState.chat)
   };
 }
@@ -727,7 +736,8 @@ async function hydrateFromApi() {
           cache: { ...(stateResponse.state.contextualHelp?.cache || state.contextualHelp?.cache || {}) },
           position: { ...defaultState.contextualHelp.position, ...(stateResponse.state.contextualHelp?.position || state.contextualHelp?.position || {}) }
         },
-        readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(stateResponse.state.readingTrainer || state.readingTrainer || {}) }
+        readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(stateResponse.state.readingTrainer || state.readingTrainer || {}) },
+        guidedReading: { ...structuredClone(defaultState.guidedReading), ...(stateResponse.state.guidedReading || state.guidedReading || {}) }
       };
     }
     state.remoteContent = {
@@ -1490,6 +1500,115 @@ function localReadingTrainerContent(subSkill) {
   };
 }
 
+function localGuidedReadingState(lesson) {
+  const stepsResponse = buildLocalGuidedSteps(lesson);
+  return {
+    lessonId: lesson.id,
+    started: true,
+    activeStep: 0,
+    steps: stepsResponse.steps,
+    passageMap: stepsResponse.passageMap,
+    completed: false
+  };
+}
+
+function buildLocalGuidedSteps(lesson) {
+  const sentences = splitLocalSentences(lesson.passage);
+  const firstSentence = sentences[0] || lesson.passage;
+  const subjectVerb = identifyLocalSubjectVerb(firstSentence);
+  const vocab = lesson.vocabulary.map((word) => ({
+    word,
+    meaning_id: localOneWordMeaning(word),
+    context_tip: "Pahami dari kalimat passage, bukan hanya hafalan arti kamus."
+  }));
+  const passageMap = [{
+    paragraph_number: 1,
+    text: lesson.passage,
+    simple_meaning: localSimpleParagraphMeaning(lesson.passage),
+    key_vocabulary: vocab,
+    main_point: localMainIdea(lesson),
+    possible_reading_skill: "main_idea",
+    beginner_tip: "Cari subject, verb utama, lalu hubungan antar ide."
+  }];
+  return {
+    steps: [
+      guidedStep("title", 1, "Pahami judul", lesson.title, `Judul ini memberi sinyal bahwa bacaan membahas ${lesson.title.toLowerCase()}.`, "Tebak topik besar sebelum membaca detail."),
+      guidedStep("first_sentence", 2, "Baca kalimat pertama", firstSentence, localSimpleParagraphMeaning(firstSentence), "Cari pelaku dan aksi utama."),
+      {
+        ...guidedStep("subject_verb", 3, "Temukan subject dan main verb", firstSentence, `Subject: ${subjectVerb.subject}. Main verb: ${subjectVerb.mainVerb}.`, "Pegang subject dan verb utama dulu."),
+        subject: subjectVerb.subject,
+        main_verb: subjectVerb.mainVerb,
+        bantuan_context_type: "grammar_sentence"
+      },
+      {
+        ...guidedStep("vocabulary", 4, "Kenali vocabulary penting", lesson.vocabulary.join(", "), "Kata-kata ini membantu memahami passage dan opsi jawaban.", "Pahami arti kata dari konteks."),
+        key_vocabulary: vocab,
+        bantuan_context_type: "vocabulary_example"
+      },
+      {
+        ...guidedStep("paragraph_map", 5, "Pahami tiap paragraf", lesson.passage, "Baca passage per bagian kecil.", "Catat main point sebelum melihat pertanyaan."),
+        paragraph_map: passageMap
+      },
+      {
+        ...guidedStep("main_idea", 6, "Temukan main idea", lesson.passage, localMainIdea(lesson), "Pilih jawaban yang merangkum seluruh passage."),
+        main_idea: localMainIdea(lesson),
+        bantuan_context_type: "reading_question"
+      },
+      guidedStep("answer_question", 7, "Siap jawab pertanyaan", lesson.questions[0]?.text || "TOEFL-style question", "Sekarang kamu sudah siap menjawab dengan evidence.", "Jawab pertanyaan normal di bawah panel ini.")
+    ],
+    passageMap
+  };
+}
+
+function guidedStep(id, step, title, focusText, explanation, action) {
+  return {
+    id,
+    step,
+    title,
+    focus_text: focusText,
+    simple_explanation: explanation,
+    learner_action: action,
+    bantuan_context_type: "reading_paragraph"
+  };
+}
+
+function splitLocalSentences(text) {
+  return String(text || "").replaceAll("?", ".").replaceAll("!", ".").split(".").map((item) => item.trim()).filter(Boolean);
+}
+
+function identifyLocalSubjectVerb(sentence) {
+  const lower = String(sentence || "").toLowerCase();
+  if (lower.includes("business analyst") && lower.includes("must")) {
+    return { subject: "A business analyst", mainVerb: "must elicit / must ensure" };
+  }
+  if (lower.includes("analysis helps")) {
+    return { subject: "This analysis", mainVerb: "helps" };
+  }
+  return { subject: "Bagian awal kalimat", mainVerb: "aksi utama setelah subject" };
+}
+
+function localSimpleParagraphMeaning(text) {
+  const lower = String(text || "").toLowerCase();
+  if (lower.includes("stakeholder") && lower.includes("strategy")) {
+    return "Bagian ini menjelaskan bahwa kebutuhan stakeholder harus selaras dengan strategi organisasi.";
+  }
+  if (lower.includes("automation") || lower.includes("process")) {
+    return "Bagian ini menjelaskan pentingnya mengevaluasi proses sebelum memilih solusi.";
+  }
+  return `Bagian ini membahas: ${String(text || "").slice(0, 120)}`;
+}
+
+function localMainIdea(lesson) {
+  const lower = String(lesson.passage || "").toLowerCase();
+  if (lower.includes("stakeholder") && lower.includes("strategy")) {
+    return "Main idea: Business Analyst menghubungkan requirement, kebutuhan stakeholder, dan strategi organisasi.";
+  }
+  if (lower.includes("automation") && lower.includes("process")) {
+    return "Main idea: Business Analyst mengevaluasi proses sebelum merekomendasikan automation.";
+  }
+  return `Main idea: passage ini membahas ${lesson.title.toLowerCase()}.`;
+}
+
 function normalizeReadingSubskill(value) {
   const aliases = {
     detail: "detail_information",
@@ -2173,6 +2292,7 @@ function renderReading() {
     </header>
     ${journeyPanel("Reading")}
     ${readingJourneySummary()}
+    ${guidedReadingPanel(selectedLesson)}
     ${readingSubskillProgress()}
     ${readingTrainerPanel()}
 
@@ -2204,6 +2324,7 @@ function renderReading() {
   document.querySelectorAll("[data-lesson]").forEach((button) => {
     button.addEventListener("click", () => {
       state.selectedReadingLessonId = button.dataset.lesson;
+      state.guidedReading = structuredClone(defaultState.guidedReading);
       saveState();
       renderReading();
     });
@@ -2257,6 +2378,14 @@ function renderReading() {
   });
   document.getElementById("continueReadingButton")?.addEventListener("click", () => {
     document.getElementById("readingResult")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  document.getElementById("startGuidedReadingButton")?.addEventListener("click", async () => {
+    await startGuidedReading(selectedLesson);
+  });
+
+  document.getElementById("nextGuidedReadingStepButton")?.addEventListener("click", async () => {
+    await nextGuidedReadingStep(selectedLesson);
   });
 
   document.querySelectorAll("[data-reading-trainer-subskill]").forEach((button) => {
@@ -2324,6 +2453,154 @@ function readingJourneySummary() {
       <button id="continueReadingButton" class="primary-button" type="button">Lanjutkan Reading</button>
     </section>
   `;
+}
+
+function guidedReadingPanel(lesson) {
+  const guided = state.guidedReading?.lessonId === lesson.id ? state.guidedReading : structuredClone(defaultState.guidedReading);
+  const hasSteps = guided.started && guided.steps?.length;
+  const activeIndex = Math.min(guided.activeStep || 0, Math.max((guided.steps || []).length - 1, 0));
+  const visibleSteps = hasSteps ? guided.steps.slice(0, activeIndex + 1) : [];
+  return `
+    <section class="panel" id="guidedReadingPanel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Guided Reading Mode</p>
+          <h3>Baca passage langkah demi langkah</h3>
+          <p>Mode ini membantu pemula memahami judul, kalimat pertama, subject/verb, vocabulary, paragraph map, dan main idea sebelum menjawab soal.</p>
+        </div>
+        <button id="startGuidedReadingButton" class="primary-button" type="button">${hasSteps ? "Ulangi Guided Reading" : "Mulai Guided Reading"}</button>
+      </div>
+      ${hasSteps ? `
+        <div class="lesson-list">
+          ${visibleSteps.map((step) => guidedReadingStepCard(step, lesson)).join("")}
+        </div>
+        ${guided.completed ? "" : `
+          <button id="nextGuidedReadingStepButton" class="ghost-button" type="button">
+            ${activeIndex >= guided.steps.length - 1 ? "Selesai Guided Reading" : "Lanjut ke Langkah Berikutnya"}
+          </button>
+        `}
+        ${guided.completed ? resultTemplate("success", "Guided Reading selesai", "Aktivitas pendukung sudah dicatat. Sekarang lanjut jawab TOEFL-style Questions di bawah.") : ""}
+      ` : `
+        ${beginnerTip("Kenapa pakai Guided Reading?", "Kalau masih basic, jangan langsung loncat ke soal. Pahami dulu bagian kecil dari passage supaya pilihan jawaban lebih mudah dibandingkan.")}
+      `}
+    </section>
+  `;
+}
+
+function guidedReadingStepCard(step, lesson) {
+  const contextType = step.bantuan_context_type || "reading_paragraph";
+  const helpContext = readingHelpContext(lesson, lesson.questions?.[0]);
+  return `
+    <div class="question">
+      <p class="eyebrow">Step ${step.step}</p>
+      <h3>${escapeHtml(step.title || "")} ${step.focus_text ? renderContextualHelpButton("reading", contextType, step.focus_text, helpContext) : ""}</h3>
+      ${step.focus_text ? `<p>${escapeHtml(step.focus_text)}</p>` : ""}
+      ${step.subject || step.main_verb ? `
+        <div class="drill-result-grid">
+          <div class="metric">
+            <span class="muted">Subject</span>
+            <strong class="metric-word">${escapeHtml(step.subject || "-")}</strong>
+          </div>
+          <div class="metric">
+            <span class="muted">Main Verb</span>
+            <strong class="metric-word">${escapeHtml(step.main_verb || "-")}</strong>
+          </div>
+        </div>
+      ` : ""}
+      ${step.key_vocabulary?.length ? guidedVocabularyList(step.key_vocabulary) : ""}
+      ${step.paragraph_map?.length ? guidedParagraphMap(step.paragraph_map, lesson) : ""}
+      ${step.main_idea ? `<p><strong>Main idea:</strong> ${escapeHtml(step.main_idea)}</p>` : ""}
+      <p>${escapeHtml(step.simple_explanation || "")}</p>
+      <p class="muted">${escapeHtml(step.learner_action || "")}</p>
+    </div>
+  `;
+}
+
+function guidedVocabularyList(items) {
+  return `
+    <div class="lesson-list compact-list">
+      ${items.map((item) => `
+        <p><strong>${escapeHtml(item.word || "")}</strong>: ${escapeHtml(item.meaning_id || "")}<br><span class="muted">${escapeHtml(item.context_tip || "")}</span></p>
+      `).join("")}
+    </div>
+  `;
+}
+
+function guidedParagraphMap(paragraphs, lesson) {
+  return `
+    <div class="lesson-list compact-list">
+      ${paragraphs.map((paragraph) => `
+        <div>
+          <h3>Paragraf ${paragraph.paragraph_number} ${renderContextualHelpButton("reading", "reading_paragraph", paragraph.text || "", readingHelpContext(lesson, lesson.questions?.[0]))}</h3>
+          <p>${escapeHtml(paragraph.simple_meaning || "")}</p>
+          <p><strong>Main point:</strong> ${escapeHtml(paragraph.main_point || "")}</p>
+          <p class="muted">Skill: ${escapeHtml(readingSubskillLabel(paragraph.possible_reading_skill))} · ${escapeHtml(paragraph.beginner_tip || "")}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function startGuidedReading(lesson) {
+  let guided = localGuidedReadingState(lesson);
+  if (apiOnline) {
+    try {
+      const [stepsResponse, mapResponse] = await Promise.all([
+        apiRequest("/reading/guided-steps", {
+          method: "POST",
+          body: {
+            lesson_id: lesson.id,
+            title: lesson.title,
+            passage: lesson.passage,
+            vocabulary: lesson.vocabulary,
+            question_text: lesson.questions?.[0]?.text || ""
+          }
+        }),
+        apiRequest("/reading/passage-map", {
+          method: "POST",
+          body: {
+            lesson_id: lesson.id,
+            title: lesson.title,
+            passage: lesson.passage,
+            vocabulary: lesson.vocabulary
+          }
+        })
+      ]);
+      guided = {
+        lessonId: lesson.id,
+        started: true,
+        activeStep: 0,
+        steps: stepsResponse.steps || guided.steps,
+        passageMap: mapResponse.paragraphs || guided.passageMap,
+        completed: false
+      };
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.guidedReading = guided;
+  saveState();
+  renderReading();
+}
+
+async function nextGuidedReadingStep(lesson) {
+  if (!state.guidedReading?.started || state.guidedReading.lessonId !== lesson.id) {
+    await startGuidedReading(lesson);
+    return;
+  }
+  const lastIndex = Math.max((state.guidedReading.steps || []).length - 1, 0);
+  if ((state.guidedReading.activeStep || 0) >= lastIndex) {
+    state.guidedReading.completed = true;
+    addActivity("Reading", `Guided Reading: ${lesson.title}`, 100);
+    saveState();
+    renderDashboard();
+    renderJourney();
+    renderReading();
+    return;
+  }
+  state.guidedReading.activeStep = (state.guidedReading.activeStep || 0) + 1;
+  saveState();
+  renderReading();
 }
 
 function readingSubskillProgress() {
