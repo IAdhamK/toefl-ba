@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.database import get_connection
+from backend.database import decode_json, get_connection
 from backend.services.journey_service import (
     get_default_user_id,
     get_or_create_skill_journey,
@@ -499,6 +499,133 @@ def generate_answer_review(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def get_reading_review(user_id: str | None = None) -> dict[str, Any]:
+    user_id = get_default_user_id(user_id)
+    journey = get_reading_journey(user_id)
+    subskills = journey["sub_skill_mastery"]
+    attempts = get_reading_attempt_history(user_id)
+    mistake_data = get_reading_mistake_patterns(user_id)
+    queue_data = get_reading_review_queue(user_id)
+    weak = weakest_subskills(subskills)
+    recommended_sub_skill = next_trainable_subskill(weak[0]["subskill"] if weak else "main_idea")
+    low_passages = low_score_passages(attempts)
+    misunderstood_vocab = vocabulary_frequently_misunderstood(attempts, subskills)
+    weakness_summary = {
+        "primary_weakness": weak[0] if weak else None,
+        "secondary_weakness": weak[1] if len(weak) > 1 else None,
+        "low_score_passages": low_passages,
+        "vocabulary_frequently_misunderstood": misunderstood_vocab,
+        "bantuan_id_usage": bantuan_id_usage_summary(attempts),
+    }
+    return {
+        "user_id": user_id,
+        "weakness_summary": weakness_summary,
+        "mistake_patterns": mistake_data["patterns"],
+        "recommended_sub_skill": recommended_sub_skill,
+        "recommended_practice": READING_ACTIONS.get(recommended_sub_skill, READING_ACTIONS["main_idea"]),
+        "review_items": queue_data["review_items"],
+        "mentor_message": reading_mentor_message(weakness_summary, recommended_sub_skill),
+    }
+
+
+def get_reading_mistake_patterns(user_id: str | None = None) -> dict[str, Any]:
+    user_id = get_default_user_id(user_id)
+    attempts = get_reading_attempt_history(user_id)
+    subskills = get_reading_subskill_mastery(user_id)
+    patterns = []
+    for item in sorted(subskills, key=lambda value: (value["wrong_count"], -value["attempt_count"]), reverse=True):
+        if item["wrong_count"] > 0 or item["mastery_score"] < 60:
+            patterns.append(
+                {
+                    "pattern": pattern_text_for_subskill(item["subskill"]),
+                    "sub_skill": item["subskill"],
+                    "label": item["label"],
+                    "wrong_count": item["wrong_count"],
+                    "attempt_count": item["attempt_count"],
+                    "mastery_score": item["mastery_score"],
+                    "recommendation": READING_ACTIONS.get(item["subskill"], READING_ACTIONS["main_idea"]),
+                }
+            )
+    if not patterns:
+        patterns.append(
+            {
+                "pattern": "Belum ada pola salah yang kuat. Mulai dari main idea agar fondasinya rapi.",
+                "sub_skill": "main_idea",
+                "label": label_subskill("main_idea"),
+                "wrong_count": 0,
+                "attempt_count": 0,
+                "mastery_score": 0,
+                "recommendation": READING_ACTIONS["main_idea"],
+            }
+        )
+    return {
+        "user_id": user_id,
+        "patterns": patterns[:5],
+        "repeated_wrong_question_types": patterns[:3],
+        "low_score_passages": low_score_passages(attempts),
+        "vocabulary_frequently_misunderstood": vocabulary_frequently_misunderstood(attempts, subskills),
+        "bantuan_id_usage": bantuan_id_usage_summary(attempts),
+    }
+
+
+def get_reading_review_queue(user_id: str | None = None) -> dict[str, Any]:
+    user_id = get_default_user_id(user_id)
+    attempts = get_reading_attempt_history(user_id)
+    subskills = get_reading_subskill_mastery(user_id)
+    weak = weakest_subskills(subskills)
+    items = []
+    for index, item in enumerate(weak[:3], start=1):
+        target = next_trainable_subskill(item["subskill"])
+        items.append(
+            {
+                "id": f"review-subskill-{item['subskill']}",
+                "type": "weak_subskill",
+                "title": f"Review {item['label']}",
+                "sub_skill": target,
+                "priority": index,
+                "reason": f"Mastery {round(item['mastery_score'])}% dengan {item['wrong_count']} jawaban salah.",
+                "action": READING_ACTIONS.get(target, READING_ACTIONS["main_idea"]),
+            }
+        )
+    for passage in low_score_passages(attempts)[:3]:
+        items.append(
+            {
+                "id": f"review-passage-{passage['activity_id']}",
+                "type": "low_score_passage",
+                "title": f"Ulangi passage {passage['activity_id']}",
+                "sub_skill": "detail_information",
+                "priority": 3,
+                "reason": f"Skor terakhir {round(passage['accuracy'])}%.",
+                "action": "Baca ulang evidence sentence dan cocokkan detail pertanyaan dengan passage.",
+            }
+        )
+    for vocab in vocabulary_frequently_misunderstood(attempts, subskills)[:3]:
+        items.append(
+            {
+                "id": f"review-vocab-{vocab['word']}",
+                "type": "vocabulary_review",
+                "title": f"Review vocabulary: {vocab['word']}",
+                "sub_skill": "vocabulary_context",
+                "priority": 2,
+                "reason": vocab["reason"],
+                "action": READING_ACTIONS["vocabulary_context"],
+            }
+        )
+    if not items:
+        items.append(
+            {
+                "id": "review-main-idea-start",
+                "type": "starter_review",
+                "title": "Mulai review Main Idea",
+                "sub_skill": "main_idea",
+                "priority": 1,
+                "reason": "Belum ada data review yang cukup.",
+                "action": READING_ACTIONS["main_idea"],
+            }
+        )
+    return {"user_id": user_id, "review_items": items[:8]}
+
+
 def save_reading_attempt(payload: dict[str, Any]) -> dict[str, Any]:
     user_id = get_default_user_id(payload.get("user_id") or payload.get("userId"))
     passage_id = payload.get("passage_id") or payload.get("lesson_id") or payload.get("activity_id") or "reading-passage"
@@ -900,6 +1027,121 @@ def answer_review_next_practice(sub_skill: str, is_correct: bool) -> str:
     if is_correct:
         return f"Lanjutkan latihan {label_subskill(sub_skill)} dengan passage baru. {action}"
     return f"Ulangi sub-skill {label_subskill(sub_skill)}. {action}"
+
+
+def get_reading_attempt_history(user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM learning_attempts
+            WHERE user_id = ? AND skill_type = 'reading'
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+    attempts = []
+    for row in rows:
+        item = dict(row)
+        item["score"] = float(item.get("score") or 0)
+        item["max_score"] = float(item.get("max_score") or 100)
+        item["accuracy"] = float(item.get("accuracy") or 0)
+        item["mistakes"] = decode_json(item.get("mistakes_json"), [])
+        attempts.append(item)
+    return attempts
+
+
+def low_score_passages(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen = set()
+    items = []
+    for attempt in attempts:
+        activity_id = attempt.get("activity_id") or "reading-passage"
+        if activity_id in seen:
+            continue
+        seen.add(activity_id)
+        if float(attempt.get("accuracy") or 0) < 70 and attempt.get("activity_type") != "contextual_help":
+            items.append(
+                {
+                    "activity_id": activity_id,
+                    "activity_type": attempt.get("activity_type"),
+                    "accuracy": round(float(attempt.get("accuracy") or 0), 1),
+                    "created_at": attempt.get("created_at"),
+                    "feedback": attempt.get("feedback") or "Skor passage masih perlu review.",
+                }
+            )
+    return items
+
+
+def vocabulary_frequently_misunderstood(attempts: list[dict[str, Any]], subskills: list[dict[str, Any]]) -> list[dict[str, str]]:
+    words: dict[str, int] = {}
+    for attempt in attempts:
+        for mistake in attempt.get("mistakes", []) or []:
+            text = " ".join(str(value) for value in mistake.values()) if isinstance(mistake, dict) else str(mistake)
+            for word in READING_VOCABULARY_MEANINGS:
+                if word in text.lower():
+                    words[word] = words.get(word, 0) + 1
+    vocab_mastery = next((item for item in subskills if item["subskill"] == "vocabulary_context"), None)
+    if vocab_mastery and vocab_mastery["wrong_count"] > 0 and not words:
+        words["clarify"] = vocab_mastery["wrong_count"]
+    return [
+        {
+            "word": word,
+            "meaning_id": READING_VOCABULARY_MEANINGS.get(word, "arti sesuai konteks"),
+            "count": count,
+            "reason": "Sering muncul pada kesalahan Reading atau sub-skill vocabulary context masih rendah.",
+        }
+        for word, count in sorted(words.items(), key=lambda item: item[1], reverse=True)[:5]
+    ]
+
+
+def bantuan_id_usage_summary(attempts: list[dict[str, Any]]) -> dict[str, Any]:
+    help_attempts = [
+        attempt for attempt in attempts
+        if "contextual_help" in str(attempt.get("activity_type") or "")
+        or "Bantuan ID" in str(attempt.get("feedback") or "")
+    ]
+    count = len(help_attempts)
+    if count >= 8:
+        level = "high"
+        message = "Bantuan ID sering dipakai. Coba tebak arti kalimat dulu sebelum membuka bantuan."
+    elif count >= 3:
+        level = "medium"
+        message = "Bantuan ID dipakai cukup sering. Itu baik untuk belajar, lalu coba jawab tanpa bantuan."
+    else:
+        level = "normal"
+        message = "Penggunaan Bantuan ID masih wajar atau belum tercatat di backend."
+    return {"count": count, "level": level, "message": message}
+
+
+def pattern_text_for_subskill(subskill: str) -> str:
+    patterns = {
+        "general_meaning": "Masih perlu memperkuat arti umum passage sebelum masuk ke soal.",
+        "main_idea": "Sering memilih detail kecil sebagai ide utama.",
+        "detail_information": "Sering kehilangan evidence sentence untuk detail spesifik.",
+        "vocabulary_context": "Sering memakai arti kamus tanpa mengecek konteks kalimat.",
+        "reference": "Perlu latihan mencari noun yang dirujuk pronoun seperti it, they, this.",
+        "sentence_simplification": "Perlu memisahkan subject, main verb, dan informasi tambahan dalam kalimat panjang.",
+        "inference": "Perlu membedakan informasi tersirat dari asumsi yang tidak didukung passage.",
+        "author_purpose": "Perlu memahami alasan penulis menyebut detail tertentu.",
+        "paragraph_function": "Perlu memahami fungsi paragraf dalam struktur bacaan.",
+        "ba_case_analysis": "Perlu menghubungkan masalah, stakeholder, requirement, dan business outcome.",
+    }
+    return patterns.get(subskill, "Pola salah belum spesifik. Lanjutkan review Reading.")
+
+
+def reading_mentor_message(weakness_summary: dict[str, Any], recommended_sub_skill: str) -> str:
+    weakness = weakness_summary.get("primary_weakness") or {}
+    label = weakness.get("label") or label_subskill(recommended_sub_skill)
+    low_count = len(weakness_summary.get("low_score_passages") or [])
+    if low_count:
+        return (
+            f"Fokus Reading berikutnya adalah {label}. Ada {low_count} passage dengan skor rendah, "
+            "jadi ulangi evidence sentence dulu sebelum mengerjakan soal baru."
+        )
+    return (
+        f"Fokus Reading berikutnya adalah {label}. Kerjakan latihan pendek, lalu cek Answer Review untuk melihat pola salah."
+    )
 
 
 def split_paragraphs(passage: str) -> list[str]:

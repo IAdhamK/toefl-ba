@@ -6,7 +6,10 @@ from backend.services.reading_service import (
     generate_passage_map,
     get_reading_journey,
     get_reading_levels,
+    get_reading_mistake_patterns,
     get_reading_recommendation,
+    get_reading_review,
+    get_reading_review_queue,
     get_reading_subskills,
     get_reading_trainer,
     save_reading_attempt,
@@ -29,6 +32,21 @@ def reading_levels() -> dict:
 @router.get("/recommendation")
 def reading_recommendation(user_id: str | None = None) -> dict:
     return {"recommendation": get_reading_recommendation(user_id)}
+
+
+@router.get("/review")
+def reading_review(user_id: str | None = None) -> dict:
+    return get_reading_review(user_id)
+
+
+@router.get("/mistake-patterns")
+def reading_mistake_patterns(user_id: str | None = None) -> dict:
+    return get_reading_mistake_patterns(user_id)
+
+
+@router.get("/review-queue")
+def reading_review_queue(user_id: str | None = None) -> dict:
+    return get_reading_review_queue(user_id)
 
 
 @router.get("/subskills")

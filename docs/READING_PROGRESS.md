@@ -52,10 +52,15 @@ Yang sudah tersedia:
   - response `POST /api/reading/attempt` menyertakan `answer_review`, `evidence_sentence`, `distractor_analysis`, dan `next_recommendation`
   - submit Reading normal menampilkan Answer Review panel setelah skor
   - review menjelaskan jawaban user, jawaban benar, evidence sentence, alasan benar/salah, analisis opsi, sub-skill terkait, dan rekomendasi latihan
+- Reading Review Phase 5:
+  - endpoint `GET /api/reading/review`
+  - endpoint `GET /api/reading/mistake-patterns`
+  - endpoint `GET /api/reading/review-queue`
+  - UI Reading Review menampilkan weakness report, mistake pattern, review queue, recommended practice, dan mentor message
+  - tombol "Latihan Ulang Skill Lemah" mengarahkan user ke trainer sub-skill yang direkomendasikan
 
 Yang belum tersedia:
 
-- Reading weakness report.
 - TOEFL Reading simulation dengan timer.
 - Reading-specific review history.
 
@@ -229,18 +234,25 @@ Deliverables:
 Completed:
 
 - Integrated Journey sudah punya daily plan umum.
+- Service Reading menganalisis `learning_attempts` dan `skill_mastery` untuk mencari weak sub-skills, low score passages, repeated wrong question types, vocabulary yang sering salah, dan indikasi penggunaan Bantuan ID.
+- Endpoint `GET /api/reading/review` tersedia.
+- Endpoint `GET /api/reading/mistake-patterns` tersedia.
+- Endpoint `GET /api/reading/review-queue` tersedia.
+- UI Reading menampilkan panel Reading Review dekat Journey Summary.
+- Tombol "Latihan Ulang Skill Lemah" mengarahkan user ke Reading Trainer sub-skill yang direkomendasikan.
+- Smoke test mencakup Reading Review, mistake patterns, dan review queue.
 
 Pending:
 
-- Reading-specific analytics.
-- Mistake classification.
-- Recommended practice berdasarkan sub-skill.
+- Review history khusus Reading belum punya tabel sendiri.
+- Mistake classification masih memakai rule-based analysis dari mastery dan attempts.
+- Deteksi overuse Bantuan ID baru aktif jika event tersebut tersimpan di backend.
 
 Testing checklist:
 
-- User melihat kelemahan Reading paling dominan.
-- Recommendation berubah setelah beberapa attempt.
-- Review list tidak kosong jika ada kesalahan.
+- User melihat kelemahan Reading paling dominan. Done.
+- Recommendation berubah setelah beberapa attempt. Done berdasarkan mastery/attempt.
+- Review list tidak kosong jika ada kesalahan. Done.
 
 ### Phase 6 — TOEFL Simulation
 

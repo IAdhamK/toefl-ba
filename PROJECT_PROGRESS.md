@@ -153,6 +153,13 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - submit Reading normal mengembalikan review untuk setiap soal yang dijawab
   - UI menampilkan jawaban user, jawaban benar, bukti passage, alasan benar/salah, analisis opsi A/B/C/D, sub-skill terkait, dan rekomendasi latihan berikutnya
   - Bantuan ID tetap tersedia pada evidence sentence dan setiap opsi review
+- Reading Review:
+  - endpoint `GET /api/reading/review`
+  - endpoint `GET /api/reading/mistake-patterns`
+  - endpoint `GET /api/reading/review-queue`
+  - backend menganalisis weak sub-skills, repeated wrong question types, low score passages, vocabulary yang sering salah, dan indikasi penggunaan Bantuan ID jika tercatat
+  - UI menampilkan weakness report, mistake pattern, review queue, recommended practice, dan mentor message
+  - tombol "Latihan Ulang Skill Lemah" mengarahkan user ke Reading Trainer sub-skill yang direkomendasikan
 
 ## Verifikasi
 
@@ -172,6 +179,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Smoke test diperluas untuk Reading subskills, Reading trainer main idea, attempt main idea, dan attempt vocabulary context.
 - Smoke test diperluas untuk Guided Reading steps dan passage map.
 - Smoke test diperluas untuk Reading answer review dan distractor analysis.
+- Smoke test diperluas untuk Reading review, mistake patterns, dan review queue.
 
 ## Cara Menjalankan Saat Ini
 
@@ -205,11 +213,11 @@ python3 scripts/smoke_api.py
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
 - Auth production-grade dan role-based access control.
-- Reading Review Phase 5 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
+- TOEFL Reading Simulation Phase 6 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
 
 ## Rekomendasi Step Berikutnya
 
-1. Implementasikan Phase 5 Reading Review.
+1. Implementasikan Phase 6 TOEFL Reading Simulation.
 2. Tambahkan edit/delete di Admin CMS frontend.
 3. Tambahkan E2E browser tests untuk alur utama.
 4. Tambahkan API tests dengan SQLite test database.

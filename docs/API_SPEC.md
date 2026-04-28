@@ -64,6 +64,9 @@ Compatibility endpoint lama tetap tersedia:
 - `GET /api/reading/journey`
 - `GET /api/reading/levels`
 - `GET /api/reading/recommendation`
+- `GET /api/reading/review`
+- `GET /api/reading/mistake-patterns`
+- `GET /api/reading/review-queue`
 - `GET /api/reading/subskills`
 - `GET /api/reading/trainer/{sub_skill}`
 - `POST /api/reading/guided-steps`
@@ -212,6 +215,26 @@ Example Answer Review request:
 - distractor analysis for every option
 - related reading sub-skill
 - next practice recommendation
+
+`GET /api/reading/review` returns the Reading Review summary:
+
+- `weakness_summary`
+- `mistake_patterns`
+- `recommended_sub_skill`
+- `recommended_practice`
+- `review_items`
+- `mentor_message`
+
+`GET /api/reading/mistake-patterns` returns repeated mistake patterns, low score passages, vocabulary frequently misunderstood, and Bantuan ID usage summary when tracked.
+
+`GET /api/reading/review-queue` returns prioritized review items. Each item includes:
+
+- `type`
+- `title`
+- `sub_skill`
+- `priority`
+- `reason`
+- `action`
 
 Reading Journey response includes:
 

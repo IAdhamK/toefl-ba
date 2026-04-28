@@ -220,6 +220,32 @@ def main():
         and "next_practice_recommendation" in review,
     )
 
+    status, reading_review = call("/reading/review")
+    assert_ok(
+        "reading review",
+        status == 200
+        and "weakness_summary" in reading_review
+        and "mistake_patterns" in reading_review
+        and "review_items" in reading_review
+        and "mentor_message" in reading_review,
+    )
+
+    status, mistake_patterns = call("/reading/mistake-patterns")
+    assert_ok(
+        "reading mistake patterns",
+        status == 200
+        and "patterns" in mistake_patterns
+        and "repeated_wrong_question_types" in mistake_patterns,
+    )
+
+    status, review_queue = call("/reading/review-queue")
+    assert_ok(
+        "reading review queue",
+        status == 200
+        and "review_items" in review_queue
+        and len(review_queue["review_items"]) >= 1,
+    )
+
     first_vocab = daily_vocab["items"][0]
     status, vocab_score = call("/scoring/vocabulary", {"itemId": first_vocab["id"], "answer": first_vocab["answer"]})
     assert_ok("vocabulary scoring", status == 200 and vocab_score["isCorrect"])

@@ -46,6 +46,7 @@ const defaultState = {
   },
   integratedJourney: null,
   readingJourney: null,
+  readingReview: null,
   readingTrainer: {
     selectedSubSkill: "main_idea",
     subskills: [],
@@ -700,6 +701,7 @@ function loadState() {
       cache: { ...(parsed.contextualHelp?.cache || {}) },
       position: { ...defaultState.contextualHelp.position, ...(parsed.contextualHelp?.position || {}) }
     },
+    readingReview: parsed.readingReview || null,
     readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(parsed.readingTrainer || {}) },
     guidedReading: { ...structuredClone(defaultState.guidedReading), ...(parsed.guidedReading || {}) },
     chat: parsed.chat || structuredClone(defaultState.chat)
@@ -737,6 +739,7 @@ async function hydrateFromApi() {
           cache: { ...(stateResponse.state.contextualHelp?.cache || state.contextualHelp?.cache || {}) },
           position: { ...defaultState.contextualHelp.position, ...(stateResponse.state.contextualHelp?.position || state.contextualHelp?.position || {}) }
         },
+        readingReview: stateResponse.state.readingReview || state.readingReview || null,
         readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(stateResponse.state.readingTrainer || state.readingTrainer || {}) },
         guidedReading: { ...structuredClone(defaultState.guidedReading), ...(stateResponse.state.guidedReading || state.guidedReading || {}) }
       };
@@ -758,6 +761,7 @@ async function hydrateFromApi() {
     apiOnline = false;
     state.integratedJourney = localJourneySummary();
     state.readingJourney = localReadingJourney();
+    state.readingReview = localReadingReview();
     state.readingTrainer = localReadingTrainerState();
   }
 }
@@ -787,11 +791,26 @@ async function refreshReadingJourney() {
     const response = await apiRequest(`/reading/journey${query}`);
     state.readingJourney = response.reading_journey;
     await refreshReadingTrainer(state.readingTrainer?.selectedSubSkill || "main_idea");
+    await refreshReadingReview();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     apiOnline = false;
     state.readingJourney = localReadingJourney();
+    state.readingReview = localReadingReview();
     state.readingTrainer = localReadingTrainerState();
+  }
+}
+
+async function refreshReadingReview() {
+  if (!apiOnline) {
+    state.readingReview = localReadingReview();
+    return;
+  }
+  try {
+    const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
+    state.readingReview = await apiRequest(`/reading/review${query}`);
+  } catch (error) {
+    state.readingReview = localReadingReview();
   }
 }
 
@@ -1472,6 +1491,50 @@ function localReadingTrainerState(subSkill = state.readingTrainer?.selectedSubSk
     content: localReadingTrainerContent(normalized),
     selectedAnswer: null,
     feedback: null
+  };
+}
+
+function localReadingReview() {
+  const journey = state.readingJourney || localReadingJourney();
+  const weak = journey.weak_subskills?.[0] || localReadingSubskills()[0];
+  const recommended = normalizeReadingSubskill(weak?.subskill || "main_idea");
+  const lowActivities = state.activity
+    .filter((item) => item.module === "Reading" && Number(item.score || 0) < 70)
+    .slice(-3)
+    .map((item) => ({
+      activity_id: item.title || "Reading activity",
+      accuracy: item.score || 0,
+      feedback: "Skor lokal masih perlu review."
+    }));
+  return {
+    weakness_summary: {
+      primary_weakness: weak,
+      secondary_weakness: journey.weak_subskills?.[1] || null,
+      low_score_passages: lowActivities,
+      vocabulary_frequently_misunderstood: recommended === "vocabulary_context" ? [{ word: "clarify", meaning_id: "membuat lebih jelas", count: 1, reason: "Vocabulary context masih perlu dilatih." }] : [],
+      bantuan_id_usage: { count: 0, level: "local", message: "Penggunaan Bantuan ID belum tersinkron ke backend." }
+    },
+    mistake_patterns: [{
+      pattern: `Fokus review lokal: ${readingSubskillLabel(recommended)}.`,
+      sub_skill: recommended,
+      label: readingSubskillLabel(recommended),
+      wrong_count: weak?.wrong_count || 0,
+      attempt_count: weak?.attempt_count || 0,
+      mastery_score: weak?.mastery_score || 0,
+      recommendation: localReadingAction(recommended)
+    }],
+    recommended_sub_skill: recommended,
+    recommended_practice: localReadingAction(recommended),
+    review_items: [{
+      id: `local-review-${recommended}`,
+      type: "weak_subskill",
+      title: `Latihan ulang ${readingSubskillLabel(recommended)}`,
+      sub_skill: recommended,
+      priority: 1,
+      reason: "Berdasarkan progress lokal Reading.",
+      action: localReadingAction(recommended)
+    }],
+    mentor_message: `Hari ini fokus ke ${readingSubskillLabel(recommended)}. Baca evidence sentence dulu sebelum memilih opsi.`
   };
 }
 
@@ -2293,6 +2356,7 @@ function renderReading() {
     </header>
     ${journeyPanel("Reading")}
     ${readingJourneySummary()}
+    ${readingReviewPanel()}
     ${guidedReadingPanel(selectedLesson)}
     ${readingSubskillProgress()}
     ${readingTrainerPanel()}
@@ -2386,6 +2450,18 @@ function renderReading() {
     document.getElementById("readingResult")?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 
+  document.getElementById("retryWeakReadingSkillButton")?.addEventListener("click", async () => {
+    const subSkill = state.readingReview?.recommended_sub_skill || "main_idea";
+    if (apiOnline) {
+      await refreshReadingTrainer(subSkill);
+    } else {
+      state.readingTrainer = localReadingTrainerState(subSkill);
+    }
+    saveState();
+    renderReading();
+    document.getElementById("readingTrainerPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   document.getElementById("startGuidedReadingButton")?.addEventListener("click", async () => {
     await startGuidedReading(selectedLesson);
   });
@@ -2457,6 +2533,85 @@ function readingJourneySummary() {
         </div>
       </div>
       <button id="continueReadingButton" class="primary-button" type="button">Lanjutkan Reading</button>
+    </section>
+  `;
+}
+
+function readingReviewPanel() {
+  const review = state.readingReview || localReadingReview();
+  const weakness = review.weakness_summary || {};
+  const primary = weakness.primary_weakness || {};
+  const secondary = weakness.secondary_weakness || {};
+  const patterns = review.mistake_patterns || [];
+  const queue = review.review_items || [];
+  const lowPassages = weakness.low_score_passages || [];
+  const vocab = weakness.vocabulary_frequently_misunderstood || [];
+  return `
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Reading Review</p>
+          <h3>Laporan kelemahan Reading</h3>
+          <p>${escapeHtml(review.mentor_message || "Review membantu kamu tahu pola salah dan latihan berikutnya.")}</p>
+        </div>
+        <button id="retryWeakReadingSkillButton" class="primary-button" type="button">Latihan Ulang Skill Lemah</button>
+      </div>
+      <div class="drill-result-grid">
+        <div class="metric">
+          <span class="muted">Weakness utama</span>
+          <strong class="metric-word">${escapeHtml(primary.label || readingSubskillLabel(review.recommended_sub_skill))}</strong>
+          <small>${Math.round(primary.mastery_score || 0)}% mastery</small>
+        </div>
+        <div class="metric">
+          <span class="muted">Weakness kedua</span>
+          <strong class="metric-word">${escapeHtml(secondary.label || "Belum ada")}</strong>
+          <small>${Math.round(secondary.mastery_score || 0)}% mastery</small>
+        </div>
+        <div class="metric">
+          <span class="muted">Recommended practice</span>
+          <strong class="metric-word">${escapeHtml(readingSubskillLabel(review.recommended_sub_skill))}</strong>
+          <small>${escapeHtml(review.recommended_practice || "")}</small>
+        </div>
+        <div class="metric">
+          <span class="muted">Bantuan ID</span>
+          <strong class="metric-word">${escapeHtml(weakness.bantuan_id_usage?.level || "normal")}</strong>
+          <small>${escapeHtml(weakness.bantuan_id_usage?.message || "")}</small>
+        </div>
+      </div>
+      <div class="content-grid compact-grid">
+        <div>
+          <h3>Mistake pattern</h3>
+          <div class="lesson-list compact-list">
+            ${patterns.length ? patterns.map((item) => `
+              <p><strong>${escapeHtml(item.label || readingSubskillLabel(item.sub_skill))}</strong><br>${escapeHtml(item.pattern || "")}<br><span class="muted">${escapeHtml(item.recommendation || "")}</span></p>
+            `).join("") : `<p class="muted">Belum ada pola salah yang cukup kuat.</p>`}
+          </div>
+        </div>
+        <div>
+          <h3>Review queue</h3>
+          <div class="lesson-list compact-list">
+            ${queue.length ? queue.map((item) => `
+              <p><strong>${escapeHtml(item.title || "")}</strong><br>${escapeHtml(item.reason || "")}<br><span class="muted">${escapeHtml(item.action || "")}</span></p>
+            `).join("") : `<p class="muted">Belum ada item review.</p>`}
+          </div>
+        </div>
+      </div>
+      ${(lowPassages.length || vocab.length) ? `
+        <div class="content-grid compact-grid">
+          <div>
+            <h3>Passage skor rendah</h3>
+            <div class="lesson-list compact-list">
+              ${lowPassages.length ? lowPassages.map((item) => `<p><strong>${escapeHtml(item.activity_id || "")}</strong><br><span class="muted">Skor ${Math.round(item.accuracy || 0)}% · ${escapeHtml(item.feedback || "")}</span></p>`).join("") : `<p class="muted">Belum ada passage rendah.</p>`}
+            </div>
+          </div>
+          <div>
+            <h3>Vocabulary perlu review</h3>
+            <div class="lesson-list compact-list">
+              ${vocab.length ? vocab.map((item) => `<p><strong>${escapeHtml(item.word || "")}</strong>: ${escapeHtml(item.meaning_id || "")}<br><span class="muted">${escapeHtml(item.reason || "")}</span></p>`).join("") : `<p class="muted">Belum ada vocabulary Reading yang sering salah.</p>`}
+            </div>
+          </div>
+        </div>
+      ` : ""}
     </section>
   `;
 }
