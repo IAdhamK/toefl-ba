@@ -47,11 +47,14 @@ Yang sudah tersedia:
   - endpoint `POST /api/reading/passage-map`
   - UI Guided Reading di halaman Reading
   - step-by-step cards untuk judul, kalimat pertama, subject/verb, vocabulary, paragraph map, main idea, dan siap menjawab soal
+- Answer Review Phase 4:
+  - endpoint `POST /api/reading/review-answer`
+  - response `POST /api/reading/attempt` menyertakan `answer_review`, `evidence_sentence`, `distractor_analysis`, dan `next_recommendation`
+  - submit Reading normal menampilkan Answer Review panel setelah skor
+  - review menjelaskan jawaban user, jawaban benar, evidence sentence, alasan benar/salah, analisis opsi, sub-skill terkait, dan rekomendasi latihan
 
 Yang belum tersedia:
 
-- Evidence sentence per jawaban.
-- Distractor analysis lengkap.
 - Reading weakness report.
 - TOEFL Reading simulation dengan timer.
 - Reading-specific review history.
@@ -191,18 +194,25 @@ Completed:
 
 - Basic result dan explanation sudah ada.
 - Bantuan ID option sudah mulai mengenali opsi kuat/lemah.
+- Service Reading menghasilkan answer review terstruktur.
+- Endpoint `POST /api/reading/review-answer` tersedia.
+- `POST /api/reading/attempt` mengembalikan `answer_review`, `evidence_sentence`, `distractor_analysis`, dan `next_recommendation` jika payload berisi jawaban.
+- Submit Reading normal mengembalikan `answer_reviews` untuk semua soal yang dijawab.
+- UI menampilkan panel Answer Review setelah submit Reading.
+- Bantuan ID tetap tersedia untuk evidence sentence dan setiap opsi di review.
+- Smoke test mencakup review-answer dan answer review di Reading attempt.
 
 Pending:
 
-- Evidence sentence data.
-- Distractor analysis terstruktur.
-- UI review setelah submit.
+- Evidence sentence masih rule-based, belum berasal dari bank soal penuh.
+- Distractor analysis masih rule-based untuk pola opsi umum dan belum disimpan per soal.
+- Belum ada review history khusus Reading.
 
 Testing checklist:
 
-- Setiap soal punya explanation yang spesifik.
-- Jawaban salah menampilkan alasan dan evidence.
-- Distractor tidak dijelaskan secara generic.
+- Setiap soal punya explanation yang spesifik. Done untuk soal MVP.
+- Jawaban salah menampilkan alasan dan evidence. Done.
+- Distractor tidak dijelaskan secara generic. Done untuk pola opsi MVP.
 
 ### Phase 5 — Reading Review
 

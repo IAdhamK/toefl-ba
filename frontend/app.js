@@ -17,6 +17,7 @@ const defaultState = {
   },
   completedExercises: 0,
   readingAnswers: {},
+  readingAnswerReviews: [],
   vocabularyAnswers: {},
   vocabularyDrill: {
     date: "",
@@ -2340,6 +2341,7 @@ function renderReading() {
   document.getElementById("submitReading").addEventListener("click", async () => {
     let score = scoreReading(selectedLesson);
     let details = [];
+    let answerReviews = localReadingAnswerReviews(selectedLesson);
     let readingResponse = null;
     if (apiOnline) {
       try {
@@ -2353,6 +2355,7 @@ function renderReading() {
         });
         score = readingResponse.score;
         details = readingResponse.details || [];
+        answerReviews = readingResponse.answer_reviews || answerReviews;
       } catch (error) {
         apiOnline = false;
       }
@@ -2363,6 +2366,7 @@ function renderReading() {
     if (readingResponse?.reading_journey_update) {
       state.readingJourney = readingResponse.reading_journey_update;
     }
+    state.readingAnswerReviews = answerReviews;
     saveState();
     await refreshIntegratedJourney();
     await refreshReadingJourney();
@@ -2372,7 +2376,9 @@ function renderReading() {
       score >= 70
         ? "Bagus. Kamu sudah menangkap main idea dan detail penting."
         : "Ulangi passage dan perhatikan kata kunci seperti analyst, stakeholder, dan outcome."
-    ) + (details.length ? `<div class="lesson-list compact-list">${details.map((detail) => `<p class="muted">${detail.questionId}: ${detail.isCorrect ? "Correct" : "Review"} - ${detail.explanation}</p>`).join("")}</div>` : "");
+    ) + (details.length ? `<div class="lesson-list compact-list">${details.map((detail) => `<p class="muted">${detail.questionId}: ${detail.isCorrect ? "Correct" : "Review"} - ${detail.explanation}</p>`).join("")}</div>` : "")
+      + readingAnswerReviewPanel(answerReviews, selectedLesson);
+    bindContextualHelpButtons(document.getElementById("readingResult"));
     renderDashboard();
     renderJourney();
   });
@@ -2817,6 +2823,158 @@ function readingHelpContext(lesson, question = null) {
 function scoreReading(lesson) {
   const correct = lesson.questions.filter((question) => state.readingAnswers[question.id] === question.answer).length;
   return Math.round((correct / lesson.questions.length) * 100);
+}
+
+function localReadingAnswerReviews(lesson) {
+  return lesson.questions
+    .filter((question) => state.readingAnswers[question.id] !== undefined)
+    .map((question) => localReadingAnswerReview(lesson, question, state.readingAnswers[question.id]));
+}
+
+function localReadingAnswerReview(lesson, question, selectedIndex) {
+  const correctIndex = question.answer;
+  const selectedText = question.options[selectedIndex] || "";
+  const correctText = question.options[correctIndex] || "";
+  const isCorrect = selectedIndex === correctIndex;
+  const evidence = localEvidenceSentence(lesson.passage, correctText);
+  const distractorAnalysis = {};
+  question.options.forEach((option, index) => {
+    const letter = String.fromCharCode(65 + index);
+    const correct = index === correctIndex;
+    distractorAnalysis[letter] = {
+      meaning: localOptionMeaning(option),
+      relation_to_passage: correct ? "Sesuai dengan passage dan bukti utama." : localOptionRelation(option),
+      correct_or_wrong: correct ? "correct" : "wrong",
+      reason: correct
+        ? `Opsi ini didukung oleh evidence: ${evidence}`
+        : `${index === selectedIndex ? "Ini pilihan Anda, tetapi " : ""}${localOptionWrongReason(option)}`
+    };
+  });
+  return {
+    question_id: question.id,
+    question_text: question.text,
+    selected_answer: { label: String.fromCharCode(65 + selectedIndex), index: selectedIndex, text: selectedText },
+    correct_answer: { label: String.fromCharCode(65 + correctIndex), index: correctIndex, text: correctText },
+    is_correct: isCorrect,
+    direct_explanation: isCorrect
+      ? `Jawaban Anda benar. Opsi ${String.fromCharCode(65 + correctIndex)} paling sesuai dengan passage.`
+      : `Jawaban Anda belum tepat. Jawaban yang lebih kuat adalah opsi ${String.fromCharCode(65 + correctIndex)}.`,
+    evidence_sentence: evidence,
+    why_correct_answer_is_correct: question.explanation || "Jawaban benar didukung oleh evidence passage.",
+    why_selected_answer_is_wrong: isCorrect ? "" : localOptionWrongReason(selectedText),
+    distractor_analysis: distractorAnalysis,
+    related_reading_sub_skill: inferLocalQuestionSubskill(question),
+    next_practice_recommendation: isCorrect
+      ? `Lanjutkan latihan ${readingSubskillLabel(inferLocalQuestionSubskill(question))}.`
+      : `Ulangi ${readingSubskillLabel(inferLocalQuestionSubskill(question))}: cocokkan opsi dengan evidence sentence.`
+  };
+}
+
+function readingAnswerReviewPanel(reviews, lesson) {
+  if (!reviews?.length) return "";
+  return `
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Answer Review</p>
+          <h3>Kenapa jawaban benar atau salah?</h3>
+          <p>Pelajari bukti dari passage dan analisis setiap opsi supaya tidak hanya tahu skor.</p>
+        </div>
+      </div>
+      <div class="lesson-list">
+        ${reviews.map((review, index) => readingAnswerReviewCard(review, lesson, index)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function readingAnswerReviewCard(review, lesson, index) {
+  const question = lesson.questions.find((item) => item.id === review.question_id) || lesson.questions[index] || {};
+  const baseContext = readingHelpContext(lesson, question);
+  const analysis = review.distractor_analysis || {};
+  return `
+    <div class="question">
+      <p class="eyebrow">Review Soal ${index + 1} · ${escapeHtml(readingSubskillLabel(review.related_reading_sub_skill))}</p>
+      <h3>${escapeHtml(review.question_text || question.text || "")} ${renderContextualHelpButton("reading", "reading_question", review.question_text || question.text || "", baseContext)}</h3>
+      <div class="drill-result-grid">
+        <div class="metric">
+          <span class="muted">Jawaban Anda</span>
+          <strong class="metric-word">${escapeHtml(review.selected_answer?.label || "-")}. ${escapeHtml(review.selected_answer?.text || "-")}</strong>
+        </div>
+        <div class="metric">
+          <span class="muted">Jawaban Benar</span>
+          <strong class="metric-word">${escapeHtml(review.correct_answer?.label || "-")}. ${escapeHtml(review.correct_answer?.text || "-")}</strong>
+        </div>
+      </div>
+      <p><strong>Bukti dari Passage:</strong> ${escapeHtml(review.evidence_sentence || "-")} ${renderContextualHelpButton("reading", "reading_paragraph", review.evidence_sentence || lesson.passage, baseContext)}</p>
+      <p><strong>Penjelasan langsung:</strong> ${escapeHtml(review.direct_explanation || "")}</p>
+      <p><strong>Kenapa benar:</strong> ${escapeHtml(review.why_correct_answer_is_correct || "")}</p>
+      ${review.why_selected_answer_is_wrong ? `<p><strong>Kenapa salah:</strong> ${escapeHtml(review.why_selected_answer_is_wrong)}</p>` : ""}
+      <div class="lesson-list compact-list">
+        ${Object.entries(analysis).map(([letter, item]) => `
+          <div>
+            <h3>Opsi ${letter} ${renderContextualHelpButton("reading", "reading_option", optionTextFromReview(question, letter, item), {
+              ...baseContext,
+              option_label: letter,
+              option_text: optionTextFromReview(question, letter, item)
+            })}</h3>
+            <p><strong>Arti:</strong> ${escapeHtml(item.meaning || "")}</p>
+            <p><strong>Hubungan dengan passage:</strong> ${escapeHtml(item.relation_to_passage || "")}</p>
+            <p><strong>Status:</strong> ${escapeHtml(item.correct_or_wrong === "correct" ? "benar" : "salah")} · ${escapeHtml(item.reason || "")}</p>
+          </div>
+        `).join("")}
+      </div>
+      <p class="muted">${escapeHtml(review.next_practice_recommendation || "")}</p>
+    </div>
+  `;
+}
+
+function optionTextFromReview(question, letter, item) {
+  const index = letter.charCodeAt(0) - 65;
+  return question?.options?.[index] || item?.meaning || "";
+}
+
+function localEvidenceSentence(passage, correctText) {
+  const sentences = splitLocalSentences(passage);
+  const lowerCorrect = String(correctText || "").toLowerCase();
+  if (lowerCorrect.includes("requirements") && lowerCorrect.includes("stakeholder")) {
+    return sentences.find((sentence) => sentence.toLowerCase().includes("requirements") && sentence.toLowerCase().includes("stakeholder")) || sentences[0] || passage;
+  }
+  if (lowerCorrect.includes("clarify") || lowerCorrect.includes("clearer") || lowerCorrect.includes("outcome")) {
+    return sentences.find((sentence) => sentence.toLowerCase().includes("clarify") || sentence.toLowerCase().includes("outcome")) || sentences[0] || passage;
+  }
+  return sentences[0] || passage;
+}
+
+function localOptionMeaning(option) {
+  const lowered = String(option || "").toLowerCase();
+  const map = {
+    "business analysts should write code immediately.": "Business Analyst sebaiknya langsung menulis kode.",
+    "business analysts must connect requirements with stakeholder needs and strategy.": "Business Analyst harus menghubungkan requirement dengan kebutuhan stakeholder dan strategi.",
+    "stakeholders should avoid discussing vague problems.": "Stakeholder sebaiknya menghindari membahas masalah yang masih samar.",
+    "organizational strategy is unrelated to requirements.": "Strategi organisasi tidak berhubungan dengan requirement.",
+    "make clearer": "membuat lebih jelas",
+    "remove": "menghapus",
+    "delay": "menunda",
+    "approve": "menyetujui"
+  };
+  return map[lowered] || `Arti opsi: ${option}`;
+}
+
+function localOptionRelation(option) {
+  const lowered = String(option || "").toLowerCase();
+  if (lowered.includes("write code")) return "Tidak didukung oleh passage.";
+  if (lowered.includes("avoid discussing")) return "Kurang sesuai dengan passage.";
+  if (lowered.includes("unrelated")) return "Bertentangan dengan passage.";
+  return "Perlu dicek dengan bukti passage; opsi ini bukan yang paling kuat.";
+}
+
+function localOptionWrongReason(option) {
+  const lowered = String(option || "").toLowerCase();
+  if (lowered.includes("write code")) return "passage membahas requirement dan alignment, bukan coding langsung.";
+  if (lowered.includes("avoid discussing")) return "passage meminta analyst mengklarifikasi masalah samar, bukan stakeholder menghindarinya.";
+  if (lowered.includes("unrelated")) return "passage justru menyatakan requirement perlu selaras dengan strategy.";
+  return "opsi ini tidak paling sesuai dengan evidence passage.";
 }
 
 function renderGrammar() {

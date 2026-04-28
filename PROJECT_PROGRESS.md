@@ -147,6 +147,12 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - halaman Reading memiliki mode step-by-step untuk memahami judul, kalimat pertama, subject/verb, vocabulary, paragraph map, main idea, dan kesiapan menjawab soal
   - passage map menampilkan simple meaning, key vocabulary, main point, possible reading skill, dan beginner tip
   - completion Guided Reading dicatat sebagai aktivitas pendukung lokal tanpa menurunkan skor
+- Reading Answer Review:
+  - endpoint `POST /api/reading/review-answer`
+  - `POST /api/reading/attempt` mengembalikan `answer_review`, `evidence_sentence`, `distractor_analysis`, dan `next_recommendation` ketika payload berisi jawaban
+  - submit Reading normal mengembalikan review untuk setiap soal yang dijawab
+  - UI menampilkan jawaban user, jawaban benar, bukti passage, alasan benar/salah, analisis opsi A/B/C/D, sub-skill terkait, dan rekomendasi latihan berikutnya
+  - Bantuan ID tetap tersedia pada evidence sentence dan setiap opsi review
 
 ## Verifikasi
 
@@ -165,6 +171,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Smoke test diperluas untuk Reading Journey, Reading levels, Reading recommendation, dan save Reading attempt.
 - Smoke test diperluas untuk Reading subskills, Reading trainer main idea, attempt main idea, dan attempt vocabulary context.
 - Smoke test diperluas untuk Guided Reading steps dan passage map.
+- Smoke test diperluas untuk Reading answer review dan distractor analysis.
 
 ## Cara Menjalankan Saat Ini
 
@@ -198,11 +205,11 @@ python3 scripts/smoke_api.py
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
 - Auth production-grade dan role-based access control.
-- Answer Review Phase 4 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
+- Reading Review Phase 5 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
 
 ## Rekomendasi Step Berikutnya
 
-1. Implementasikan Phase 4 Answer Review.
+1. Implementasikan Phase 5 Reading Review.
 2. Tambahkan edit/delete di Admin CMS frontend.
 3. Tambahkan E2E browser tests untuk alur utama.
 4. Tambahkan API tests dengan SQLite test database.

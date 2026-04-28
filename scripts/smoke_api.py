@@ -155,6 +155,8 @@ def main():
         "reading attempt main idea subskill",
         status == 201
         and reading_main_idea_attempt["answer_feedback"]["is_correct"]
+        and "answer_review" in reading_main_idea_attempt
+        and "distractor_analysis" in reading_main_idea_attempt
         and reading_main_idea_attempt["next_recommended_subskill"],
     )
 
@@ -198,6 +200,24 @@ def main():
         and len(passage_map["paragraphs"]) >= 1
         and "simple_meaning" in passage_map["paragraphs"][0]
         and "beginner_tip" in passage_map["paragraphs"][0],
+    )
+
+    review_payload = {
+        "passage": lesson["passage"],
+        "question": lesson["questions"][0],
+        "selected": 0,
+        "correct_answer": lesson["questions"][0]["answer"],
+        "explanation": lesson["questions"][0]["explanation"],
+    }
+    status, answer_review = call("/reading/review-answer", review_payload)
+    review = answer_review.get("answer_review", {})
+    assert_ok(
+        "reading answer review",
+        status == 200
+        and not review["is_correct"]
+        and "evidence_sentence" in review
+        and len(review["distractor_analysis"]) == len(lesson["questions"][0]["options"])
+        and "next_practice_recommendation" in review,
     )
 
     first_vocab = daily_vocab["items"][0]

@@ -439,6 +439,66 @@ def generate_passage_map(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def generate_answer_review(payload: dict[str, Any]) -> dict[str, Any]:
+    passage = str(payload.get("passage") or payload.get("passage_text") or "").strip()
+    question = normalize_review_question(payload)
+    options = [str(option) for option in question.get("options", [])]
+    if not options:
+        raise ValueError("Options wajib diisi untuk Answer Review.")
+    selected_index = parse_selected_index(
+        payload.get("selected") if payload.get("selected") is not None else payload.get("selected_answer"),
+        options,
+    )
+    correct_index = parse_correct_index(payload.get("correct_answer", question.get("answer")), options)
+    if selected_index is None:
+        raise ValueError("Selected answer tidak valid.")
+    if correct_index is None:
+        raise ValueError("Correct answer tidak valid.")
+    selected_text = options[selected_index]
+    correct_text = options[correct_index]
+    is_correct = selected_index == correct_index
+    sub_skill = normalize_subskill(payload.get("sub_skill") or payload.get("question_type") or infer_question_subskill(question))
+    evidence_sentence = (
+        payload.get("evidence_sentence")
+        or question.get("evidence_sentence")
+        or find_evidence_sentence(passage, question.get("text", ""), correct_text)
+    )
+    explanation = payload.get("explanation") or question.get("explanation") or answer_review_explanation(question, correct_text, evidence_sentence)
+    distractors = build_distractor_analysis(options, correct_index, selected_index, passage, question.get("text", ""), evidence_sentence)
+    selected_letter = option_letter(selected_index)
+    correct_letter = option_letter(correct_index)
+    why_wrong = ""
+    if not is_correct:
+        selected_analysis = distractors[selected_letter]
+        why_wrong = f"Opsi {selected_letter} kurang tepat karena {selected_analysis['reason']}"
+    return {
+        "question_id": question.get("id") or payload.get("question_id") or payload.get("activity_id") or "reading-question",
+        "question_text": question.get("text", ""),
+        "selected_answer": {
+            "label": selected_letter,
+            "index": selected_index,
+            "text": selected_text,
+        },
+        "correct_answer": {
+            "label": correct_letter,
+            "index": correct_index,
+            "text": correct_text,
+        },
+        "is_correct": is_correct,
+        "direct_explanation": (
+            f"Jawaban Anda benar. Opsi {correct_letter} paling sesuai dengan bukti passage."
+            if is_correct
+            else f"Jawaban Anda belum tepat. Anda memilih opsi {selected_letter}, sedangkan jawaban yang lebih kuat adalah opsi {correct_letter}."
+        ),
+        "evidence_sentence": evidence_sentence,
+        "why_correct_answer_is_correct": f"Opsi {correct_letter} benar karena {explanation}",
+        "why_selected_answer_is_wrong": why_wrong,
+        "distractor_analysis": distractors,
+        "related_reading_sub_skill": sub_skill,
+        "next_practice_recommendation": answer_review_next_practice(sub_skill, is_correct),
+    }
+
+
 def save_reading_attempt(payload: dict[str, Any]) -> dict[str, Any]:
     user_id = get_default_user_id(payload.get("user_id") or payload.get("userId"))
     passage_id = payload.get("passage_id") or payload.get("lesson_id") or payload.get("activity_id") or "reading-passage"
@@ -455,6 +515,9 @@ def save_reading_attempt(payload: dict[str, Any]) -> dict[str, Any]:
     feedback = payload.get("feedback") or (trainer_feedback or {}).get("message") or "Reading attempt tersimpan. Lanjutkan latihan sesuai rekomendasi."
     if sub_skill and sub_skill not in READING_SUBSKILLS:
         raise ValueError(f"Sub-skill Reading tidak dikenal: {sub_skill}")
+    answer_review = None
+    if has_review_payload(payload):
+        answer_review = generate_answer_review(payload)
     update = save_learning_attempt(
         user_id=user_id,
         skill_type="reading",
@@ -483,6 +546,10 @@ def save_reading_attempt(payload: dict[str, Any]) -> dict[str, Any]:
         "reading_journey": get_reading_journey(user_id),
         "recommendation": get_reading_recommendation(user_id),
         "answer_feedback": trainer_feedback,
+        "answer_review": answer_review,
+        "evidence_sentence": (answer_review or {}).get("evidence_sentence") or (trainer_feedback or {}).get("evidence_sentence"),
+        "distractor_analysis": (answer_review or {}).get("distractor_analysis", {}),
+        "next_recommendation": (answer_review or {}).get("next_practice_recommendation") or READING_ACTIONS.get(next_trainable_subskill(next_subskill)),
         "next_recommended_subskill": next_trainable_subskill(next_subskill),
     }
 
@@ -655,6 +722,184 @@ def parse_selected_index(selected: Any, options: list[str]) -> int | None:
         if option.lower() == lowered:
             return index
     return None
+
+
+def parse_correct_index(correct: Any, options: list[str]) -> int | None:
+    parsed = parse_selected_index(correct, options)
+    if parsed is not None:
+        return parsed
+    if correct is None:
+        return None
+    lowered = str(correct).strip().lower()
+    for index, option in enumerate(options):
+        if option.lower() == lowered:
+            return index
+    return None
+
+
+def has_review_payload(payload: dict[str, Any]) -> bool:
+    has_selected = any(key in payload for key in ("selected", "selected_answer", "answer"))
+    has_question = bool(payload.get("question") or payload.get("question_text") or payload.get("sub_skill"))
+    return has_selected and has_question
+
+
+def normalize_review_question(payload: dict[str, Any]) -> dict[str, Any]:
+    question = dict(payload.get("question") or {})
+    sub_skill = normalize_subskill(payload.get("sub_skill") or question.get("sub_skill") or question.get("question_type") or "")
+    if sub_skill in READING_TRAINER_CONTENT and not question.get("options"):
+        question = dict(READING_TRAINER_CONTENT[sub_skill]["question"])
+    question["id"] = question.get("id") or payload.get("question_id") or payload.get("activity_id") or "reading-question"
+    question["text"] = question.get("text") or payload.get("question_text") or ""
+    question["options"] = question.get("options") or payload.get("options") or []
+    question["answer"] = question.get("answer", payload.get("correct_answer"))
+    question["explanation"] = question.get("explanation") or payload.get("explanation") or ""
+    question["evidence_sentence"] = question.get("evidence_sentence") or payload.get("evidence_sentence") or ""
+    question["sub_skill"] = sub_skill or infer_question_subskill(question)
+    return question
+
+
+def option_letter(index: int) -> str:
+    return chr(65 + int(index))
+
+
+def build_distractor_analysis(
+    options: list[str],
+    correct_index: int,
+    selected_index: int,
+    passage: str,
+    question_text: str,
+    evidence_sentence: str,
+) -> dict[str, dict[str, str]]:
+    analysis = {}
+    for index, option in enumerate(options):
+        letter = option_letter(index)
+        is_correct = index == correct_index
+        relation, reason = option_relation_and_reason(option, is_correct, passage, question_text, evidence_sentence)
+        if not is_correct and index == selected_index:
+            reason = f"Ini pilihan Anda, tetapi {reason}"
+        analysis[letter] = {
+            "meaning": translate_reading_option(option),
+            "relation_to_passage": relation,
+            "correct_or_wrong": "correct" if is_correct else "wrong",
+            "reason": reason,
+        }
+    return analysis
+
+
+def option_relation_and_reason(option: str, is_correct: bool, passage: str, question_text: str, evidence_sentence: str) -> tuple[str, str]:
+    lowered = option.lower()
+    if is_correct:
+        return (
+            "Sesuai dengan passage dan bukti yang ditemukan.",
+            f"opsi ini paling cocok dengan evidence: {evidence_sentence or 'bagian utama passage'}."
+        )
+    if "write code" in lowered:
+        return (
+            "Tidak didukung oleh passage.",
+            "passage membahas analisis requirement dan alignment, bukan langsung menulis kode."
+        )
+    if "avoid discussing vague problems" in lowered:
+        return (
+            "Kurang sesuai dengan passage.",
+            "passage mengatakan analyst perlu mengklarifikasi masalah yang samar, bukan stakeholder harus menghindarinya."
+        )
+    if "unrelated" in lowered:
+        return (
+            "Bertentangan dengan passage.",
+            "passage justru menyatakan requirement perlu selaras dengan strategy."
+        )
+    if "replace all employees" in lowered or "avoid speaking" in lowered or "ignore" in lowered:
+        return (
+            "Tidak didukung oleh passage.",
+            "opsi ini terlalu ekstrem dan tidak muncul sebagai tujuan analyst."
+        )
+    if "technical documentation" in lowered:
+        return (
+            "Terlalu sempit.",
+            "passage membahas kebutuhan, requirement, dan strategi, bukan hanya dokumentasi teknis."
+        )
+    overlap = vocabulary_overlap(option, passage)
+    if overlap:
+        return (
+            "Memiliki beberapa kata yang terkait, tetapi bukan jawaban terbaik.",
+            "ada kata yang mirip dengan passage, namun maknanya tidak paling menjawab pertanyaan."
+        )
+    return (
+        "Tidak menjadi fokus passage.",
+        "opsi ini tidak punya bukti kuat di passage."
+    )
+
+
+def translate_reading_option(option: str) -> str:
+    lowered = option.lower().strip()
+    known = {
+        "business analysts should write code immediately.": "Business Analyst sebaiknya langsung menulis kode.",
+        "business analysts should write code before asking questions.": "Business Analyst sebaiknya menulis kode sebelum bertanya.",
+        "business analysts must connect requirements with stakeholder needs and strategy.": "Business Analyst harus menghubungkan requirement dengan kebutuhan stakeholder dan strategi.",
+        "business analysts connect stakeholder needs, requirements, and strategy.": "Business Analyst menghubungkan kebutuhan stakeholder, requirement, dan strategi.",
+        "stakeholders should avoid discussing vague problems.": "Stakeholder sebaiknya menghindari membahas masalah yang masih samar.",
+        "organizational strategy is unrelated to requirements.": "Strategi organisasi tidak berhubungan dengan requirement.",
+        "make clearer": "membuat lebih jelas",
+        "remove": "menghapus",
+        "delay": "menunda",
+        "approve": "menyetujui",
+        "clarify the expected outcome.": "memperjelas hasil yang diharapkan.",
+        "ask the developer to build it.": "meminta developer langsung membuatnya.",
+        "ignore the stakeholder.": "mengabaikan stakeholder.",
+        "create a final contract.": "membuat kontrak final.",
+        "when managers wait for missing information.": "ketika manager menunggu informasi yang masih kurang.",
+        "the analyst checked data accuracy before improving the dashboard.": "Analyst memeriksa akurasi data sebelum memperbaiki dashboard.",
+    }
+    if lowered in known:
+        return known[lowered]
+    return f"Arti opsi: {option}"
+
+
+def vocabulary_overlap(option: str, passage: str) -> bool:
+    option_words = {word.strip(".,:;!?").lower() for word in option.split() if len(word.strip(".,:;!?")) > 4}
+    passage_words = {word.strip(".,:;!?").lower() for word in passage.split() if len(word.strip(".,:;!?")) > 4}
+    return bool(option_words & passage_words)
+
+
+def find_evidence_sentence(passage: str, question_text: str, correct_answer: str) -> str:
+    sentences = split_sentences(passage)
+    if not sentences:
+        return passage
+    lower_correct = correct_answer.lower()
+    if "requirements" in lower_correct and "stakeholder" in lower_correct and "strategy" in lower_correct:
+        for sentence in sentences:
+            lower = sentence.lower()
+            if "requirements" in lower and "stakeholder" in lower and "strategy" in lower:
+                return sentence
+    if "clarify" in lower_correct or "clearer" in lower_correct or "outcome" in lower_correct:
+        for sentence in sentences:
+            if "clarify" in sentence.lower() or "outcome" in sentence.lower():
+                return sentence
+    target_words = {word.strip(".,:;!?").lower() for word in f"{question_text} {correct_answer}".split() if len(word.strip(".,:;!?")) > 4}
+    ranked = sorted(
+        sentences,
+        key=lambda sentence: len(target_words & {word.strip(".,:;!?").lower() for word in sentence.split()}),
+        reverse=True,
+    )
+    return ranked[0]
+
+
+def answer_review_explanation(question: dict[str, Any], correct_text: str, evidence_sentence: str) -> str:
+    if question.get("explanation"):
+        return question["explanation"]
+    text = (question.get("text") or "").lower()
+    if "main idea" in text:
+        return "jawaban benar merangkum isi passage secara umum, bukan hanya mengambil satu detail kecil."
+    if "closest in meaning" in text:
+        return "jawaban benar cocok dengan arti kata dalam konteks kalimat."
+    return f"jawaban benar didukung oleh evidence sentence: {evidence_sentence or correct_text}."
+
+
+def answer_review_next_practice(sub_skill: str, is_correct: bool) -> str:
+    action = READING_ACTIONS.get(sub_skill, READING_ACTIONS["main_idea"])
+    if is_correct:
+        return f"Lanjutkan latihan {label_subskill(sub_skill)} dengan passage baru. {action}"
+    return f"Ulangi sub-skill {label_subskill(sub_skill)}. {action}"
 
 
 def split_paragraphs(passage: str) -> list[str]:

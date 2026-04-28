@@ -68,6 +68,7 @@ Compatibility endpoint lama tetap tersedia:
 - `GET /api/reading/trainer/{sub_skill}`
 - `POST /api/reading/guided-steps`
 - `POST /api/reading/passage-map`
+- `POST /api/reading/review-answer`
 - `POST /api/reading/attempt`
 
 Example Reading attempt:
@@ -133,6 +134,12 @@ Trainer response includes:
 - `guidance`
 
 Trainer attempt response includes `answer_feedback`, `reading_journey`, and `next_recommended_subskill`.
+When the request includes a selected answer, Reading attempt also includes:
+
+- `answer_review`
+- `evidence_sentence`
+- `distractor_analysis`
+- `next_recommendation`
 
 Example Guided Reading request:
 
@@ -172,6 +179,39 @@ Guided steps currently cover:
 - beginner tip
 
 Guided Reading is rule-based for now and beginner-friendly in Indonesian. The frontend records completion as a support activity without lowering the Reading score.
+
+Example Answer Review request:
+
+```json
+{
+  "passage": "A business analyst ... organizational strategy.",
+  "question": {
+    "id": "r1q1",
+    "text": "What is the main idea of the passage?",
+    "options": [
+      "Business analysts should write code immediately.",
+      "Business analysts must connect requirements with stakeholder needs and strategy.",
+      "Stakeholders should avoid discussing vague problems.",
+      "Organizational strategy is unrelated to requirements."
+    ],
+    "answer": 1,
+    "explanation": "The passage emphasizes eliciting requirements and aligning them with needs and strategy."
+  },
+  "selected": 0
+}
+```
+
+`POST /api/reading/review-answer` returns:
+
+- selected answer
+- correct answer
+- direct explanation
+- evidence sentence from passage
+- why correct answer is correct
+- why selected answer is wrong if wrong
+- distractor analysis for every option
+- related reading sub-skill
+- next practice recommendation
 
 Reading Journey response includes:
 

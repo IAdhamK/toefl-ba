@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from backend.services.reading_service import (
     generate_guided_reading_steps,
+    generate_answer_review,
     generate_passage_map,
     get_reading_journey,
     get_reading_levels,
@@ -55,6 +56,14 @@ def reading_guided_steps(payload: dict) -> dict:
 def reading_passage_map(payload: dict) -> dict:
     try:
         return generate_passage_map(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@router.post("/review-answer")
+def reading_review_answer(payload: dict) -> dict:
+    try:
+        return {"answer_review": generate_answer_review(payload)}
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 

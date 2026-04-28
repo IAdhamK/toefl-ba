@@ -5,7 +5,7 @@ from backend.services.listening_service import evaluate_listening
 from backend.services.scoring_service import evaluate_writing, score_reading, score_scenario, score_vocabulary
 from backend.repository import get_vocabulary_item
 from backend.services.journey_service import save_learning_attempt, update_skill_mastery, update_vocabulary_memory
-from backend.services.reading_service import get_reading_journey, update_reading_subskills_from_quiz
+from backend.services.reading_service import generate_answer_review, get_reading_journey, update_reading_subskills_from_quiz
 
 
 router = APIRouter(tags=["scoring"])
@@ -41,6 +41,7 @@ def reading_score(payload: dict) -> dict:
         lesson,
         result,
     )
+    result["answer_reviews"] = build_reading_answer_reviews(lesson, payload.get("answers", {}))
     result["journey_update"] = compact_journey_update(update)
     result["reading_journey_update"] = get_reading_journey(payload.get("user_id") or payload.get("userId") or "default-user")
     return result
@@ -146,3 +147,24 @@ def compact_journey_update(update: dict) -> dict:
         "overall_score": update.get("journey", {}).get("overall_score", 0),
         "recommended_module": update.get("journey", {}).get("next_recommended_module", "grammar"),
     }
+
+
+def build_reading_answer_reviews(lesson: dict, answers: dict) -> list[dict]:
+    reviews = []
+    for question in lesson.get("questions", []):
+        selected = answers.get(question.get("id"))
+        if selected is None:
+            continue
+        reviews.append(
+            generate_answer_review(
+                {
+                    "passage": lesson.get("passage", ""),
+                    "question": question,
+                    "selected": selected,
+                    "correct_answer": question.get("answer"),
+                    "explanation": question.get("explanation", ""),
+                    "sub_skill": question.get("sub_skill") or question.get("question_type"),
+                }
+            )
+        )
+    return reviews
