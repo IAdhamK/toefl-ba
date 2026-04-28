@@ -45,6 +45,13 @@ const defaultState = {
   },
   integratedJourney: null,
   readingJourney: null,
+  readingTrainer: {
+    selectedSubSkill: "main_idea",
+    subskills: [],
+    content: null,
+    selectedAnswer: null,
+    feedback: null
+  },
   adaptivePractice: null,
   chat: [
     {
@@ -684,6 +691,7 @@ function loadState() {
       cache: { ...(parsed.contextualHelp?.cache || {}) },
       position: { ...defaultState.contextualHelp.position, ...(parsed.contextualHelp?.position || {}) }
     },
+    readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(parsed.readingTrainer || {}) },
     chat: parsed.chat || structuredClone(defaultState.chat)
   };
 }
@@ -718,7 +726,8 @@ async function hydrateFromApi() {
         contextualHelp: {
           cache: { ...(stateResponse.state.contextualHelp?.cache || state.contextualHelp?.cache || {}) },
           position: { ...defaultState.contextualHelp.position, ...(stateResponse.state.contextualHelp?.position || state.contextualHelp?.position || {}) }
-        }
+        },
+        readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(stateResponse.state.readingTrainer || state.readingTrainer || {}) }
       };
     }
     state.remoteContent = {
@@ -738,6 +747,7 @@ async function hydrateFromApi() {
     apiOnline = false;
     state.integratedJourney = localJourneySummary();
     state.readingJourney = localReadingJourney();
+    state.readingTrainer = localReadingTrainerState();
   }
 }
 
@@ -765,10 +775,36 @@ async function refreshReadingJourney() {
     const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
     const response = await apiRequest(`/reading/journey${query}`);
     state.readingJourney = response.reading_journey;
+    await refreshReadingTrainer(state.readingTrainer?.selectedSubSkill || "main_idea");
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     apiOnline = false;
     state.readingJourney = localReadingJourney();
+    state.readingTrainer = localReadingTrainerState();
+  }
+}
+
+async function refreshReadingTrainer(subSkill = "main_idea") {
+  if (!apiOnline) {
+    state.readingTrainer = localReadingTrainerState(subSkill);
+    return;
+  }
+  try {
+    const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
+    const [subskillsResponse, trainerResponse] = await Promise.all([
+      apiRequest(`/reading/subskills${query}`),
+      apiRequest(`/reading/trainer/${encodeURIComponent(subSkill)}${query}`)
+    ]);
+    state.readingTrainer = {
+      selectedSubSkill: trainerResponse.sub_skill,
+      subskills: subskillsResponse.subskills || [],
+      content: trainerResponse,
+      selectedAnswer: null,
+      feedback: null
+    };
+  } catch (error) {
+    apiOnline = false;
+    state.readingTrainer = localReadingTrainerState(subSkill);
   }
 }
 
@@ -1374,12 +1410,7 @@ function localAdaptivePractice(summary) {
 function localReadingJourney() {
   const score = state.progress.Reading || 0;
   const completed = state.activity.filter((item) => item.module === "Reading").length;
-  const subskills = [
-    { subskill: "general_meaning", label: "Arti umum", mastery_score: score, attempt_count: completed, status: completed ? "developing" : "not_started" },
-    { subskill: "main_idea", label: "Main idea", mastery_score: score, attempt_count: completed, status: completed ? "developing" : "not_started" },
-    { subskill: "detail_information", label: "Detail informasi", mastery_score: Math.max(0, score - 5), attempt_count: completed, status: completed ? "developing" : "not_started" },
-    { subskill: "vocabulary_context", label: "Vocabulary in context", mastery_score: Math.max(0, score - 10), attempt_count: completed, status: completed ? "developing" : "not_started" }
-  ];
+  const subskills = localReadingSubskills(score, completed);
   const weak = [...subskills].sort((a, b) => a.mastery_score - b.mastery_score).slice(0, 2);
   const strong = [...subskills].sort((a, b) => b.mastery_score - a.mastery_score).slice(0, 2);
   return {
@@ -1397,6 +1428,101 @@ function localReadingJourney() {
       ? `Fokus berikutnya: ${weak[0].label}. ${localReadingAction(weak[0].subskill)}`
       : "Mulai dari satu passage pendek. Baca judul, kalimat pertama, lalu cari arti umum bacaan."
   };
+}
+
+function localReadingSubskills(score = state.progress.Reading || 0, completed = state.activity.filter((item) => item.module === "Reading").length) {
+  const definitions = [
+    ["general_meaning", "Arti umum", score],
+    ["main_idea", "Main idea", score],
+    ["detail_information", "Detail informasi", Math.max(0, score - 5)],
+    ["vocabulary_context", "Vocabulary in context", Math.max(0, score - 10)],
+    ["reference", "Reference/pronoun", Math.max(0, score - 15)],
+    ["sentence_simplification", "Kalimat kompleks", Math.max(0, score - 15)],
+    ["inference", "Inference", Math.max(0, score - 20)],
+    ["author_purpose", "Author purpose", Math.max(0, score - 20)],
+    ["paragraph_function", "Fungsi paragraf", Math.max(0, score - 20)],
+    ["ba_case_analysis", "BA case reading", Math.max(0, score - 10)]
+  ];
+  return definitions.map(([subskill, label, mastery]) => ({
+    subskill,
+    label,
+    mastery_score: mastery,
+    attempt_count: completed,
+    status: completed ? "developing" : "not_started",
+    trainer_available: ["main_idea", "detail_information", "vocabulary_context", "inference", "sentence_simplification"].includes(subskill)
+  }));
+}
+
+function localReadingTrainerState(subSkill = state.readingTrainer?.selectedSubSkill || "main_idea") {
+  const normalized = normalizeReadingSubskill(subSkill);
+  return {
+    selectedSubSkill: normalized,
+    subskills: localReadingSubskills(),
+    content: localReadingTrainerContent(normalized),
+    selectedAnswer: null,
+    feedback: null
+  };
+}
+
+function localReadingTrainerContent(subSkill) {
+  const selectedLesson = getLessons().find((lesson) => lesson.id === state.selectedReadingLessonId) || getLessons()[0];
+  const fallbackQuestion = selectedLesson.questions.find((question) => normalizeReadingSubskill(question.sub_skill || question.question_type || inferLocalQuestionSubskill(question)) === subSkill) || selectedLesson.questions[0];
+  return {
+    sub_skill: subSkill,
+    label: readingSubskillLabel(subSkill),
+    next_action: localReadingAction(subSkill),
+    passage: {
+      id: selectedLesson.id,
+      title: selectedLesson.title,
+      text: selectedLesson.passage
+    },
+    question: {
+      ...fallbackQuestion,
+      sub_skill: subSkill,
+      question_type: subSkill,
+      evidence_sentence: selectedLesson.passage,
+      answer: fallbackQuestion.answer
+    },
+    guidance: {
+      goal: `Latihan ${readingSubskillLabel(subSkill)}.`,
+      tip: localReadingAction(subSkill)
+    }
+  };
+}
+
+function normalizeReadingSubskill(value) {
+  const aliases = {
+    detail: "detail_information",
+    vocabulary: "vocabulary_context",
+    sentence_breakdown: "sentence_simplification"
+  };
+  const key = String(value || "main_idea").toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
+  return aliases[key] || key;
+}
+
+function inferLocalQuestionSubskill(question) {
+  const text = String(question?.text || "").toLowerCase();
+  if (text.includes("main idea")) return "main_idea";
+  if (text.includes("word") || text.includes("closest in meaning")) return "vocabulary_context";
+  if (text.includes("infer")) return "inference";
+  if (text.includes("simplif")) return "sentence_simplification";
+  return "detail_information";
+}
+
+function readingSubskillLabel(subskill) {
+  const labels = {
+    general_meaning: "Arti umum",
+    main_idea: "Main Idea",
+    detail_information: "Detail",
+    vocabulary_context: "Vocabulary Context",
+    reference: "Reference",
+    sentence_simplification: "Sentence Breakdown",
+    inference: "Inference",
+    author_purpose: "Author Purpose",
+    paragraph_function: "Paragraph Function",
+    ba_case_analysis: "BA Case"
+  };
+  return labels[subskill] || String(subskill || "").replaceAll("_", " ");
 }
 
 function readingScoreLevel(score) {
@@ -1417,7 +1543,9 @@ function localReadingAction(subskill) {
     general_meaning: "Pahami arti umum passage pendek sebelum melihat pilihan jawaban.",
     main_idea: "Pilih jawaban yang merangkum seluruh passage, bukan detail kecil.",
     detail_information: "Cocokkan pertanyaan dengan kalimat bukti di passage.",
-    vocabulary_context: "Pahami arti kata dari kalimatnya, bukan hanya arti kamus."
+    vocabulary_context: "Pahami arti kata dari kalimatnya, bukan hanya arti kamus.",
+    inference: "Cari jawaban yang tersirat tetapi tetap didukung evidence passage.",
+    sentence_simplification: "Sederhanakan kalimat panjang tanpa mengubah makna utama."
   };
   return actions[subskill] || actions.main_idea;
 }
@@ -2045,6 +2173,8 @@ function renderReading() {
     </header>
     ${journeyPanel("Reading")}
     ${readingJourneySummary()}
+    ${readingSubskillProgress()}
+    ${readingTrainerPanel()}
 
     <section class="content-grid">
       <div class="panel">
@@ -2128,6 +2258,27 @@ function renderReading() {
   document.getElementById("continueReadingButton")?.addEventListener("click", () => {
     document.getElementById("readingResult")?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
+
+  document.querySelectorAll("[data-reading-trainer-subskill]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const subSkill = button.dataset.readingTrainerSubskill;
+      state.readingTrainer = { ...(state.readingTrainer || {}), selectedSubSkill: subSkill, selectedAnswer: null, feedback: null };
+      if (apiOnline) {
+        await refreshReadingTrainer(subSkill);
+      } else {
+        state.readingTrainer = localReadingTrainerState(subSkill);
+      }
+      saveState();
+      renderReading();
+    });
+  });
+
+  document.querySelectorAll("[data-reading-trainer-answer]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const selected = Number(button.dataset.readingTrainerAnswer);
+      await submitReadingTrainerAnswer(selected);
+    });
+  });
   bindContextualHelpButtons(document.getElementById("readingView"));
 }
 
@@ -2173,6 +2324,177 @@ function readingJourneySummary() {
       <button id="continueReadingButton" class="primary-button" type="button">Lanjutkan Reading</button>
     </section>
   `;
+}
+
+function readingSubskillProgress() {
+  const subskills = state.readingTrainer?.subskills?.length
+    ? state.readingTrainer.subskills
+    : (state.readingJourney?.sub_skill_mastery || localReadingSubskills());
+  return `
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Reading Sub-skill Progress</p>
+          <h3>Progress kemampuan Reading</h3>
+        </div>
+      </div>
+      <div class="drill-result-grid">
+        ${subskills.map((item) => `
+          <div class="metric">
+            <span class="muted">${escapeHtml(item.label || readingSubskillLabel(item.subskill))}</span>
+            <strong>${Math.round(item.mastery_score || 0)}%</strong>
+            <small>${readingMasteryStatusLabel(item.status)} · ${item.attempt_count || 0} latihan</small>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function readingTrainerPanel() {
+  const trainer = state.readingTrainer?.content || localReadingTrainerContent(state.readingTrainer?.selectedSubSkill || "main_idea");
+  const subSkill = trainer.sub_skill || state.readingTrainer?.selectedSubSkill || "main_idea";
+  const question = trainer.question || {};
+  const passage = trainer.passage || {};
+  const selected = state.readingTrainer?.selectedAnswer;
+  const feedback = state.readingTrainer?.feedback;
+  const buttons = [
+    ["main_idea", "Main Idea"],
+    ["detail_information", "Detail"],
+    ["vocabulary_context", "Vocabulary Context"],
+    ["inference", "Inference"],
+    ["sentence_simplification", "Sentence Breakdown"]
+  ];
+  const baseContext = {
+    passage_title: passage.title || "",
+    passage_text: passage.text || "",
+    question_text: question.text || "",
+    correct_answer: question.options?.[question.answer] || "",
+    explanation: question.explanation || "",
+    tags: [trainer.label, "Reading Trainer"].filter(Boolean)
+  };
+  return `
+    <section class="panel" id="readingTrainerPanel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Reading Trainer</p>
+          <h3>Latihan berdasarkan sub-skill</h3>
+          <p>${escapeHtml(trainer.guidance?.tip || "Pilih tipe latihan, jawab soal, lalu lihat feedback.")}</p>
+        </div>
+      </div>
+      <div class="pill-row">
+        ${buttons.map(([value, label]) => `
+          <button class="ghost-button ${subSkill === value ? "selected-control" : ""}" type="button" data-reading-trainer-subskill="${value}">
+            ${label}
+          </button>
+        `).join("")}
+      </div>
+      <div class="content-grid compact-grid">
+        <div>
+          <h3>${escapeHtml(passage.title || "Trainer Passage")}</h3>
+          <p>${escapeHtml(passage.text || "")} ${renderContextualHelpButton("reading", "reading_paragraph", passage.text || "", baseContext)}</p>
+          <p class="muted">${escapeHtml(trainer.guidance?.goal || "")}</p>
+        </div>
+        <div class="question">
+          <h3>${escapeHtml(question.text || "")} ${renderContextualHelpButton("reading", "reading_question", question.text || "", baseContext)}</h3>
+          <div class="question-options">
+            ${(question.options || []).map((option, index) => `
+              <div class="option-help-row">
+                <button class="option-button ${selected === index ? "selected" : ""}" type="button" data-reading-trainer-answer="${index}">
+                  ${String.fromCharCode(65 + index)}. ${escapeHtml(option)}
+                </button>
+                ${renderContextualHelpButton("reading", "reading_option", option, {
+                  ...baseContext,
+                  option_label: String.fromCharCode(65 + index),
+                  option_text: option
+                })}
+              </div>
+            `).join("")}
+          </div>
+          ${feedback ? readingTrainerFeedbackTemplate(feedback) : `<p class="muted">Pilih jawaban untuk menyimpan latihan ${escapeHtml(readingSubskillLabel(subSkill))}.</p>`}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function readingTrainerFeedbackTemplate(feedback) {
+  const type = feedback.is_correct ? "success" : "warning";
+  const title = feedback.is_correct ? "Jawaban benar" : "Perlu review";
+  const message = feedback.message || feedback.explanation || "Feedback tersimpan.";
+  return resultTemplate(
+    type,
+    title,
+    `${message}${feedback.evidence_sentence ? ` Evidence: ${feedback.evidence_sentence}` : ""}`
+  );
+}
+
+async function submitReadingTrainerAnswer(selected) {
+  const trainer = state.readingTrainer?.content || localReadingTrainerContent(state.readingTrainer?.selectedSubSkill || "main_idea");
+  const subSkill = trainer.sub_skill || "main_idea";
+  const question = trainer.question || {};
+  let feedback = localReadingTrainerFeedback(trainer, selected);
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/reading/attempt", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          passage_id: trainer.passage?.id || `trainer-${subSkill}`,
+          activity_type: "reading_subskill_trainer",
+          sub_skill: subSkill,
+          selected,
+          correct_answer: question.answer,
+          mistakes: feedback.is_correct ? [] : [{ question_id: question.id, selected }],
+          feedback: feedback.message
+        }
+      });
+      feedback = response.answer_feedback || feedback;
+      state.readingJourney = response.reading_journey || state.readingJourney;
+      await refreshReadingTrainer(subSkill);
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.readingTrainer = {
+    ...(state.readingTrainer || localReadingTrainerState(subSkill)),
+    selectedSubSkill: subSkill,
+    selectedAnswer: selected,
+    feedback
+  };
+  state.progress.Reading = Math.max(state.progress.Reading, feedback.is_correct ? 80 : 45);
+  addActivity("Reading", `${readingSubskillLabel(subSkill)} trainer`, feedback.is_correct ? 100 : 0);
+  saveState();
+  renderReading();
+  renderDashboard();
+  renderJourney();
+}
+
+function localReadingTrainerFeedback(trainer, selected) {
+  const question = trainer.question || {};
+  const isCorrect = selected === question.answer;
+  const correctAnswer = question.options?.[question.answer] || "";
+  return {
+    is_correct: isCorrect,
+    selected_index: selected,
+    correct_index: question.answer,
+    correct_answer: correctAnswer,
+    evidence_sentence: question.evidence_sentence,
+    explanation: question.explanation,
+    message: isCorrect
+      ? `Benar. ${question.explanation || "Jawaban sesuai evidence passage."}`
+      : `Belum tepat. Jawaban yang lebih kuat: ${correctAnswer}. ${question.explanation || "Cocokkan lagi dengan evidence passage."}`
+  };
+}
+
+function readingMasteryStatusLabel(status) {
+  const labels = {
+    not_started: "belum mulai",
+    needs_review: "perlu review",
+    developing: "berkembang",
+    strong: "kuat"
+  };
+  return labels[status] || "belajar";
 }
 
 function readingQuestionTemplate(question, index, lesson) {

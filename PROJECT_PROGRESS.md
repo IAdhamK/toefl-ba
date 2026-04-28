@@ -133,6 +133,14 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - endpoint `POST /api/reading/attempt`
   - halaman Reading menampilkan Reading level, score, completed passages, strongest/weakest sub-skill, dan next recommended action
   - sub-skill Phase 1: `general_meaning`, `main_idea`, `detail_information`, `vocabulary_context`
+- Reading Sub-skill Trainer:
+  - service Reading sekarang mendukung 10 sub-skill Reading
+  - endpoint `GET /api/reading/subskills`
+  - endpoint `GET /api/reading/trainer/{sub_skill}`
+  - `POST /api/reading/attempt` bisa menerima `sub_skill` dan memperbarui mastery yang tepat
+  - trainer awal tersedia untuk `main_idea`, `detail_information`, `vocabulary_context`, `inference`, dan `sentence_simplification`
+  - halaman Reading menampilkan progress per sub-skill dan selector trainer
+  - Bantuan ID tetap tersedia di passage, question, dan option trainer
 
 ## Verifikasi
 
@@ -149,6 +157,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Smoke test diperluas untuk Bantuan ID kontekstual di Reading, Grammar, Vocabulary, Listening, Scenario, reading main idea question, reading correct/wrong/contradictory option, dan scenario problem statement.
 - Dokumentasi Reading foundation dibuat tanpa mengubah behavior frontend/backend.
 - Smoke test diperluas untuk Reading Journey, Reading levels, Reading recommendation, dan save Reading attempt.
+- Smoke test diperluas untuk Reading subskills, Reading trainer main idea, attempt main idea, dan attempt vocabulary context.
 
 ## Cara Menjalankan Saat Ini
 
@@ -182,11 +191,11 @@ python3 scripts/smoke_api.py
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
 - Auth production-grade dan role-based access control.
-- Reading Sub-skill Trainer Phase 2 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
+- Guided Reading Mode Phase 3 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
 
 ## Rekomendasi Step Berikutnya
 
-1. Implementasikan Phase 2 Reading Sub-skill Trainer.
+1. Implementasikan Phase 3 Guided Reading Mode.
 2. Tambahkan edit/delete di Admin CMS frontend.
 3. Tambahkan E2E browser tests untuk alur utama.
 4. Tambahkan API tests dengan SQLite test database.

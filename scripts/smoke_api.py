@@ -124,6 +124,57 @@ def main():
     )
     assert_ok("save reading attempt", status == 201 and "reading_journey" in reading_attempt)
 
+    status, reading_subskills = call("/reading/subskills")
+    assert_ok(
+        "reading subskills",
+        status == 200
+        and len(reading_subskills["subskills"]) == 10
+        and "next_recommended_subskill" in reading_subskills,
+    )
+
+    status, reading_trainer = call("/reading/trainer/main_idea")
+    assert_ok(
+        "reading trainer main idea",
+        status == 200
+        and reading_trainer["sub_skill"] == "main_idea"
+        and "question" in reading_trainer
+        and reading_trainer["question"]["sub_skill"] == "main_idea",
+    )
+
+    status, reading_main_idea_attempt = call(
+        "/reading/attempt",
+        {
+            "user_id": "default-user",
+            "passage_id": "trainer-main-idea-1",
+            "activity_type": "reading_subskill_trainer",
+            "sub_skill": "main_idea",
+            "selected": 1,
+        },
+    )
+    assert_ok(
+        "reading attempt main idea subskill",
+        status == 201
+        and reading_main_idea_attempt["answer_feedback"]["is_correct"]
+        and reading_main_idea_attempt["next_recommended_subskill"],
+    )
+
+    status, reading_vocab_attempt = call(
+        "/reading/attempt",
+        {
+            "user_id": "default-user",
+            "passage_id": "trainer-vocab-1",
+            "activity_type": "reading_subskill_trainer",
+            "sub_skill": "vocabulary_context",
+            "selected": 0,
+        },
+    )
+    assert_ok(
+        "reading attempt vocabulary context subskill",
+        status == 201
+        and reading_vocab_attempt["answer_feedback"]["is_correct"]
+        and reading_vocab_attempt["reading_journey"]["sub_skill_mastery"],
+    )
+
     first_vocab = daily_vocab["items"][0]
     status, vocab_score = call("/scoring/vocabulary", {"itemId": first_vocab["id"], "answer": first_vocab["answer"]})
     assert_ok("vocabulary scoring", status == 200 and vocab_score["isCorrect"])

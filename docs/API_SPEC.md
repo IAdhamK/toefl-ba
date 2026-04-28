@@ -64,6 +64,8 @@ Compatibility endpoint lama tetap tersedia:
 - `GET /api/reading/journey`
 - `GET /api/reading/levels`
 - `GET /api/reading/recommendation`
+- `GET /api/reading/subskills`
+- `GET /api/reading/trainer/{sub_skill}`
 - `POST /api/reading/attempt`
 
 Example Reading attempt:
@@ -72,6 +74,7 @@ Example Reading attempt:
 {
   "user_id": "default-user",
   "passage_id": "reading-1",
+  "sub_skill": "main_idea",
   "score": 82,
   "max_score": 100,
   "subskill_scores": {
@@ -83,6 +86,51 @@ Example Reading attempt:
   "feedback": "Reading attempt tersimpan."
 }
 ```
+
+Example Reading trainer attempt:
+
+```json
+{
+  "user_id": "default-user",
+  "passage_id": "trainer-main-idea-1",
+  "activity_type": "reading_subskill_trainer",
+  "sub_skill": "main_idea",
+  "selected": 1
+}
+```
+
+`GET /api/reading/subskills` returns 10 Reading sub-skills:
+
+- `general_meaning`
+- `main_idea`
+- `detail_information`
+- `vocabulary_context`
+- `reference`
+- `sentence_simplification`
+- `inference`
+- `author_purpose`
+- `paragraph_function`
+- `ba_case_analysis`
+
+`GET /api/reading/trainer/{sub_skill}` currently supports:
+
+- `main_idea`
+- `detail_information`
+- `vocabulary_context`
+- `inference`
+- `sentence_simplification`
+
+Trainer response includes:
+
+- `sub_skill`
+- `label`
+- `mastery`
+- `next_action`
+- `passage`
+- `question`
+- `guidance`
+
+Trainer attempt response includes `answer_feedback`, `reading_journey`, and `next_recommended_subskill`.
 
 Reading Journey response includes:
 

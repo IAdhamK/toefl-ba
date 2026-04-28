@@ -36,12 +36,16 @@ Yang sudah tersedia:
   - endpoint `POST /api/reading/attempt`
   - panel Reading Journey Summary di halaman Reading
   - tracking awal sub-skill `general_meaning`, `main_idea`, `detail_information`, dan `vocabulary_context`
+- Reading Sub-skill Trainer Phase 2:
+  - endpoint `GET /api/reading/subskills`
+  - endpoint `GET /api/reading/trainer/{sub_skill}`
+  - `POST /api/reading/attempt` menerima `sub_skill`
+  - trainer awal untuk `main_idea`, `detail_information`, `vocabulary_context`, `inference`, dan `sentence_simplification`
+  - halaman Reading menampilkan progress 10 sub-skill dan selector trainer
 
 Yang belum tersedia:
 
-- Reading sub-skill mastery khusus.
 - Guided Reading mode.
-- Question Trainer berdasarkan tipe soal.
 - Evidence sentence per jawaban.
 - Distractor analysis lengkap.
 - Reading weakness report.
@@ -100,29 +104,35 @@ Deliverables:
   - main idea
   - detail
   - vocabulary
-  - reference
   - inference
-  - purpose
+  - sentence simplification
 - Bank soal dengan `question_type`.
 - Scoring per sub-skill.
 - Feedback singkat per tipe soal.
 
 Completed:
 
-- Belum dimulai.
+- Reading service menyimpan dan mengklasifikasikan `sub_skill`/`question_type`.
+- `POST /api/reading/attempt` memperbarui mastery sub-skill yang dikirim.
+- Endpoint `GET /api/reading/subskills` mengembalikan progress 10 sub-skill Reading.
+- Endpoint `GET /api/reading/trainer/{sub_skill}` mengembalikan konten trainer untuk 5 sub-skill awal.
+- UI Reading menampilkan progress sub-skill dan selector trainer.
+- Bantuan ID tetap tersedia untuk trainer passage, question, dan option.
+- Smoke test mencakup subskills, trainer main idea, attempt main idea, dan attempt vocabulary context.
 
 Pending:
 
-- Schema question type.
-- Seed data soal berdasarkan tipe.
-- UI filter/trainer.
-- Smoke test per question type.
+- Trainer untuk `reference`, `author_purpose`, `paragraph_function`, dan `ba_case_analysis`.
+- Bank soal yang lebih besar dan tersimpan di database.
+- Feedback distractor per opsi salah.
+- Review history khusus Reading.
 
 Testing checklist:
 
-- User bisa memilih tipe latihan.
-- Setiap jawaban memperbarui mastery tipe soal yang benar.
-- Feedback sesuai tipe soal, bukan generic.
+- User bisa memilih tipe latihan. Done.
+- Setiap jawaban memperbarui mastery tipe soal yang benar. Done.
+- Feedback sesuai tipe soal, bukan generic. Done untuk trainer awal.
+- Bantuan ID tetap muncul di passage, question, dan option trainer. Done.
 
 ### Phase 3 — Guided Reading Mode
 
