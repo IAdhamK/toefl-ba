@@ -17,6 +17,7 @@ const defaultState = {
     Scenario: 0
   },
   completedExercises: 0,
+  readingMode: "overview",
   readingAnswers: {},
   readingAnswerReviews: [],
   vocabularyAnswers: {},
@@ -2364,50 +2365,27 @@ function logContextualHelpUsage(module, contextType, text) {
 function renderReading() {
   const allLessons = getLessons();
   const selectedLesson = allLessons.find((lesson) => lesson.id === state.selectedReadingLessonId) || allLessons[0];
+  const activeMode = normalizeReadingMode(state.readingMode);
+  state.readingMode = activeMode;
   document.getElementById("readingView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Reading Analyzer</p>
-        <h2>${selectedLesson.title}</h2>
-        <p>${selectedLesson.passage} ${renderContextualHelpButton("reading", "reading_passage", selectedLesson.passage, readingHelpContext(selectedLesson))}</p>
-        <div class="pill-row">
-          <span class="pill">${selectedLesson.level}</span>
-          <span class="pill">${selectedLesson.context}</span>
-        </div>
-      </div>
-      <button id="readingHelpButton" class="ghost-button">Jelaskan bacaan ini</button>
-    </header>
-    ${journeyPanel("Reading")}
-    ${readingJourneySummary()}
-    ${readingReviewPanel()}
-    ${readingSimulationPanel()}
-    ${guidedReadingPanel(selectedLesson)}
-    ${readingSubskillProgress()}
-    ${readingTrainerPanel()}
-
-    <section class="content-grid">
-      <div class="panel">
-        ${beginnerTip("Cara mengerjakan Reading", "Baca judul dan kalimat pertama. Cari ide utama, lalu cocokkan pilihan jawaban dengan kata kunci yang sama maknanya.")}
-        <h3>TOEFL-style Questions</h3>
-        ${selectedLesson.questions.map((question, index) => readingQuestionTemplate(question, index, selectedLesson)).join("")}
-        <button id="submitReading" class="primary-button">Submit Reading</button>
-        <div id="readingResult"></div>
-      </div>
-      <aside class="panel">
-        <h3>Lesson List</h3>
-        <div class="lesson-list compact-list">
-          ${allLessons.map((lesson) => `<button class="ghost-button ${lesson.id === selectedLesson.id ? "selected-control" : ""}" data-lesson="${lesson.id}">${lesson.title}</button>`).join("")}
-        </div>
-        <h3>Grammar Insight</h3>
-        <p>${selectedLesson.grammar} ${renderContextualHelpButton("grammar", "grammar_explanation", selectedLesson.grammar)}</p>
-        <h3>Vocabulary</h3>
-        <div class="pill-row">${selectedLesson.vocabulary.map((word) => `<span class="pill">${word} ${renderContextualHelpButton("vocabulary", "vocabulary_word", word)}</span>`).join("")}</div>
-      </aside>
+    ${readingJourneyLabTop()}
+    ${readingHero(selectedLesson)}
+    ${readingModeTabs(activeMode)}
+    <section class="reading-workspace">
+      ${readingActivePanel(activeMode, selectedLesson, allLessons)}
     </section>
   `;
 
-  document.getElementById("readingHelpButton").addEventListener("click", () => {
+  document.getElementById("readingHelpButton")?.addEventListener("click", () => {
     openHelpWith(selectedLesson.passage);
+  });
+
+  document.querySelectorAll("[data-reading-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.readingMode = normalizeReadingMode(button.dataset.readingMode);
+      saveState();
+      renderReading();
+    });
   });
 
   document.querySelectorAll("[data-lesson]").forEach((button) => {
@@ -2426,7 +2404,7 @@ function renderReading() {
     });
   });
 
-  document.getElementById("submitReading").addEventListener("click", async () => {
+  document.getElementById("submitReading")?.addEventListener("click", async () => {
     let score = scoreReading(selectedLesson);
     let details = [];
     let answerReviews = localReadingAnswerReviews(selectedLesson);
@@ -2471,7 +2449,10 @@ function renderReading() {
     renderJourney();
   });
   document.getElementById("continueReadingButton")?.addEventListener("click", () => {
-    document.getElementById("readingResult")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    state.readingMode = "practice";
+    saveState();
+    renderReading();
+    document.getElementById("readingPracticePanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   document.getElementById("retryWeakReadingSkillButton")?.addEventListener("click", async () => {
@@ -2481,6 +2462,7 @@ function renderReading() {
     } else {
       state.readingTrainer = localReadingTrainerState(subSkill);
     }
+    state.readingMode = "trainer";
     saveState();
     renderReading();
     document.getElementById("readingTrainerPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2542,12 +2524,274 @@ function renderReading() {
   setupReadingSimulationTimer();
 }
 
+function normalizeReadingMode(mode) {
+  const allowed = ["overview", "practice", "guided", "trainer", "review", "simulation"];
+  return allowed.includes(mode) ? mode : "overview";
+}
+
+function readingJourneyLabTop() {
+  const journey = state.readingJourney || localReadingJourney();
+  const strongest = journey.strong_subskills?.[0];
+  const weakest = journey.weak_subskills?.[0];
+  const score = Math.round(journey.reading_score || 0);
+  return `
+    <section class="reading-top-grid">
+      <article class="reading-journey-lab-card">
+        <div>
+          <p class="eyebrow">Reading Journey Lab</p>
+          <h2>${escapeHtml(journey.reading_level || "Understand Simple Meaning")}</h2>
+          <p>${escapeHtml(journey.next_recommended_action || "Mulai dari memahami arti umum passage.")}</p>
+        </div>
+        <div class="reading-journey-mini-grid">
+          ${readingMiniStat("Completed", `${journey.completed_passages || 0} passage`)}
+          ${readingMiniStat("Skill kuat", strongest?.label || "Belum ada")}
+          ${readingMiniStat("Skill lemah", weakest?.label || "Belum ada")}
+          ${readingMiniStat("Aktivitas terakhir", journey.last_activity_at ? formatDate(journey.last_activity_at) : "Belum ada")}
+        </div>
+      </article>
+      <article class="reading-score-overview-card">
+        <span>Reading Score</span>
+        <strong>${score}</strong>
+        ${readingPercentBar(score)}
+        <small>${escapeHtml(journey.reading_level || "Level awal")}</small>
+        <button class="primary-button" type="button" data-reading-mode="practice">Lanjutkan Reading</button>
+      </article>
+    </section>
+  `;
+}
+
+function readingHero(lesson) {
+  const journey = state.readingJourney || localReadingJourney();
+  const review = state.readingReview || localReadingReview();
+  const weakSkill = review.recommended_sub_skill || journey.weak_subskills?.[0]?.subskill || "main_idea";
+  return `
+    <header class="reading-hero">
+      <div class="reading-hero-copy">
+        <p class="eyebrow">Reading Lab</p>
+        <h2>${escapeHtml(lesson.title)}</h2>
+        <p class="reading-passage-preview">
+          ${escapeHtml(lesson.passage)}
+          ${renderContextualHelpButton("reading", "reading_passage", lesson.passage, readingHelpContext(lesson))}
+        </p>
+        <div class="pill-row">
+          <span class="pill">${escapeHtml(lesson.level || "Foundation")}</span>
+          <span class="pill">${escapeHtml(lesson.context || "Business Analyst")}</span>
+          <span class="pill">${escapeHtml(readingSubskillLabel(weakSkill))} perlu fokus</span>
+        </div>
+      </div>
+      <div class="reading-hero-side">
+        <div class="reading-hero-actions">
+          <button class="primary-button" type="button" data-reading-mode="practice">Kerjakan Soal</button>
+          <button class="ghost-button" type="button" data-reading-mode="guided">Guided Reading</button>
+          <button id="readingHelpButton" class="ghost-button" type="button">Jelaskan bacaan</button>
+        </div>
+      </div>
+    </header>
+  `;
+}
+
+function readingModeTabs(activeMode) {
+  const guidanceTabs = [
+    ["overview", "Overview", "Ringkasan"],
+    ["guided", "Guided", "Langkah pelan"],
+    ["trainer", "Trainer", "Sub-skill"],
+    ["review", "Review", "Pola salah"]
+  ];
+  const testingTabs = [
+    ["practice", "Practice", "Soal TOEFL"],
+    ["simulation", "Simulation", "Timer"]
+  ];
+  return `
+    <nav class="reading-mode-shell" aria-label="Reading modes">
+      <section class="reading-mode-group guidance">
+        <div class="reading-mode-group-label">
+          <span>Guidance Lab</span>
+          <small>Belajar pelan, review, dan perbaiki skill</small>
+        </div>
+        <div class="reading-mode-tabs guidance-tabs">
+          ${guidanceTabs.map(([mode, label, hint]) => readingModeTabButton(mode, label, hint, activeMode, "guidance")).join("")}
+        </div>
+      </section>
+      <section class="reading-mode-group testing">
+        <div class="reading-mode-group-label">
+          <span>Testing Zone</span>
+          <small>Uji pemahaman dengan soal dan timer</small>
+        </div>
+        <div class="reading-mode-tabs testing-tabs">
+          ${testingTabs.map(([mode, label, hint]) => readingModeTabButton(mode, label, hint, activeMode, "testing")).join("")}
+        </div>
+      </section>
+    </nav>
+  `;
+}
+
+function readingModeTabButton(mode, label, hint, activeMode, group) {
+  return `
+    <button class="reading-mode-tab ${group} ${activeMode === mode ? "active" : ""}" type="button" data-reading-mode="${mode}">
+      <strong>${label}</strong>
+      <span>${hint}</span>
+    </button>
+  `;
+}
+
+function readingActivePanel(activeMode, selectedLesson, allLessons) {
+  if (activeMode === "practice") return readingPracticeLayout(selectedLesson, allLessons);
+  if (activeMode === "guided") return readingGuidedLayout(selectedLesson, allLessons);
+  if (activeMode === "trainer") return `${readingSubskillProgress()}${readingTrainerPanel()}`;
+  if (activeMode === "review") return readingReviewPanel();
+  if (activeMode === "simulation") return readingSimulationPanel();
+  return readingOverviewLayout(selectedLesson, allLessons);
+}
+
+function readingOverviewLayout(selectedLesson, allLessons) {
+  return `
+    <section class="reading-overview-grid">
+      <div class="reading-overview-main">
+        ${readingSubskillProgress()}
+        ${readingNextStepsPanel()}
+      </div>
+      ${readingLessonSidebar(allLessons, selectedLesson)}
+    </section>
+  `;
+}
+
+function readingNextStepsPanel() {
+  return `
+    <section class="panel reading-next-steps">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Alur belajar Reading</p>
+          <h3>Pilih mode sesuai kebutuhan hari ini</h3>
+          <p>Mulai dari Guided kalau masih bingung, Practice untuk soal normal, Trainer untuk skill lemah, atau Simulation untuk latihan timer.</p>
+        </div>
+      </div>
+      <div class="reading-action-grid">
+        <button class="metric ghost-button" type="button" data-reading-mode="guided">
+          <span class="muted">Step-by-step</span>
+          <strong class="metric-word">Guided Reading</strong>
+          <small>Pahami judul, subject/verb, vocabulary, dan main idea.</small>
+        </button>
+        <button class="metric ghost-button" type="button" data-reading-mode="practice">
+          <span class="muted">TOEFL questions</span>
+          <strong class="metric-word">Practice</strong>
+          <small>Kerjakan soal dari passage aktif dan lihat review jawaban.</small>
+        </button>
+        <button class="metric ghost-button" type="button" data-reading-mode="trainer">
+          <span class="muted">Skill lemah</span>
+          <strong class="metric-word">Trainer</strong>
+          <small>Latihan main idea, detail, inference, vocabulary, dan sentence breakdown.</small>
+        </button>
+        <button class="metric ghost-button" type="button" data-reading-mode="simulation">
+          <span class="muted">Timed mode</span>
+          <strong class="metric-word">Simulation</strong>
+          <small>Latihan Reading dengan timer dan final report.</small>
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function readingPracticeLayout(selectedLesson, allLessons) {
+  return `
+    <section class="reading-practice-layout" id="readingPracticePanel">
+      <div class="panel reading-practice-panel">
+        ${readingPracticeGuide()}
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">TOEFL-style Questions</p>
+            <h3>Jawab berdasarkan passage aktif</h3>
+            <p>Pilih opsi yang paling didukung oleh passage. Setelah submit, baca Answer Review untuk melihat bukti dan alasan.</p>
+          </div>
+          <span class="pill">${selectedLesson.questions.length} soal</span>
+        </div>
+        ${selectedLesson.questions.map((question, index) => readingQuestionTemplate(question, index, selectedLesson)).join("")}
+        <div class="reading-submit-bar">
+          <span>${selectedReadingAnswerCount(selectedLesson)}/${selectedLesson.questions.length} soal dijawab</span>
+          <button id="submitReading" class="primary-button" type="button">Submit Reading</button>
+        </div>
+        <div id="readingResult"></div>
+      </div>
+      ${readingLessonSidebar(allLessons, selectedLesson)}
+    </section>
+  `;
+}
+
+function readingPracticeGuide() {
+  const steps = [
+    ["1", "Baca judul", "Tangkap topik sebelum melihat opsi."],
+    ["2", "Cari main idea", "Pilih jawaban yang merangkum passage."],
+    ["3", "Cek evidence", "Cocokkan opsi dengan kalimat bukti."]
+  ];
+  return `
+    <div class="reading-practice-guide">
+      <div>
+        <span class="reading-badge">Cara cepat</span>
+        <h3>Cara mengerjakan Reading</h3>
+      </div>
+      <div class="reading-guide-steps">
+        ${steps.map(([number, title, text]) => `
+          <article>
+            <strong>${number}</strong>
+            <div>
+              <b>${title}</b>
+              <p>${text}</p>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function selectedReadingAnswerCount(lesson) {
+  return lesson.questions.filter((question) => state.readingAnswers[question.id] !== undefined).length;
+}
+
+function readingGuidedLayout(selectedLesson, allLessons) {
+  return `
+    <section class="reading-practice-layout">
+      <div>${guidedReadingPanel(selectedLesson)}</div>
+      ${readingLessonSidebar(allLessons, selectedLesson)}
+    </section>
+  `;
+}
+
+function readingLessonSidebar(allLessons, selectedLesson) {
+  return `
+    <aside class="panel reading-resource-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Passage aktif</p>
+          <h3>${escapeHtml(selectedLesson.title)}</h3>
+        </div>
+      </div>
+      <div class="lesson-list compact-list reading-lesson-list">
+        ${allLessons.map((lesson) => `
+          <button class="ghost-button ${lesson.id === selectedLesson.id ? "selected-control" : ""}" type="button" data-lesson="${lesson.id}">
+            ${escapeHtml(lesson.title)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="reading-resource-card">
+        <h3>Grammar Insight</h3>
+        <p>${escapeHtml(selectedLesson.grammar || "")} ${renderContextualHelpButton("grammar", "grammar_explanation", selectedLesson.grammar || "")}</p>
+      </div>
+      <div class="reading-resource-card">
+        <h3>Vocabulary</h3>
+        <div class="pill-row">
+          ${(selectedLesson.vocabulary || []).map((word) => `<span class="pill">${escapeHtml(word)} ${renderContextualHelpButton("vocabulary", "vocabulary_word", word)}</span>`).join("")}
+        </div>
+      </div>
+    </aside>
+  `;
+}
+
 function readingJourneySummary() {
   const journey = state.readingJourney || localReadingJourney();
   const strongest = journey.strong_subskills?.[0];
   const weakest = journey.weak_subskills?.[0];
   return `
-    <section class="panel">
+    <section class="panel reading-journey-card">
       <div class="journey-summary">
         <div>
           <p class="eyebrow">Reading Journey Foundation</p>
@@ -2581,7 +2825,13 @@ function readingJourneySummary() {
           <small>${journey.last_activity_at ? formatDate(journey.last_activity_at) : "Belum ada aktivitas backend"}</small>
         </div>
       </div>
-      <button id="continueReadingButton" class="primary-button" type="button">Lanjutkan Reading</button>
+      <div class="reading-focus-banner">
+        <div>
+          <strong>Fokus berikutnya</strong>
+          <p>${escapeHtml(journey.next_recommended_action || "Kerjakan satu passage pendek dan cek Answer Review setelah submit.")}</p>
+        </div>
+        <button id="continueReadingButton" class="primary-button" type="button">Lanjutkan Reading</button>
+      </div>
     </section>
   `;
 }
@@ -2596,7 +2846,7 @@ function readingReviewPanel() {
   const lowPassages = weakness.low_score_passages || [];
   const vocab = weakness.vocabulary_frequently_misunderstood || [];
   return `
-    <section class="panel">
+    <section class="panel reading-review-panel">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Reading Review</p>
@@ -2605,58 +2855,66 @@ function readingReviewPanel() {
         </div>
         <button id="retryWeakReadingSkillButton" class="primary-button" type="button">Latihan Ulang Skill Lemah</button>
       </div>
-      <div class="drill-result-grid">
-        <div class="metric">
-          <span class="muted">Weakness utama</span>
-          <strong class="metric-word">${escapeHtml(primary.label || readingSubskillLabel(review.recommended_sub_skill))}</strong>
-          <small>${Math.round(primary.mastery_score || 0)}% mastery</small>
+      <div class="reading-review-hero">
+        <div>
+          <span class="reading-badge warning">Prioritas review</span>
+          <h3>${escapeHtml(primary.label || readingSubskillLabel(review.recommended_sub_skill))}</h3>
+          <p>${escapeHtml(review.recommended_practice || "Latihan ulang skill terlemah dengan passage pendek.")}</p>
         </div>
-        <div class="metric">
-          <span class="muted">Weakness kedua</span>
-          <strong class="metric-word">${escapeHtml(secondary.label || "Belum ada")}</strong>
-          <small>${Math.round(secondary.mastery_score || 0)}% mastery</small>
-        </div>
-        <div class="metric">
-          <span class="muted">Recommended practice</span>
-          <strong class="metric-word">${escapeHtml(readingSubskillLabel(review.recommended_sub_skill))}</strong>
-          <small>${escapeHtml(review.recommended_practice || "")}</small>
-        </div>
-        <div class="metric">
-          <span class="muted">Bantuan ID</span>
-          <strong class="metric-word">${escapeHtml(weakness.bantuan_id_usage?.level || "normal")}</strong>
-          <small>${escapeHtml(weakness.bantuan_id_usage?.message || "")}</small>
+        <div class="reading-review-stats">
+          ${readingMiniStat("Mastery utama", `${Math.round(primary.mastery_score || 0)}%`)}
+          ${readingMiniStat("Weakness kedua", secondary.label || "Belum ada")}
+          ${readingMiniStat("Bantuan ID", weakness.bantuan_id_usage?.level || "normal")}
         </div>
       </div>
-      <div class="content-grid compact-grid">
-        <div>
+      <div class="reading-two-column">
+        <div class="reading-soft-card">
           <h3>Mistake pattern</h3>
-          <div class="lesson-list compact-list">
+          <div class="reading-list-stack">
             ${patterns.length ? patterns.map((item) => `
-              <p><strong>${escapeHtml(item.label || readingSubskillLabel(item.sub_skill))}</strong><br>${escapeHtml(item.pattern || "")}<br><span class="muted">${escapeHtml(item.recommendation || "")}</span></p>
+              <article class="reading-list-item">
+                <strong>${escapeHtml(item.label || readingSubskillLabel(item.sub_skill))}</strong>
+                <p>${escapeHtml(item.pattern || "")}</p>
+                <small>${escapeHtml(item.recommendation || "")}</small>
+              </article>
             `).join("") : `<p class="muted">Belum ada pola salah yang cukup kuat.</p>`}
           </div>
         </div>
-        <div>
+        <div class="reading-soft-card">
           <h3>Review queue</h3>
-          <div class="lesson-list compact-list">
+          <div class="reading-list-stack">
             ${queue.length ? queue.map((item) => `
-              <p><strong>${escapeHtml(item.title || "")}</strong><br>${escapeHtml(item.reason || "")}<br><span class="muted">${escapeHtml(item.action || "")}</span></p>
+              <article class="reading-list-item">
+                <strong>${escapeHtml(item.title || "")}</strong>
+                <p>${escapeHtml(item.reason || "")}</p>
+                <small>${escapeHtml(item.action || "")}</small>
+              </article>
             `).join("") : `<p class="muted">Belum ada item review.</p>`}
           </div>
         </div>
       </div>
       ${(lowPassages.length || vocab.length) ? `
-        <div class="content-grid compact-grid">
-          <div>
+        <div class="reading-two-column">
+          <div class="reading-soft-card">
             <h3>Passage skor rendah</h3>
-            <div class="lesson-list compact-list">
-              ${lowPassages.length ? lowPassages.map((item) => `<p><strong>${escapeHtml(item.activity_id || "")}</strong><br><span class="muted">Skor ${Math.round(item.accuracy || 0)}% · ${escapeHtml(item.feedback || "")}</span></p>`).join("") : `<p class="muted">Belum ada passage rendah.</p>`}
+            <div class="reading-list-stack">
+              ${lowPassages.length ? lowPassages.map((item) => `
+                <article class="reading-list-item">
+                  <strong>${escapeHtml(item.activity_id || "")}</strong>
+                  <p>Skor ${Math.round(item.accuracy || 0)}% · ${escapeHtml(readingAttemptFeedbackSummary(item.feedback))}</p>
+                </article>
+              `).join("") : `<p class="muted">Belum ada passage rendah.</p>`}
             </div>
           </div>
-          <div>
+          <div class="reading-soft-card">
             <h3>Vocabulary perlu review</h3>
-            <div class="lesson-list compact-list">
-              ${vocab.length ? vocab.map((item) => `<p><strong>${escapeHtml(item.word || "")}</strong>: ${escapeHtml(item.meaning_id || "")}<br><span class="muted">${escapeHtml(item.reason || "")}</span></p>`).join("") : `<p class="muted">Belum ada vocabulary Reading yang sering salah.</p>`}
+            <div class="reading-list-stack">
+              ${vocab.length ? vocab.map((item) => `
+                <article class="reading-list-item">
+                  <strong>${escapeHtml(item.word || "")}: ${escapeHtml(item.meaning_id || "")}</strong>
+                  <p>${escapeHtml(item.reason || "")}</p>
+                </article>
+              `).join("") : `<p class="muted">Belum ada vocabulary Reading yang sering salah.</p>`}
             </div>
           </div>
         </div>
@@ -2674,34 +2932,53 @@ function readingSimulationPanel() {
     ["medium", "Medium", "2 passage · 10 soal · 20 menit"],
     ["full", "Full Practice", "3 passage · 15 soal · 30 menit"]
   ];
+  const answered = session ? Object.keys(simulation.answers || {}).length : 0;
+  const totalQuestions = session?.question_count || 0;
   return `
-    <section class="panel" id="readingSimulationPanel">
+    <section class="panel reading-simulation-panel" id="readingSimulationPanel">
       <div class="section-heading">
         <div>
           <p class="eyebrow">TOEFL Reading Simulation</p>
           <h3>Latihan Reading dengan timer</h3>
           <p>Mode simulasi melatih fokus seperti TOEFL. Bantuan ID dibatasi supaya hasil lebih mirip ujian.</p>
         </div>
-        ${session && !result ? `<div class="journey-score"><span>Sisa waktu</span><strong id="readingSimulationTimer">${formatSimulationTime(remainingSimulationSeconds())}</strong></div>` : ""}
+        ${session && !result ? `
+          <div class="reading-timer-card">
+            <span>Sisa waktu</span>
+            <strong id="readingSimulationTimer">${formatSimulationTime(remainingSimulationSeconds())}</strong>
+            <small>${answered}/${totalQuestions} soal dijawab</small>
+          </div>
+        ` : ""}
       </div>
-      <div class="drill-result-grid">
+      <div class="reading-simulation-modes">
         ${modes.map(([mode, label, description]) => `
-          <button class="metric ghost-button ${simulation.mode === mode ? "selected-control" : ""}" type="button" data-simulation-mode="${mode}">
-            <span class="muted">${label}</span>
-            <strong class="metric-word">${description}</strong>
+          <button class="reading-mode-card ${simulation.mode === mode ? "selected-control" : ""}" type="button" data-simulation-mode="${mode}">
+            <span>${label}</span>
+            <strong>${description}</strong>
           </button>
         `).join("")}
       </div>
-      <p class="muted"><strong>Catatan:</strong> Bantuan ID tidak ditampilkan di dalam soal simulasi. Setelah submit, gunakan Answer Review dan rekomendasi practice untuk belajar ulang.</p>
+      <div class="reading-note">
+        <strong>Catatan simulasi</strong>
+        <p>Bantuan ID tidak ditampilkan di dalam soal simulasi. Setelah submit, fokus ke hasil prioritas, sub-skill lemah, dan Answer Review.</p>
+      </div>
       ${!session ? `
         <button id="startReadingSimulationButton" class="primary-button" type="button">Mulai Simulasi</button>
       ` : ""}
       ${session && !result ? readingSimulationSessionTemplate(session, simulation.answers || {}) : ""}
       ${result ? readingSimulationResultTemplate(result) : ""}
       ${simulation.history?.length ? `
-        <h3>Riwayat simulasi</h3>
-        <div class="lesson-list compact-list">
-          ${simulation.history.slice(0, 3).map((item) => `<p><strong>${escapeHtml(item.mode || "")}</strong> · score ${Math.round(item.total_score || 0)}<br><span class="muted">${escapeHtml(item.recommended_next_practice || "")}</span></p>`).join("")}
+        <div class="reading-history-block">
+          <h3>Riwayat simulasi</h3>
+          <div class="reading-history-list">
+            ${simulation.history.slice(0, 3).map((item) => `
+              <article>
+                <strong>${escapeHtml(simulationModeLabel(item.mode))}</strong>
+                <span>Score ${Math.round(item.total_score || 0)}</span>
+                <p>${escapeHtml(item.recommended_next_practice || "")}</p>
+              </article>
+            `).join("")}
+          </div>
         </div>
       ` : ""}
     </section>
@@ -2709,15 +2986,22 @@ function readingSimulationPanel() {
 }
 
 function readingSimulationSessionTemplate(session, answers) {
+  const answered = Object.keys(answers || {}).length;
   return `
-    <div class="lesson-list">
+    <div class="reading-simulation-progress">
+      <span>${answered}/${session.question_count || 0} soal terjawab</span>
+      ${readingPercentBar((answered / Math.max(session.question_count || 1, 1)) * 100)}
+    </div>
+    <div class="reading-sim-passage-list">
       ${(session.passages || []).map((passage, passageIndex) => `
-        <div class="question">
+        <article class="reading-sim-passage-card">
           <p class="eyebrow">Passage ${passageIndex + 1}</p>
           <h3>${escapeHtml(passage.title || "")}</h3>
-          <p>${escapeHtml(passage.text || "")}</p>
-          ${(passage.questions || []).map((question, questionIndex) => readingSimulationQuestionTemplate(question, answers, questionIndex)).join("")}
-        </div>
+          <p class="reading-sim-passage-text">${escapeHtml(passage.text || "")}</p>
+          <div class="reading-sim-question-list">
+            ${(passage.questions || []).map((question, questionIndex) => readingSimulationQuestionTemplate(question, answers, questionIndex)).join("")}
+          </div>
+        </article>
       `).join("")}
     </div>
     <button id="submitReadingSimulationButton" class="primary-button" type="button">Submit Simulasi</button>
@@ -2727,8 +3011,11 @@ function readingSimulationSessionTemplate(session, answers) {
 function readingSimulationQuestionTemplate(question, answers, questionIndex) {
   const selected = answers[question.id];
   return `
-    <div class="question">
-      <h3>${questionIndex + 1}. ${escapeHtml(question.text || "")}</h3>
+    <div class="reading-sim-question-card">
+      <div class="reading-question-topline">
+        <h3>${questionIndex + 1}. ${escapeHtml(question.text || "")}</h3>
+        <span>${escapeHtml(readingSubskillLabel(question.sub_skill))}</span>
+      </div>
       <div class="question-options">
         ${(question.options || []).map((option, optionIndex) => `
           <button class="option-button ${selected === optionIndex ? "selected" : ""}" type="button" data-simulation-question="${question.id}" data-simulation-option="${optionIndex}">
@@ -2736,7 +3023,6 @@ function readingSimulationQuestionTemplate(question, answers, questionIndex) {
           </button>
         `).join("")}
       </div>
-      <p class="muted">Sub-skill: ${escapeHtml(readingSubskillLabel(question.sub_skill))}</p>
     </div>
   `;
 }
@@ -2744,44 +3030,148 @@ function readingSimulationQuestionTemplate(question, answers, questionIndex) {
 function readingSimulationResultTemplate(result) {
   const weakest = result.weakest_sub_skill || {};
   const strongest = result.strongest_sub_skill || {};
+  const score = Math.round(result.total_score || 0);
+  const accuracy = Math.round(result.accuracy || 0);
+  const tone = accuracy >= 70 ? "success" : accuracy >= 45 ? "warning" : "danger";
+  const statusText = accuracy >= 70
+    ? "Simulasi stabil. Lanjut naikkan speed dan konsistensi."
+    : accuracy >= 45
+      ? "Masih berkembang. Fokus satu sub-skill lemah dulu."
+      : "Perlu penguatan dasar. Ulangi Guided Reading sebelum simulasi berikutnya.";
   return `
-    ${resultTemplate(result.accuracy >= 70 ? "success" : "warning", `Final Score: ${Math.round(result.total_score || 0)}`, `Accuracy ${Math.round(result.accuracy || 0)}% · waktu ${formatSimulationTime(result.time_spent_seconds || 0)}`)}
-    <div class="drill-result-grid">
-      <div class="metric">
-        <span class="muted">Strongest sub-skill</span>
-        <strong class="metric-word">${escapeHtml(strongest.label || "-")}</strong>
-        <small>${Math.round(strongest.accuracy || 0)}%</small>
-      </div>
-      <div class="metric">
-        <span class="muted">Weakest sub-skill</span>
-        <strong class="metric-word">${escapeHtml(weakest.label || "-")}</strong>
-        <small>${Math.round(weakest.accuracy || 0)}%</small>
-      </div>
-      <div class="metric">
-        <span class="muted">Recommended next practice</span>
-        <strong class="metric-word">${escapeHtml(result.recommended_next_practice || "")}</strong>
-      </div>
-    </div>
-    <h3>Sub-skill breakdown</h3>
-    <div class="drill-result-grid">
-      ${(result.sub_skill_breakdown || []).map((item) => `
-        <div class="metric">
-          <span class="muted">${escapeHtml(item.label || readingSubskillLabel(item.sub_skill))}</span>
-          <strong>${Math.round(item.accuracy || 0)}%</strong>
-          <small>${item.correct || 0}/${item.total || 0} benar</small>
+    <section class="reading-result-report ${tone}">
+      <div class="reading-result-main">
+        <span class="reading-badge ${tone}">Final report</span>
+        <h3>Score ${score}</h3>
+        <p>${escapeHtml(statusText)}</p>
+        <div class="reading-result-meta">
+          <span>Accuracy ${accuracy}%</span>
+          <span>Waktu ${formatSimulationTime(result.time_spent_seconds || 0)}</span>
+          <span>${result.correct || 0}/${result.total_questions || 0} benar</span>
         </div>
+      </div>
+      <div class="reading-result-action">
+        <strong>Latihan berikutnya</strong>
+        <p>${escapeHtml(result.recommended_next_practice || "Ulangi latihan sub-skill terlemah.")}</p>
+        <div class="inline-actions">
+          <button class="primary-button" type="button" data-reading-mode="trainer">Latih Skill Lemah</button>
+          <button id="startReadingSimulationButton" class="ghost-button" type="button">Simulasi Baru</button>
+        </div>
+      </div>
+    </section>
+    <div class="reading-two-column">
+      <div class="reading-soft-card">
+        <span class="reading-badge success">Paling kuat</span>
+        <h3>${escapeHtml(strongest.label || "-")}</h3>
+        ${readingPercentBar(strongest.accuracy || 0)}
+        <p>${Math.round(strongest.accuracy || 0)}% akurat di sub-skill ini.</p>
+      </div>
+      <div class="reading-soft-card">
+        <span class="reading-badge warning">Perlu fokus</span>
+        <h3>${escapeHtml(weakest.label || "-")}</h3>
+        ${readingPercentBar(weakest.accuracy || 0)}
+        <p>${Math.round(weakest.accuracy || 0)}% akurat. Mulai dari review evidence dan kata kunci.</p>
+      </div>
+    </div>
+    <div class="reading-section-title">
+      <h3>Sub-skill breakdown</h3>
+      <p>Lihat skill mana yang sudah aman dan mana yang perlu latihan ulang.</p>
+    </div>
+    <div class="reading-skill-grid">
+      ${(result.sub_skill_breakdown || []).map((item) => `
+        ${readingSkillBreakdownCard(item)}
       `).join("")}
     </div>
-    <h3>Answer review summary</h3>
-    <div class="lesson-list compact-list">
+    <div class="reading-section-title">
+      <h3>Answer Review</h3>
+      <p>Review ini dibuat ringkas supaya kamu tahu alasan salah/benar tanpa membaca ulang semuanya.</p>
+    </div>
+    <div class="reading-review-summary-grid">
       ${(result.answer_review_summary || []).slice(0, 5).map((review) => `
-        <p><strong>${escapeHtml(review.question_text || "")}</strong><br>
-        ${review.is_correct ? "Benar" : "Review"} · ${escapeHtml(review.direct_explanation || "")}<br>
-        <span class="muted">Evidence: ${escapeHtml(review.evidence_sentence || "-")}</span></p>
+        ${readingSimulationReviewCard(review)}
       `).join("")}
     </div>
-    <button id="startReadingSimulationButton" class="ghost-button" type="button">Mulai Simulasi Baru</button>
   `;
+}
+
+function readingMiniStat(label, value) {
+  return `
+    <div>
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(value || "-"))}</strong>
+    </div>
+  `;
+}
+
+function readingAttemptFeedbackSummary(feedback) {
+  const text = String(feedback || "").trim();
+  if (!text) return "Baca ulang evidence sentence dan cek ulang pilihan jawaban.";
+  if (text.startsWith("SIMULATION_RESULT:")) {
+    try {
+      const result = JSON.parse(text.replace("SIMULATION_RESULT:", ""));
+      return `Simulasi ${simulationModeLabel(result.mode)}: ${Math.round(result.total_score || result.accuracy || 0)}%. Fokus berikutnya: ${result.recommended_next_practice || "latihan sub-skill terlemah."}`;
+    } catch (error) {
+      return "Hasil simulasi tersimpan. Fokus review sub-skill terlemah dan evidence sentence.";
+    }
+  }
+  return text.length > 160 ? `${text.slice(0, 157)}...` : text;
+}
+
+function readingPercentBar(value) {
+  const percent = Math.max(0, Math.min(100, Math.round(Number(value || 0))));
+  return `<div class="reading-progress-line" aria-label="Progress ${percent}%"><span style="width: ${percent}%"></span></div>`;
+}
+
+function readingSkillBreakdownCard(item) {
+  const accuracy = Math.round(item.accuracy || item.mastery_score || 0);
+  const tone = accuracy >= 70 ? "success" : accuracy >= 40 ? "warning" : "danger";
+  const hasScoreDetail = item.correct !== undefined && item.total !== undefined;
+  const detail = hasScoreDetail
+    ? `${item.correct || 0}/${item.total || 0} benar`
+    : `${item.attempt_count || 0} latihan`;
+  return `
+    <article class="reading-skill-card ${tone}">
+      <div>
+        <strong>${escapeHtml(item.label || readingSubskillLabel(item.sub_skill || item.subskill))}</strong>
+        <span>${accuracy}%</span>
+      </div>
+      ${readingPercentBar(accuracy)}
+      <small>${escapeHtml(detail)}</small>
+    </article>
+  `;
+}
+
+function readingSimulationReviewCard(review) {
+  const correct = Boolean(review.is_correct);
+  const selected = review.selected_answer?.label
+    ? `${review.selected_answer.label}. ${review.selected_answer.text || ""}`
+    : "";
+  const answer = review.correct_answer?.label
+    ? `${review.correct_answer.label}. ${review.correct_answer.text || ""}`
+    : "";
+  return `
+    <article class="reading-answer-mini-card ${correct ? "correct" : "review"}">
+      <div class="reading-answer-mini-head">
+        <span class="reading-badge ${correct ? "success" : "warning"}">${correct ? "Benar" : "Review"}</span>
+        <small>${escapeHtml(readingSubskillLabel(review.related_reading_sub_skill))}</small>
+      </div>
+      <h3>${escapeHtml(review.question_text || "")}</h3>
+      ${selected || answer ? `
+        <p><strong>Anda:</strong> ${escapeHtml(selected || "-")}<br><strong>Benar:</strong> ${escapeHtml(answer || "-")}</p>
+      ` : ""}
+      <p>${escapeHtml(review.direct_explanation || "")}</p>
+      <small>Evidence: ${escapeHtml(review.evidence_sentence || "-")}</small>
+    </article>
+  `;
+}
+
+function simulationModeLabel(mode) {
+  const labels = {
+    short: "Short simulation",
+    medium: "Medium simulation",
+    full: "Full practice"
+  };
+  return labels[mode] || mode || "Simulation";
 }
 
 async function startReadingSimulation() {
@@ -2981,7 +3371,7 @@ function guidedReadingPanel(lesson) {
   const activeIndex = Math.min(guided.activeStep || 0, Math.max((guided.steps || []).length - 1, 0));
   const visibleSteps = hasSteps ? guided.steps.slice(0, activeIndex + 1) : [];
   return `
-    <section class="panel" id="guidedReadingPanel">
+    <section class="panel reading-guided-panel" id="guidedReadingPanel">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Guided Reading Mode</p>
@@ -2991,7 +3381,12 @@ function guidedReadingPanel(lesson) {
         <button id="startGuidedReadingButton" class="primary-button" type="button">${hasSteps ? "Ulangi Guided Reading" : "Mulai Guided Reading"}</button>
       </div>
       ${hasSteps ? `
-        <div class="lesson-list">
+        <div class="reading-step-track">
+          ${guided.steps.map((step, index) => `
+            <span class="${index < activeIndex ? "done" : index === activeIndex ? "current" : ""}">${step.step}</span>
+          `).join("")}
+        </div>
+        <div class="reading-guided-list">
           ${visibleSteps.map((step) => guidedReadingStepCard(step, lesson)).join("")}
         </div>
         ${guided.completed ? "" : `
@@ -3001,7 +3396,10 @@ function guidedReadingPanel(lesson) {
         `}
         ${guided.completed ? resultTemplate("success", "Guided Reading selesai", "Aktivitas pendukung sudah dicatat. Sekarang lanjut jawab TOEFL-style Questions di bawah.") : ""}
       ` : `
-        ${beginnerTip("Kenapa pakai Guided Reading?", "Kalau masih basic, jangan langsung loncat ke soal. Pahami dulu bagian kecil dari passage supaya pilihan jawaban lebih mudah dibandingkan.")}
+        <div class="reading-empty-state">
+          <strong>Mulai dari memahami bacaan, bukan menebak opsi.</strong>
+          <p>Guided Reading akan membuka langkah kecil: judul, kalimat pertama, subject/verb, vocabulary, paragraph map, lalu main idea.</p>
+        </div>
       `}
     </section>
   `;
@@ -3011,19 +3409,19 @@ function guidedReadingStepCard(step, lesson) {
   const contextType = step.bantuan_context_type || "reading_paragraph";
   const helpContext = readingHelpContext(lesson, lesson.questions?.[0]);
   return `
-    <div class="question">
-      <p class="eyebrow">Step ${step.step}</p>
+    <article class="reading-guided-card">
+      <span class="reading-badge">Step ${step.step}</span>
       <h3>${escapeHtml(step.title || "")} ${step.focus_text ? renderContextualHelpButton("reading", contextType, step.focus_text, helpContext) : ""}</h3>
-      ${step.focus_text ? `<p>${escapeHtml(step.focus_text)}</p>` : ""}
+      ${step.focus_text ? `<p class="reading-focus-text">${escapeHtml(step.focus_text)}</p>` : ""}
       ${step.subject || step.main_verb ? `
-        <div class="drill-result-grid">
-          <div class="metric">
+        <div class="reading-two-column">
+          <div class="reading-soft-card compact">
             <span class="muted">Subject</span>
-            <strong class="metric-word">${escapeHtml(step.subject || "-")}</strong>
+            <strong>${escapeHtml(step.subject || "-")}</strong>
           </div>
-          <div class="metric">
+          <div class="reading-soft-card compact">
             <span class="muted">Main Verb</span>
-            <strong class="metric-word">${escapeHtml(step.main_verb || "-")}</strong>
+            <strong>${escapeHtml(step.main_verb || "-")}</strong>
           </div>
         </div>
       ` : ""}
@@ -3032,7 +3430,7 @@ function guidedReadingStepCard(step, lesson) {
       ${step.main_idea ? `<p><strong>Main idea:</strong> ${escapeHtml(step.main_idea)}</p>` : ""}
       <p>${escapeHtml(step.simple_explanation || "")}</p>
       <p class="muted">${escapeHtml(step.learner_action || "")}</p>
-    </div>
+    </article>
   `;
 }
 
@@ -3128,21 +3526,21 @@ function readingSubskillProgress() {
     ? state.readingTrainer.subskills
     : (state.readingJourney?.sub_skill_mastery || localReadingSubskills());
   return `
-    <section class="panel">
+    <section class="panel reading-subskill-panel">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Reading Sub-skill Progress</p>
           <h3>Progress kemampuan Reading</h3>
+          <p>Setiap skill punya progress sendiri. Prioritaskan yang merah/kuning sebelum masuk simulasi lagi.</p>
         </div>
       </div>
-      <div class="drill-result-grid">
-        ${subskills.map((item) => `
-          <div class="metric">
-            <span class="muted">${escapeHtml(item.label || readingSubskillLabel(item.subskill))}</span>
-            <strong>${Math.round(item.mastery_score || 0)}%</strong>
-            <small>${readingMasteryStatusLabel(item.status)} · ${item.attempt_count || 0} latihan</small>
-          </div>
-        `).join("")}
+      <div class="reading-skill-grid">
+        ${subskills.map((item) => readingSkillBreakdownCard({
+          ...item,
+          sub_skill: item.sub_skill || item.subskill,
+          accuracy: item.mastery_score,
+          attempt_count: item.attempt_count
+        })).join("")}
       </div>
     </section>
   `;
@@ -3171,7 +3569,7 @@ function readingTrainerPanel() {
     tags: [trainer.label, "Reading Trainer"].filter(Boolean)
   };
   return `
-    <section class="panel" id="readingTrainerPanel">
+    <section class="panel reading-trainer-panel" id="readingTrainerPanel">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Reading Trainer</p>
@@ -3179,20 +3577,22 @@ function readingTrainerPanel() {
           <p>${escapeHtml(trainer.guidance?.tip || "Pilih tipe latihan, jawab soal, lalu lihat feedback.")}</p>
         </div>
       </div>
-      <div class="pill-row">
+      <div class="reading-trainer-tabs">
         ${buttons.map(([value, label]) => `
-          <button class="ghost-button ${subSkill === value ? "selected-control" : ""}" type="button" data-reading-trainer-subskill="${value}">
+          <button class="${subSkill === value ? "selected-control" : ""}" type="button" data-reading-trainer-subskill="${value}">
             ${label}
           </button>
         `).join("")}
       </div>
-      <div class="content-grid compact-grid">
-        <div>
+      <div class="reading-trainer-layout">
+        <div class="reading-soft-card reading-trainer-passage">
+          <span class="reading-badge">Passage</span>
           <h3>${escapeHtml(passage.title || "Trainer Passage")}</h3>
           <p>${escapeHtml(passage.text || "")} ${renderContextualHelpButton("reading", "reading_paragraph", passage.text || "", baseContext)}</p>
           <p class="muted">${escapeHtml(trainer.guidance?.goal || "")}</p>
         </div>
-        <div class="question">
+        <div class="reading-question-card">
+          <span class="reading-badge warning">${escapeHtml(readingSubskillLabel(subSkill))}</span>
           <h3>${escapeHtml(question.text || "")} ${renderContextualHelpButton("reading", "reading_question", question.text || "", baseContext)}</h3>
           <div class="question-options">
             ${(question.options || []).map((option, index) => `
@@ -3208,7 +3608,7 @@ function readingTrainerPanel() {
               </div>
             `).join("")}
           </div>
-          ${feedback ? readingTrainerFeedbackTemplate(feedback) : `<p class="muted">Pilih jawaban untuk menyimpan latihan ${escapeHtml(readingSubskillLabel(subSkill))}.</p>`}
+          ${feedback ? readingTrainerFeedbackTemplate(feedback) : `<div class="reading-note"><strong>Belum dijawab</strong><p>Pilih satu opsi untuk menyimpan latihan ${escapeHtml(readingSubskillLabel(subSkill))}.</p></div>`}
         </div>
       </div>
     </section>
@@ -3216,14 +3616,14 @@ function readingTrainerPanel() {
 }
 
 function readingTrainerFeedbackTemplate(feedback) {
-  const type = feedback.is_correct ? "success" : "warning";
-  const title = feedback.is_correct ? "Jawaban benar" : "Perlu review";
   const message = feedback.message || feedback.explanation || "Feedback tersimpan.";
-  return resultTemplate(
-    type,
-    title,
-    `${message}${feedback.evidence_sentence ? ` Evidence: ${feedback.evidence_sentence}` : ""}`
-  );
+  return `
+    <div class="reading-feedback-card ${feedback.is_correct ? "success" : "warning"}">
+      <span class="reading-badge ${feedback.is_correct ? "success" : "warning"}">${feedback.is_correct ? "Jawaban benar" : "Perlu review"}</span>
+      <p>${escapeHtml(message)}</p>
+      ${feedback.evidence_sentence ? `<small>Evidence: ${escapeHtml(feedback.evidence_sentence)}</small>` : ""}
+    </div>
+  `;
 }
 
 async function submitReadingTrainerAnswer(selected) {
@@ -3298,15 +3698,22 @@ function readingQuestionTemplate(question, index, lesson) {
   const selected = state.readingAnswers[question.id];
   const baseContext = readingHelpContext(lesson, question);
   return `
-    <div class="question">
-      <h3>${index + 1}. ${question.text} ${renderContextualHelpButton("reading", "reading_question", question.text, baseContext)}</h3>
+    <div class="question reading-question-card reading-practice-question-card">
+      <div class="reading-question-header">
+        <div>
+          <span class="reading-badge">Soal ${index + 1}</span>
+          <h3>${escapeHtml(question.text)}</h3>
+        </div>
+        ${renderContextualHelpButton("reading", "reading_question", question.text, baseContext)}
+      </div>
       <div class="question-options">
         ${question.options
           .map(
             (option, optionIndex) => `
-              <div class="option-help-row">
-                <button class="option-button ${selected === optionIndex ? "selected" : ""}" data-reading-question="${question.id}" data-option="${optionIndex}">
-                  ${String.fromCharCode(65 + optionIndex)}. ${option}
+              <div class="option-help-row reading-option-row ${selected === optionIndex ? "selected" : ""}">
+                <button class="option-button ${selected === optionIndex ? "selected" : ""}" type="button" data-reading-question="${question.id}" data-option="${optionIndex}">
+                  <span class="option-letter">${String.fromCharCode(65 + optionIndex)}</span>
+                  <span>${escapeHtml(option)}</span>
                 </button>
                 ${renderContextualHelpButton("reading", "reading_option", option, {
                   ...baseContext,
@@ -3318,7 +3725,10 @@ function readingQuestionTemplate(question, index, lesson) {
           )
           .join("")}
       </div>
-      <p class="muted">${question.explanation}</p>
+      <div class="reading-question-hint">
+        <strong>Petunjuk setelah submit</strong>
+        <p>${escapeHtml(question.explanation || "")}</p>
+      </div>
     </div>
   `;
 }
@@ -3387,7 +3797,7 @@ function localReadingAnswerReview(lesson, question, selectedIndex) {
 function readingAnswerReviewPanel(reviews, lesson) {
   if (!reviews?.length) return "";
   return `
-    <section class="panel">
+    <section class="panel reading-answer-review-panel">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Answer Review</p>
@@ -3407,39 +3817,47 @@ function readingAnswerReviewCard(review, lesson, index) {
   const baseContext = readingHelpContext(lesson, question);
   const analysis = review.distractor_analysis || {};
   return `
-    <div class="question">
-      <p class="eyebrow">Review Soal ${index + 1} · ${escapeHtml(readingSubskillLabel(review.related_reading_sub_skill))}</p>
+    <article class="reading-answer-card ${review.is_correct ? "correct" : "review"}">
+      <div class="reading-answer-mini-head">
+        <span class="reading-badge ${review.is_correct ? "success" : "warning"}">${review.is_correct ? "Benar" : "Perlu review"}</span>
+        <small>Soal ${index + 1} · ${escapeHtml(readingSubskillLabel(review.related_reading_sub_skill))}</small>
+      </div>
       <h3>${escapeHtml(review.question_text || question.text || "")} ${renderContextualHelpButton("reading", "reading_question", review.question_text || question.text || "", baseContext)}</h3>
-      <div class="drill-result-grid">
-        <div class="metric">
-          <span class="muted">Jawaban Anda</span>
-          <strong class="metric-word">${escapeHtml(review.selected_answer?.label || "-")}. ${escapeHtml(review.selected_answer?.text || "-")}</strong>
+      <div class="reading-two-column">
+        <div class="reading-soft-card compact">
+          <span>Jawaban Anda</span>
+          <strong>${escapeHtml(review.selected_answer?.label || "-")}. ${escapeHtml(review.selected_answer?.text || "-")}</strong>
         </div>
-        <div class="metric">
-          <span class="muted">Jawaban Benar</span>
-          <strong class="metric-word">${escapeHtml(review.correct_answer?.label || "-")}. ${escapeHtml(review.correct_answer?.text || "-")}</strong>
+        <div class="reading-soft-card compact">
+          <span>Jawaban Benar</span>
+          <strong>${escapeHtml(review.correct_answer?.label || "-")}. ${escapeHtml(review.correct_answer?.text || "-")}</strong>
         </div>
       </div>
-      <p><strong>Bukti dari Passage:</strong> ${escapeHtml(review.evidence_sentence || "-")} ${renderContextualHelpButton("reading", "reading_paragraph", review.evidence_sentence || lesson.passage, baseContext)}</p>
-      <p><strong>Penjelasan langsung:</strong> ${escapeHtml(review.direct_explanation || "")}</p>
-      <p><strong>Kenapa benar:</strong> ${escapeHtml(review.why_correct_answer_is_correct || "")}</p>
-      ${review.why_selected_answer_is_wrong ? `<p><strong>Kenapa salah:</strong> ${escapeHtml(review.why_selected_answer_is_wrong)}</p>` : ""}
-      <div class="lesson-list compact-list">
+      <div class="reading-evidence-box">
+        <strong>Bukti dari passage</strong>
+        <p>${escapeHtml(review.evidence_sentence || "-")} ${renderContextualHelpButton("reading", "reading_paragraph", review.evidence_sentence || lesson.passage, baseContext)}</p>
+      </div>
+      <div class="reading-list-stack">
+        <article class="reading-list-item"><strong>Penjelasan langsung</strong><p>${escapeHtml(review.direct_explanation || "")}</p></article>
+        <article class="reading-list-item"><strong>Kenapa jawaban benar</strong><p>${escapeHtml(review.why_correct_answer_is_correct || "")}</p></article>
+        ${review.why_selected_answer_is_wrong ? `<article class="reading-list-item"><strong>Kenapa jawaban Anda salah</strong><p>${escapeHtml(review.why_selected_answer_is_wrong)}</p></article>` : ""}
+      </div>
+      <div class="reading-distractor-grid">
         ${Object.entries(analysis).map(([letter, item]) => `
-          <div>
+          <article class="${item.correct_or_wrong === "correct" ? "correct" : ""}">
             <h3>Opsi ${letter} ${renderContextualHelpButton("reading", "reading_option", optionTextFromReview(question, letter, item), {
               ...baseContext,
               option_label: letter,
               option_text: optionTextFromReview(question, letter, item)
             })}</h3>
             <p><strong>Arti:</strong> ${escapeHtml(item.meaning || "")}</p>
-            <p><strong>Hubungan dengan passage:</strong> ${escapeHtml(item.relation_to_passage || "")}</p>
-            <p><strong>Status:</strong> ${escapeHtml(item.correct_or_wrong === "correct" ? "benar" : "salah")} · ${escapeHtml(item.reason || "")}</p>
-          </div>
+            <p>${escapeHtml(item.relation_to_passage || "")}</p>
+            <small>${escapeHtml(item.correct_or_wrong === "correct" ? "Benar" : "Salah")} · ${escapeHtml(item.reason || "")}</small>
+          </article>
         `).join("")}
       </div>
       <p class="muted">${escapeHtml(review.next_practice_recommendation || "")}</p>
-    </div>
+    </article>
   `;
 }
 
