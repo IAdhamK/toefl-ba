@@ -115,6 +115,8 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - panel Bantuan ID dapat digeser oleh user dan ditutup kapan saja
   - kosakata penting sekarang menampilkan arti singkat satu kata, arti umum, dan arti dalam contoh kalimat tertentu
   - penjelasan pertanyaan/opsi jawaban dibuat lebih langsung ke arti teks yang diklik, tidak lagi memakai fallback generik yang membingungkan
+  - backend memakai dispatcher per `context_type`, sehingga reading question, reading option, vocabulary, grammar, writing, listening, dan scenario mendapat format penjelasan berbeda
+  - frontend mengirim `extra_context` untuk Reading, Vocabulary, Listening, dan Scenario agar helper bisa membandingkan opsi dengan passage/case/transcript
   - endpoint baru `POST /api/ai/contextual-help`
   - endpoint lama `POST /api/help/indonesian` tetap dipertahankan
   - respons mock fallback berisi arti sederhana, struktur kalimat, subject, verb, object/complement, kosakata penting, konteks, dan tips
@@ -132,7 +134,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - `.venv/bin/python scripts/smoke_api.py` berhasil terhadap FastAPI di port 8001.
 - Smoke test diperluas untuk journey summary, skill journeys, attempt, continue learning, daily plan, dan review list.
 - Smoke test diperluas lagi untuk adaptive practice, mentor summary, dan complete adaptive practice.
-- Smoke test diperluas untuk Bantuan ID kontekstual di Reading, Grammar, Vocabulary, Listening, dan Scenario.
+- Smoke test diperluas untuk Bantuan ID kontekstual di Reading, Grammar, Vocabulary, Listening, Scenario, reading main idea question, reading correct/wrong/contradictory option, dan scenario problem statement.
 
 ## Cara Menjalankan Saat Ini
 

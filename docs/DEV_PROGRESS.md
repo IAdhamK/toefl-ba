@@ -16,6 +16,7 @@
 - Adaptive mentor phase added: journey memory now produces short practice tasks, mentor summary, and completion tracking.
 - Contextual Bantuan ID added across learning modules. The old Indonesian helper page remains available, but the primary UX is now small inline help buttons beside actual English content.
 - New `POST /api/ai/contextual-help` endpoint returns predictable JSON with mock fallback for Reading, Grammar, Vocabulary, AI Tutor, Writing, Listening, and Scenario contexts.
+- Bantuan ID quality improved from generic fallback to context-specific explanations. Reading questions, reading options, vocabulary, grammar, listening, and scenario now use different response fields and can use `extra_context`.
 
 ## Verified
 
@@ -23,7 +24,7 @@
 - Frontend JavaScript syntax check passed.
 - JSON to SQLite migration completed.
 - Smoke API test passed against FastAPI on port 8001.
-- Smoke API test now covers contextual Bantuan ID samples for reading, grammar, vocabulary, listening, and scenario.
+- Smoke API test now covers contextual Bantuan ID samples for reading, grammar, vocabulary, listening, scenario, reading main idea question, correct option, wrong option, contradictory option, and scenario problem statement.
 
 ## Notes
 
@@ -31,4 +32,4 @@ The frontend remains intentionally simple and build-free. Admin CMS UI still foc
 
 Journey calculation is intentionally simple for this phase: score averages, score-based levels, basic review status, and mock AI-style recommendations. Adaptive practice is rule-based for now; later phases can make mastery, spaced repetition, and adaptive difficulty smarter with real LLM support.
 
-Contextual Bantuan ID is also intentionally simple in this phase. It uses rule-based fallback unless an LLM key is configured, and it focuses on beginner-friendly Indonesian explanations rather than perfect linguistic parsing.
+Contextual Bantuan ID still uses rule-based fallback unless an LLM key is configured, but the fallback is now less generic: it explains the exact clicked text, compares reading options against passage context when available, and avoids fake grammar parsing for questions/options.

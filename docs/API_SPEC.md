@@ -89,6 +89,17 @@ Example contextual Bantuan ID request:
 }
 ```
 
+`extra_context` is optional but recommended. The frontend now sends richer context when available:
+
+```json
+{
+  "passage_text": "A business analyst ... organizational strategy.",
+  "question_text": "What is the main idea of the passage?",
+  "option_text": "Business analysts should write code immediately.",
+  "correct_answer": "Business analysts must connect requirements with stakeholder needs and strategy."
+}
+```
+
 Expected response shape:
 
 ```json
@@ -98,6 +109,7 @@ Expected response shape:
   "context_type": "reading_paragraph",
   "explanation_id": "help-123",
   "explanation": {
+    "direct_meaning_id": "Seorang Business Analyst menggali kebutuhan dari stakeholder.",
     "simple_meaning_id": "Seorang Business Analyst menggali kebutuhan dari stakeholder.",
     "subject": "A business analyst",
     "verb": "elicit / elicits",
@@ -108,6 +120,15 @@ Expected response shape:
   "source": "mock"
 }
 ```
+
+Context-specific fields may appear depending on `context_type`:
+
+- Reading question: `question_intent`, `what_to_find`, `how_to_answer`, `trap_to_avoid`, `key_words`
+- Reading option: `option_meaning`, `relation_to_context`, `likely_correctness_hint`, `why`
+- Vocabulary: `word_one_word_meaning_id`, `word_meaning_id`, `word_contextual_meaning_id`, `memory_tip`
+- Grammar: `main_verb`, `modifier`, `grammar_pattern`, `beginner_warning`, `simplified_sentence`
+- Listening: `listening_focus`, `keywords_to_hear`, `speaker_intent`, `answer_strategy`
+- Scenario: `ba_context`, `business_problem`, `stakeholder_need`, `suggested_ba_action`
 
 For vocabulary help, each `important_vocabulary` item may include:
 

@@ -26,10 +26,12 @@ Phase 2:
 - Explain user-selected text inside textarea and chat messages.
 - Store helper usage more deeply in journey memory.
 - Improve vocabulary pronunciation and memory tips.
+- Add larger content-aware dictionaries for TOEFL question types, distractor patterns, and BA scenario patterns.
 
 Phase 3:
 - Let real AI mentor read journey history before explaining.
 - Adapt explanation depth to user level and common mistakes.
+- Use real LLM provider for open-ended explanations while preserving strict JSON output and mock fallback.
 
 ## Listening Roadmap
 

@@ -198,7 +198,7 @@ def main():
         {
             "text": "What business outcome should this solution improve?",
             "module": "scenario",
-            "context_type": "scenario_option",
+            "context_type": "scenario_question",
         },
     )
     question_explanation = question_context.get("explanation", {})
@@ -206,8 +206,104 @@ def main():
         "bantuan id direct question meaning",
         status == 200
         and "hasil bisnis apa" in question_explanation.get("simple_meaning_id", "").lower()
-        and question_explanation.get("subject") == "this solution"
-        and question_explanation.get("verb") == "should improve",
+    )
+
+    reading_passage = (
+        "A business analyst operating within a complex enterprise environment must not only elicit requirements "
+        "but also ensure alignment between stakeholder needs and organizational strategy."
+    )
+    status, reading_question = call(
+        "/ai/contextual-help",
+        {
+            "text": "What is the main idea of the passage?",
+            "module": "reading",
+            "context_type": "reading_question",
+            "extra_context": {"passage_text": reading_passage},
+        },
+    )
+    reading_question_explanation = reading_question.get("explanation", {})
+    assert_ok(
+        "bantuan id reading main idea question",
+        status == 200
+        and "ide utama" in reading_question_explanation.get("direct_meaning_id", "").lower()
+        and "passage" in reading_question_explanation.get("direct_meaning_id", "").lower()
+        and "detail" in reading_question_explanation.get("what_to_find", "").lower(),
+    )
+
+    option_context = {
+        "passage_text": reading_passage,
+        "question_text": "What is the main idea of the passage?",
+        "correct_answer": "Business analysts must connect requirements with stakeholder needs and strategy.",
+    }
+    status, correct_option = call(
+        "/ai/contextual-help",
+        {
+            "text": "Business analysts must connect requirements with stakeholder needs and strategy.",
+            "module": "reading",
+            "context_type": "reading_option",
+            "extra_context": option_context,
+        },
+    )
+    correct_option_explanation = correct_option.get("explanation", {})
+    assert_ok(
+        "bantuan id reading correct option",
+        status == 200
+        and "requirements" in correct_option_explanation.get("direct_meaning_id", "").lower()
+        and "stakeholder" in correct_option_explanation.get("direct_meaning_id", "").lower()
+        and "strategy" in correct_option_explanation.get("direct_meaning_id", "").lower()
+        and ("sesuai" in correct_option_explanation.get("relation_to_context", "").lower() or "kuat" in correct_option_explanation.get("likely_correctness_hint", "").lower()),
+    )
+
+    status, wrong_option = call(
+        "/ai/contextual-help",
+        {
+            "text": "Business analysts should write code immediately.",
+            "module": "reading",
+            "context_type": "reading_option",
+            "extra_context": option_context,
+        },
+    )
+    wrong_option_explanation = wrong_option.get("explanation", {})
+    assert_ok(
+        "bantuan id reading wrong option",
+        status == 200
+        and "kode" in wrong_option_explanation.get("direct_meaning_id", "").lower()
+        and ("tidak didukung" in wrong_option_explanation.get("relation_to_context", "").lower() or "tidak sesuai" in wrong_option_explanation.get("relation_to_context", "").lower()),
+    )
+
+    status, contradictory_option = call(
+        "/ai/contextual-help",
+        {
+            "text": "Organizational strategy is unrelated to requirements.",
+            "module": "reading",
+            "context_type": "reading_option",
+            "extra_context": option_context,
+        },
+    )
+    contradictory_explanation = contradictory_option.get("explanation", {})
+    assert_ok(
+        "bantuan id reading contradictory option",
+        status == 200
+        and ("bertentangan" in contradictory_explanation.get("relation_to_context", "").lower() or "tidak sesuai" in contradictory_explanation.get("relation_to_context", "").lower())
+        and ("strategy" in contradictory_explanation.get("relation_to_context", "").lower() or "strategi" in contradictory_explanation.get("direct_meaning_id", "").lower())
+        and "requirements" in contradictory_explanation.get("direct_meaning_id", "").lower(),
+    )
+
+    status, scenario_specific = call(
+        "/ai/contextual-help",
+        {
+            "text": "The stakeholder reports that the current approval workflow causes delays.",
+            "module": "scenario",
+            "context_type": "scenario_case",
+        },
+    )
+    scenario_explanation = scenario_specific.get("explanation", {})
+    assert_ok(
+        "bantuan id scenario specific meaning",
+        status == 200
+        and "alur persetujuan" in scenario_explanation.get("direct_meaning_id", "").lower()
+        and "keterlambatan" in scenario_explanation.get("direct_meaning_id", "").lower()
+        and "klarifikasi" in scenario_explanation.get("suggested_ba_action", "").lower(),
     )
 
     print("Selesai. API utama berjalan baik.")

@@ -127,6 +127,10 @@ Bantuan ID sekarang muncul langsung di dekat konten Inggris yang sedang dipelaja
 
 Untuk vocabulary, Bantuan ID membedakan `arti singkat satu kata`, `arti umum`, dan `arti dalam contoh kalimat`. Ini membantu pemula melihat bahwa satu kata bahasa Inggris bisa berubah rasa maknanya tergantung konteks TOEFL atau Business Analyst.
 
+Penjelasan Bantuan ID sekarang lebih spesifik sesuai konteks yang diklik. Reading question menampilkan arti langsung, maksud pertanyaan, yang harus dicari, cara menjawab, dan jebakan. Reading option menampilkan arti opsi, hubungan dengan passage, kemungkinan kuat/lemah, dan alasannya. Scenario menampilkan problem statement, masalah bisnis, kebutuhan stakeholder, dan tindakan BA yang disarankan.
+
+Frontend juga mengirim `extra_context` seperti passage, question, correct answer, transcript, atau case text jika tersedia. Dengan begitu mock fallback lokal bisa membandingkan opsi jawaban dengan konteks, bukan hanya menerjemahkan teks secara umum.
+
 Endpoint utama:
 
 ```text
