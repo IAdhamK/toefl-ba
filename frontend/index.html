@@ -24,7 +24,7 @@
       };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles.css?v=reading-ui-20260428j" />
+    <link rel="stylesheet" href="styles.css?v=form-control-fix-20260429b" />
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -38,17 +38,26 @@
         </div>
 
         <nav class="nav" aria-label="Main navigation">
-          <button class="nav-item active" data-view="dashboard"><strong>Beranda</strong><span>Ringkasan belajar</span></button>
-          <button class="nav-item" data-view="journey"><strong>Perjalanan</strong><span>Progress terpadu</span></button>
-          <button class="nav-item" data-view="help"><strong>Bantuan ID</strong><span>Terjemah & jelaskan</span></button>
-          <button class="nav-item" data-view="reading"><strong>Reading</strong><span>Baca pelan-pelan</span></button>
-          <button class="nav-item" data-view="grammar"><strong>Grammar</strong><span>Subject & verb</span></button>
-          <button class="nav-item" data-view="vocabulary"><strong>Vocabulary</strong><span>Kosakata BA</span></button>
-          <button class="nav-item" data-view="tutor"><strong>AI Tutor</strong><span>Tanya bebas</span></button>
-          <button class="nav-item" data-view="writing"><strong>Writing</strong><span>Latihan menulis</span></button>
-          <button class="nav-item" data-view="listening"><strong>Listening</strong><span>Dengar & pahami</span></button>
-          <button class="nav-item" data-view="scenario"><strong>Scenario</strong><span>Keputusan BA</span></button>
-          <button class="nav-item" data-view="admin"><strong>Admin CMS</strong><span>Tambah konten</span></button>
+          <div class="nav-group">
+            <span class="nav-label">Home</span>
+            <button class="nav-item active" data-view="dashboard"><strong>Beranda</strong><span>Ringkasan belajar</span></button>
+            <button class="nav-item" data-view="journey"><strong>Perjalanan</strong><span>Progress terpadu</span></button>
+            <button class="nav-item" data-view="help"><strong>Bantuan ID</strong><span>Helper Bahasa Indonesia</span></button>
+          </div>
+          <div class="nav-group">
+            <span class="nav-label">Latihan TOEFL</span>
+            <button class="nav-item" data-view="reading"><strong>Reading</strong><span>Baca pelan-pelan</span></button>
+            <button class="nav-item" data-view="grammar"><strong>Grammar</strong><span>Subject & verb</span></button>
+            <button class="nav-item" data-view="vocabulary"><strong>Vocabulary</strong><span>Kosakata BA</span></button>
+            <button class="nav-item" data-view="writing"><strong>Writing</strong><span>Latihan menulis</span></button>
+            <button class="nav-item" data-view="listening"><strong>Listening</strong><span>Dengar & pahami</span></button>
+          </div>
+          <div class="nav-group">
+            <span class="nav-label">Mentor & Admin</span>
+            <button class="nav-item" data-view="tutor"><strong>AI Tutor</strong><span>Tanya bebas</span></button>
+            <button class="nav-item" data-view="scenario"><strong>Scenario</strong><span>Keputusan BA</span></button>
+            <button class="nav-item" data-view="admin"><strong>Admin CMS</strong><span>Tambah konten</span></button>
+          </div>
         </nav>
 
         <div class="profile-box">
@@ -110,6 +119,6 @@
       </main>
     </div>
 
-    <script src="app.js?v=reading-ui-20260428j"></script>
+    <script src="app.js?v=ui-refresh-20260429"></script>
   </body>
 </html>

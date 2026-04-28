@@ -190,6 +190,30 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Smoke test diperluas untuk Reading review, mistake patterns, dan review queue.
 - Smoke test diperluas untuk TOEFL Reading Simulation start, submit, dan history.
 
+## UI/UX Refresh - 29 April 2026
+
+- Global layout diperbarui agar aplikasi terasa seperti learning platform modern:
+  - sidebar diberi grouping menu: Home, Latihan TOEFL, Mentor & Admin.
+  - active navigation dibuat lebih jelas.
+  - responsive sidebar pada tablet/mobile dibuat horizontal-scroll agar tidak memakan layar terlalu panjang.
+  - focus state untuk button/input/select/textarea ditambahkan.
+- Design system kecil ditambahkan di `frontend/styles.css`:
+  - `page-header`, `module-surface`, `module-grid`, `module-card`, `empty-state`, `quick-actions`, `progress-card`, `analytics-card`.
+  - button global dibuat lebih aman untuk teks panjang dan mobile tap target.
+  - empty/success/warning/error state dibuat lebih konsisten.
+- Dashboard diperbaiki:
+  - hero lebih ringkas dengan next action yang jelas.
+  - progress skill dibuat dalam kartu visual.
+  - modul utama dan recent activity dibuat lebih mudah dipindai.
+- Reading UI tetap mempertahankan Journey Lab, Reading Lab, Guided Reading, Trainer, Review, dan TOEFL Simulation; mode belajar dan mode testing sudah dibedakan secara visual.
+- Bantuan ID, Grammar, Vocabulary, AI Tutor, Writing, Listening, Scenario, dan Admin CMS diperbarui agar memakai struktur halaman yang lebih konsisten:
+  - header halaman, microcopy, form/card yang lebih jelas, empty state, dan feedback area.
+  - AI Tutor sekarang punya quick prompt buttons.
+  - Writing feedback dipisahkan menjadi score, grammar issue, revised sentence, dan next practice.
+  - Listening punya placeholder audio mock dan urutan transcript -> question -> feedback.
+  - Scenario dibuat lebih seperti case study dengan konteks dan pertanyaan terpisah.
+  - Admin CMS menjelaskan bahwa edit/delete masih roadmap, bukan tombol palsu.
+
 ## Cara Menjalankan Saat Ini
 
 ```bash

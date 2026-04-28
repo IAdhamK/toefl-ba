@@ -960,6 +960,42 @@ function render() {
   renderAdmin();
 }
 
+function pageHeaderTemplate({ eyebrow, title, description, actions = "", status = "" }) {
+  return `
+    <header class="page-header">
+      <div>
+        <div class="page-header-meta">
+          <span class="eyebrow">${escapeHtml(eyebrow || "")}</span>
+          ${status ? `<span class="status-pill">${escapeHtml(status)}</span>` : ""}
+        </div>
+        <h2>${escapeHtml(title || "")}</h2>
+        <p>${escapeHtml(description || "")}</p>
+      </div>
+      ${actions ? `<div class="page-actions">${actions}</div>` : ""}
+    </header>
+  `;
+}
+
+function emptyStateTemplate(title, body, action = "") {
+  return `
+    <div class="empty-state">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(body)}</p>
+      ${action}
+    </div>
+  `;
+}
+
+function moduleQuickActions(actions) {
+  return `
+    <div class="quick-actions">
+      ${actions.map((action) => `
+        <button class="ghost-button" type="button" ${action.attr || ""}>${escapeHtml(action.label)}</button>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderDashboard() {
   const weakest = getWeakestSkill();
   const recentActivity = state.activity.slice(0, 5);
@@ -967,93 +1003,95 @@ function renderDashboard() {
   const recommendation = state.latestRecommendation?.recommendation || recommendationText();
   const analytics = state.latestAnalytics || localAnalytics();
   document.getElementById("dashboardView").innerHTML = `
-    <header class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
-      <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div class="max-w-3xl">
-          <div class="mb-3 flex flex-wrap items-center gap-2">
-            <span class="rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-cyan-700">Beranda Belajar</span>
-            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">${apiStatus}</span>
-            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">Tailwind UI</span>
-          </div>
-          <h2 class="mb-3 text-2xl font-black leading-tight text-slate-900 lg:text-4xl">Halo, ${escapeHtml(state.user.name)}. Fokus hari ini: ${escapeHtml(weakest)}.</h2>
-          <p class="max-w-2xl text-sm leading-6 text-slate-600 lg:text-base">Ikuti alur kecil yang jelas: pahami arti umum, cari subject dan verb utama, lalu lanjutkan latihan dari rekomendasi journey.</p>
+    <header class="dashboard-hero">
+      <div>
+        <div class="page-header-meta">
+          <span class="eyebrow">Beranda Belajar</span>
+          <span class="status-pill">${apiStatus}</span>
         </div>
-        <div class="flex flex-wrap gap-3">
-          <button class="rounded-xl bg-cyan-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800" data-go="journey">Lihat Perjalanan</button>
-          <button class="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-700" data-go="reading">Mulai Reading</button>
-          <button class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50" data-go="help">Bantuan ID</button>
-        </div>
+        <h2>Halo, ${escapeHtml(state.user.name)}. Fokus hari ini: ${escapeHtml(weakest)}.</h2>
+        <p>Mulai dari satu langkah kecil: pahami arti umum, cari subject dan verb utama, lalu lanjutkan latihan dari rekomendasi journey.</p>
+      </div>
+      <div class="page-actions">
+        <button class="primary-button" data-go="journey">Lihat Perjalanan</button>
+        <button class="secondary-button" data-go="reading">Mulai Reading</button>
+        <button class="ghost-button" data-go="help">Bantuan ID</button>
       </div>
     </header>
 
-    ${integratedJourneySection()}
-
-    <section class="grid gap-4 md:grid-cols-3">
-      ${[
-        ["1", "Pahami arti umum", "Cari dulu siapa melakukan apa. Jangan langsung terjebak grammar panjang."],
-        ["2", "Temukan subject dan verb", "Subject adalah pelaku. Verb adalah aksi utama yang membawa makna."],
-        ["3", "Kerjakan latihan kecil", "Skor membantu arah belajar, bukan untuk membuat panik."]
-      ].map(([number, title, body]) => `
-        <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <span class="mb-4 grid h-9 w-9 place-items-center rounded-full bg-cyan-700 text-sm font-black text-white">${number}</span>
-          <h3 class="mb-2 text-base font-extrabold text-slate-900">${title}</h3>
-          <p class="text-sm leading-6 text-slate-600">${body}</p>
-        </article>
-      `).join("")}
-    </section>
-
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-      ${Object.entries(state.progress).map(([skill, score]) => metricTemplate(skill, score)).join("")}
-    </section>
-
-    <section class="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h3 class="text-lg font-extrabold text-slate-900">Learning Path</h3>
-            <p class="text-sm text-slate-500">Alur Business Analyst yang sedang dilatih.</p>
-          </div>
-          <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">BA Context</span>
-        </div>
-        <div class="grid gap-3 md:grid-cols-3">
+    <section class="dashboard-grid two">
+      <article class="module-surface dashboard-next-card">
+        <span class="soft-pill">Lanjut belajar</span>
+        <h3>${skillLabel((state.integratedJourney || localJourneySummary()).journey?.next_recommended_module || weakest)}</h3>
+        <p>${recommendation}</p>
+        <div class="progress-bar"><span style="width:${overallProgress()}%"></span></div>
+        <small>${overallProgress()}% progress rata-rata · ${state.completedExercises} latihan selesai</small>
+      </article>
+      <article class="module-surface">
+        <span class="soft-pill">BA Learning Path</span>
+        <div class="dashboard-step-list">
           ${["Stakeholder Need", "Requirement Clarity", "Strategy Alignment"].map((item, index) => `
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <span class="mb-3 block text-xs font-bold text-cyan-700">Step ${index + 1}</span>
-              <strong class="block text-sm text-slate-900">${item}</strong>
+            <div>
+              <strong>${index + 1}</strong>
+              <span>${item}</span>
             </div>
           `).join("")}
         </div>
-      </div>
-      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h3 class="mb-2 text-lg font-extrabold text-slate-900">Rekomendasi AI Tutor</h3>
-        <p class="mb-4 text-sm leading-6 text-slate-600">${recommendation}</p>
-        ${state.latestRecommendation?.target ? `<p class="mb-4 text-sm"><strong>Target:</strong> ${state.latestRecommendation.target}</p>` : ""}
-        <div class="mb-2 h-2 overflow-hidden rounded-full bg-slate-100"><span class="block h-full rounded-full bg-cyan-700" style="width:${overallProgress()}%"></span></div>
-        <p class="text-xs font-semibold text-slate-500">Total latihan selesai: ${state.completedExercises}</p>
-      </div>
+      </article>
     </section>
 
-    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <section class="dashboard-progress-grid">
+      ${Object.entries(state.progress).map(([skill, score]) => metricTemplate(skill, score)).join("")}
+    </section>
+
+    <section class="dashboard-grid three">
       ${dashboardAnalyticsCard("Average", analytics.averageScore, `${analytics.averageScore}%`, analytics.status)}
       ${dashboardAnalyticsCard("Weakest", analytics.weakestSkill, analytics.weakestSkill, "Skill prioritas hari ini.")}
       ${dashboardAnalyticsCard("Strongest", analytics.strongestSkill, analytics.strongestSkill, "Skill paling stabil.")}
-      ${dashboardAnalyticsCard("Exercises", analytics.completedExercises, analytics.completedExercises, "Total latihan selesai.")}
-      ${dashboardAnalyticsCard("Activity", analytics.activityCount, analytics.activityCount, "Log aktivitas tersimpan.")}
     </section>
 
-    <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div class="mb-4 flex items-center justify-between gap-3">
-        <h3 class="text-lg font-extrabold text-slate-900">Recent Activity</h3>
-        <span class="text-xs font-bold text-slate-500">${recentActivity.length} aktivitas</span>
-      </div>
-      ${
-        recentActivity.length
-          ? `<div class="grid gap-2">${recentActivity
-              .map((item) => `<div class="grid gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3 md:grid-cols-[140px_1fr_90px] md:items-center"><strong class="text-sm text-slate-900">${item.module}</strong><span class="min-w-0 truncate text-sm text-slate-600">${item.summary}</span><small class="text-sm font-bold text-cyan-700 md:text-right">${item.score}</small></div>`)
-              .join("")}</div>`
-          : `<p class="text-sm text-slate-500">Belum ada aktivitas. Mulai satu latihan untuk mengisi progress.</p>`
-      }
+    <section class="dashboard-grid two">
+      <article class="module-surface">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Modul utama</p>
+            <h3>Pilih latihan cepat</h3>
+          </div>
+        </div>
+        <div class="dashboard-module-grid">
+          ${[
+            ["reading", "Reading", "Passage, trainer, simulation"],
+            ["grammar", "Grammar", "Subject, verb, phrase"],
+            ["vocabulary", "Vocabulary", "25 kata harian"],
+            ["writing", "Writing", "Requirement statement"],
+            ["listening", "Listening", "Transcript dan jawaban"],
+            ["scenario", "Scenario BA", "Case study decision"]
+          ].map(([view, title, desc]) => `
+            <button class="module-card soft" data-go="${view}">
+              <strong>${title}</strong>
+              <span>${desc}</span>
+            </button>
+          `).join("")}
+        </div>
+      </article>
+      <article class="module-surface">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Recent Activity</p>
+            <h3>${recentActivity.length} aktivitas terakhir</h3>
+          </div>
+        </div>
+        ${
+          recentActivity.length
+            ? `<div class="activity-list">${recentActivity
+                .map((item) => `<div class="activity-row"><strong>${item.module}</strong><span>${item.summary}</span><small>${item.score}</small></div>`)
+                .join("")}</div>`
+            : emptyStateTemplate("Belum ada aktivitas", "Mulai satu latihan untuk mengisi progress dan rekomendasi.")
+        }
+      </article>
     </section>
+
+    ${integratedJourneySection()}
   `;
 
   document.querySelectorAll("[data-go]").forEach((button) => {
@@ -1091,19 +1129,12 @@ function renderJourney() {
   const summary = state.integratedJourney || localJourneySummary();
   const adaptive = state.adaptivePractice || summary.adaptive_practice || localAdaptivePractice(summary);
   document.getElementById("journeyView").innerHTML = `
-    <header class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:p-6">
-      <div class="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div class="max-w-4xl">
-          <span class="mb-3 inline-flex rounded-full bg-cyan-50 px-3 py-1 text-xs font-bold uppercase tracking-wide text-cyan-700">Perjalanan Belajar Saya</span>
-          <h2 class="mb-3 text-2xl font-black leading-tight text-slate-900 lg:text-4xl">Satu peta belajar untuk semua skill TOEFL + Business Analyst.</h2>
-          <p class="max-w-3xl text-sm leading-6 text-slate-600 lg:text-base">Progress tersimpan di backend jika API aktif. Kamu bisa lanjut dari aktivitas terakhir, melihat skill lemah, dan mengambil latihan adaptif tanpa mulai dari nol.</p>
-        </div>
-        <div class="flex flex-wrap gap-3">
-          <button id="refreshJourneyButton" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">Refresh Progress</button>
-          <button class="rounded-xl bg-cyan-700 px-4 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-cyan-800" data-journey-continue>Lanjutkan Belajar</button>
-        </div>
-      </div>
-    </header>
+    ${pageHeaderTemplate({
+      eyebrow: "Perjalanan Belajar Saya",
+      title: "Satu peta belajar untuk semua skill TOEFL + Business Analyst.",
+      description: "Progress tersimpan di backend jika API aktif. Kamu bisa lanjut dari aktivitas terakhir, melihat skill lemah, dan mengambil latihan adaptif tanpa mulai dari nol.",
+      actions: `<button id="refreshJourneyButton" class="ghost-button">Refresh Progress</button><button class="primary-button" data-journey-continue>Lanjutkan Belajar</button>`
+    })}
     ${integratedJourneySection(true)}
     ${adaptivePracticeSection(adaptive)}
   `;
@@ -1779,14 +1810,12 @@ function localNextAction(skillType) {
 
 function metricTemplate(skill, score) {
   return `
-    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div class="mb-3 flex items-center justify-between gap-3">
-        <span class="text-xs font-bold uppercase tracking-wide text-slate-500">${skill}</span>
-        <strong class="text-lg font-black text-slate-900">${score}%</strong>
+    <div class="progress-card">
+      <div>
+        <span>${escapeHtml(skill)}</span>
+        <strong>${score}%</strong>
       </div>
-      <div class="h-2 overflow-hidden rounded-full bg-slate-100">
-        <span class="block h-full rounded-full bg-cyan-700" style="width:${score}%"></span>
-      </div>
+      <div class="progress-bar"><span style="width:${Math.min(Math.max(score, 0), 100)}%"></span></div>
     </div>
   `;
 }
@@ -1794,11 +1823,11 @@ function metricTemplate(skill, score) {
 function dashboardAnalyticsCard(label, rawValue, displayValue, note) {
   const numeric = typeof rawValue === "number" ? rawValue : null;
   return `
-    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <span class="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">${label}</span>
-      <strong class="block break-words text-2xl font-black text-slate-900">${escapeHtml(String(displayValue ?? "-"))}</strong>
-      ${numeric !== null ? `<div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><span class="block h-full rounded-full bg-cyan-700" style="width:${Math.min(Math.max(numeric, 0), 100)}%"></span></div>` : ""}
-      <small class="mt-3 block text-xs leading-5 text-slate-500">${escapeHtml(String(note || ""))}</small>
+    <div class="analytics-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(String(displayValue ?? "-"))}</strong>
+      ${numeric !== null ? `<div class="progress-bar"><span style="width:${Math.min(Math.max(numeric, 0), 100)}%"></span></div>` : ""}
+      <small>${escapeHtml(String(note || ""))}</small>
     </div>
   `;
 }
@@ -1862,16 +1891,14 @@ function getJourneyCurrentIndex(steps, score) {
 function renderHelp() {
   const lastHelp = state.helpHistory[0];
   document.getElementById("helpView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Bantuan Bahasa Indonesia</p>
-        <h2>Tempel kalimat Inggris, lalu baca penjelasan versi pemula.</h2>
-        <p>Fitur ini dibuat untuk user yang masih basic. Hasilnya fokus pada arti sederhana, kata kunci, pola subject-verb, dan contoh kalimat yang lebih mudah.</p>
-      </div>
-    </header>
+    ${pageHeaderTemplate({
+      eyebrow: "Bantuan Bahasa Indonesia",
+      title: "Tempel kalimat Inggris, lalu baca penjelasan versi pemula.",
+      description: "Fokus pada arti sederhana, kata kunci, pola subject-verb, dan contoh kalimat yang mudah dipahami."
+    })}
 
-    <section class="content-grid">
-      <form id="helpForm" class="panel form-grid">
+    <section class="module-grid two">
+      <form id="helpForm" class="module-surface form-grid">
         <div class="helper-banner">
           <strong>Cara pakai cepat</strong>
           <p>Tempel kalimat dari Reading, Writing, Listening, atau Scenario. Pilih jenis bantuan, lalu tekan Jelaskan.</p>
@@ -1891,17 +1918,17 @@ function renderHelp() {
         </label>
         <button class="primary-button" type="submit">Jelaskan dalam Bahasa Indonesia</button>
       </form>
-      <aside class="panel">
+      <aside class="module-surface">
         <h3>Hasil Bantuan</h3>
         ${
           lastHelp
             ? helpResultTemplate(lastHelp)
-            : `<p class="muted">Belum ada hasil. Coba masukkan satu kalimat bahasa Inggris yang membuat bingung.</p>`
+            : emptyStateTemplate("Belum ada hasil", "Coba masukkan satu kalimat bahasa Inggris yang membuat bingung.")
         }
       </aside>
     </section>
 
-    <section class="panel">
+    <section class="module-surface">
       <h3>Contekan Basic English</h3>
       <div class="cheat-grid">
         <div><strong>Subject</strong><span>Siapa atau apa yang dibicarakan.</span></div>
@@ -3912,17 +3939,15 @@ function localOptionWrongReason(option) {
 function renderGrammar() {
   const grammarSample = "A business analyst operating within a complex enterprise environment must not only elicit requirements but also ensure alignment between stakeholder needs and organizational strategy.";
   document.getElementById("grammarView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Grammar Breakdown Engine</p>
-        <h2>Bedah struktur kalimat profesional.</h2>
-        <p>Masukkan kalimat BA untuk melihat subject, main verb, clause, phrase, pattern, dan terjemahan natural.</p>
-      </div>
-      <button id="grammarHelpButton" class="ghost-button">Bantu pahami grammar</button>
-    </header>
+    ${pageHeaderTemplate({
+      eyebrow: "Grammar Breakdown Engine",
+      title: "Bedah struktur kalimat profesional.",
+      description: "Masukkan kalimat BA untuk melihat subject, main verb, clause, phrase, pattern, dan terjemahan natural.",
+      actions: `<button id="grammarHelpButton" class="ghost-button">Bantu pahami grammar</button>`
+    })}
     ${journeyPanel("Grammar")}
-    <section class="content-grid">
-      <form id="grammarForm" class="panel form-grid">
+    <section class="module-grid two">
+      <form id="grammarForm" class="module-surface form-grid">
         ${beginnerTip("Cara membaca grammar", "Cari subject dulu, lalu verb utama. Abaikan sementara phrase panjang yang hanya menambahkan informasi.")}
         <label>
           Kalimat
@@ -3931,8 +3956,8 @@ function renderGrammar() {
         ${renderContextualHelpButton("grammar", "grammar_sentence", grammarSample)}
         <button class="primary-button" type="submit">Analyze Grammar</button>
       </form>
-      <div id="grammarResult" class="panel">
-        <p class="muted">Hasil breakdown akan muncul di sini.</p>
+      <div id="grammarResult" class="module-surface grammar-result-panel">
+        ${emptyStateTemplate("Hasil breakdown akan muncul di sini", "Submit satu kalimat untuk melihat Subject, Main Verb, Phrase, Pattern, dan terjemahan.")}
       </div>
     </section>
   `;
@@ -3973,31 +3998,52 @@ function grammarAnalysis(sentence) {
   const hasOperating = sentence.toLowerCase().includes("operating");
   const hasMust = sentence.toLowerCase().includes("must");
   return `
-    <h3>Structure</h3>
-    <p><strong>Subject:</strong> A business analyst</p>
-    <p><strong>Main verb:</strong> ${hasMust ? "must elicit / must ensure" : "identify the finite verb after the subject"}</p>
-    <p><strong>Phrase:</strong> ${hasOperating ? "operating within a complex enterprise environment" : "look for modifier phrases around the noun"}</p>
-    <p><strong>Pattern:</strong> not only ... but also ...</p>
-    <h3>Penjelasan sederhana</h3>
-    <p>Bagian dengan -ing sering bukan verb utama. Dalam contoh ini, <strong>operating</strong> menjelaskan business analyst. Verb utama muncul bersama modal <strong>must</strong>.</p>
-    <h3>Terjemahan natural</h3>
-    <p>Seorang business analyst yang bekerja dalam lingkungan enterprise kompleks harus menggali requirement dan memastikan keselarasan antara kebutuhan stakeholder dan strategi organisasi.</p>
-    <h3>Latihan serupa</h3>
-    <p>The analyst working with multiple stakeholders must clarify priorities and document agreed requirements. ${renderContextualHelpButton("grammar", "grammar_sentence", "The analyst working with multiple stakeholders must clarify priorities and document agreed requirements.")}</p>
+    <div class="grammar-breakdown-grid">
+      ${grammarChip("Subject", "A business analyst")}
+      ${grammarChip("Main Verb", hasMust ? "must elicit / must ensure" : "identify finite verb after subject")}
+      ${grammarChip("Phrase", hasOperating ? "operating within a complex enterprise environment" : "modifier phrase around noun")}
+      ${grammarChip("Pattern", "not only ... but also ...")}
+    </div>
+    <div class="module-card soft">
+      <h3>Penjelasan sederhana</h3>
+      <p>Bagian dengan -ing sering bukan verb utama. Dalam contoh ini, <strong>operating</strong> menjelaskan business analyst. Verb utama muncul bersama modal <strong>must</strong>.</p>
+    </div>
+    <div class="module-card">
+      <h3>Terjemahan natural</h3>
+      <p>Seorang business analyst yang bekerja dalam lingkungan enterprise kompleks harus menggali requirement dan memastikan keselarasan antara kebutuhan stakeholder dan strategi organisasi.</p>
+    </div>
+    <div class="module-card">
+      <h3>Latihan serupa</h3>
+      <p>The analyst working with multiple stakeholders must clarify priorities and document agreed requirements. ${renderContextualHelpButton("grammar", "grammar_sentence", "The analyst working with multiple stakeholders must clarify priorities and document agreed requirements.")}</p>
+    </div>
   `;
 }
 
 function grammarApiTemplate(analysis) {
   return `
-    <h3>Structure</h3>
-    <p><strong>Subject:</strong> ${analysis.subject}</p>
-    <p><strong>Main verb:</strong> ${analysis.mainVerb}</p>
-    <p><strong>Phrase:</strong> ${analysis.phrase}</p>
-    <p><strong>Pattern:</strong> ${analysis.pattern}</p>
-    <h3>Penjelasan sederhana</h3>
-    <p>${analysis.explanation} ${renderContextualHelpButton("grammar", "grammar_explanation", analysis.explanation)}</p>
-    <h3>Terjemahan natural</h3>
-    <p>${analysis.translation}</p>
+    <div class="grammar-breakdown-grid">
+      ${grammarChip("Subject", analysis.subject)}
+      ${grammarChip("Main Verb", analysis.mainVerb)}
+      ${grammarChip("Phrase", analysis.phrase)}
+      ${grammarChip("Pattern", analysis.pattern)}
+    </div>
+    <div class="module-card soft">
+      <h3>Penjelasan sederhana</h3>
+      <p>${analysis.explanation} ${renderContextualHelpButton("grammar", "grammar_explanation", analysis.explanation)}</p>
+    </div>
+    <div class="module-card">
+      <h3>Terjemahan natural</h3>
+      <p>${analysis.translation}</p>
+    </div>
+  `;
+}
+
+function grammarChip(label, value) {
+  return `
+    <article class="grammar-chip">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value || "-")}</strong>
+    </article>
   `;
 }
 
@@ -4007,14 +4053,12 @@ function renderVocabulary() {
   const dailyItems = getDailyVocabularyItems(vocabularyItems);
   const drillStats = getVocabularyDrillStats(dailyItems);
   document.getElementById("vocabularyView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Vocabulary Drill</p>
-        <h2>Target hari ini: 25 kata vocabulary.</h2>
-        <p>Setiap hari aplikasi memilih kata random. Jawab arti Indonesia yang paling tepat, lalu lihat hasil drill sampai mana.</p>
-      </div>
-      <button id="vocabHelpButton" class="ghost-button">Cara hafal kata</button>
-    </header>
+    ${pageHeaderTemplate({
+      eyebrow: "Vocabulary Drill",
+      title: "Target hari ini: 25 kata vocabulary.",
+      description: "Jawab arti Indonesia yang paling tepat. Fokus harian kecil lebih penting daripada menghafal semua sekaligus.",
+      actions: `<button id="vocabHelpButton" class="ghost-button">Cara hafal kata</button>`
+    })}
     ${journeyPanel("Vocabulary")}
 
     <section class="reminder-card ${drillStats.completed ? "done" : ""}">
@@ -4025,9 +4069,7 @@ function renderVocabulary() {
       <button id="resetDailyDrill" class="ghost-button">Acak ulang drill</button>
     </section>
 
-    ${beginnerTip("Cara menghafal vocabulary", "Baca word, lihat contoh kalimat, pilih arti Indonesia. Kalau salah, catat kata itu untuk diulang besok.")}
-
-    <section class="drill-result-grid">
+    <section class="vocab-progress-panel">
       <div class="metric">
         <span class="muted">Terjawab</span>
         <strong>${drillStats.answered}/${drillStats.total}</strong>
@@ -4050,14 +4092,20 @@ function renderVocabulary() {
       </div>
     </section>
 
-    <section class="panel">
-      <h3>Drill 25 Kata Hari Ini</h3>
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Daily Drill</p>
+          <h3>Drill 25 Kata Hari Ini</h3>
+          <p>Baca word, lihat contoh kalimat, lalu pilih arti Indonesia. Kata yang salah akan muncul di ringkasan review.</p>
+        </div>
+      </div>
       <div class="drill-list">
         ${dailyItems.map((item, index) => vocabularyDrillTemplate(item, index, vocabularyItems)).join("")}
       </div>
     </section>
 
-    <section class="panel">
+    <section class="module-surface">
       <h3>Bank Kosakata</h3>
       <p class="muted">Total kosakata tersedia: ${vocabularyItems.length}. Drill harian mengambil 25 kata secara acak setiap hari.</p>
       <div class="vocab-bank">
@@ -4121,15 +4169,14 @@ function vocabularyDrillTemplate(item, index, allItems) {
   const answered = state.vocabularyDrill.answers[item.id];
   const options = vocabularyOptions(item, allItems);
   return `
-    <article class="lesson-card drill-card ${answered ? (answered.isCorrect ? "correct" : "wrong") : ""}">
-      <div class="pill-row">
+    <article class="vocab-card ${answered ? (answered.isCorrect ? "correct" : "wrong") : ""}">
+      <div class="vocab-card-head">
         <span class="pill">#${index + 1}</span>
-        <span class="pill">${item.part}</span>
-        <span class="pill">BA Context</span>
+        <span class="pill">${escapeHtml(item.part)}</span>
       </div>
-      <h3>${item.word}</h3>
-      <p>${item.example}</p>
-      <p class="muted">${item.meaningEn}</p>
+      <h3>${escapeHtml(item.word)}</h3>
+      <p class="vocab-example">${escapeHtml(item.example)}</p>
+      <p class="muted">${escapeHtml(item.meaningEn)}</p>
       <div class="question-options">
         ${options
           .map((option) => `
@@ -4247,15 +4294,13 @@ function dedupeValues(values) {
 
 function renderTutor() {
   document.getElementById("tutorView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">AI Tutor Internal</p>
-        <h2>Mentor TOEFL untuk calon Business Analyst.</h2>
-        <p>Tulis pertanyaan dalam Bahasa Indonesia. Contoh: "Apa arti elicit?" atau "Kenapa operating bukan verb utama?"</p>
-      </div>
-    </header>
-    <section class="content-grid">
-      <div class="panel">
+    ${pageHeaderTemplate({
+      eyebrow: "AI Tutor Internal",
+      title: "Mentor TOEFL untuk calon Business Analyst.",
+      description: "Tanyakan grammar, vocabulary, writing, atau minta latihan singkat dalam Bahasa Indonesia."
+    })}
+    <section class="tutor-layout">
+      <div class="module-surface tutor-chat-panel">
         <div id="chatLog" class="chat-log">
           ${state.chat.map((message) => `
             <div class="chat-message ${message.role}">
@@ -4265,8 +4310,13 @@ function renderTutor() {
           `).join("")}
         </div>
       </div>
-      <form id="chatForm" class="panel form-grid">
+      <form id="chatForm" class="module-surface form-grid tutor-input-panel">
         ${beginnerTip("Tips bertanya", "Kalau bingung, tulis saja kalimat Inggrisnya lalu tanya: artinya apa, subject-nya apa, verb-nya apa.")}
+        ${moduleQuickActions([
+          { label: "Jelaskan grammar", attr: `data-chat-prompt="Jelaskan grammar kalimat ini secara sederhana."` },
+          { label: "Buat latihan", attr: `data-chat-prompt="Buatkan latihan TOEFL kecil untuk saya."` },
+          { label: "Review vocabulary", attr: `data-chat-prompt="Review 5 vocabulary BA yang sering muncul."` }
+        ])}
         <label>
           Pertanyaan
           <textarea id="chatInput" placeholder="Contoh: Saya tidak paham kenapa operating bukan verb utama."></textarea>
@@ -4297,6 +4347,12 @@ function renderTutor() {
     saveState();
     renderTutor();
   });
+  document.querySelectorAll("[data-chat-prompt]").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.getElementById("chatInput").value = button.dataset.chatPrompt;
+      document.getElementById("chatInput").focus();
+    });
+  });
   bindContextualHelpButtons(document.getElementById("tutorView"));
 }
 
@@ -4318,17 +4374,15 @@ function renderWriting() {
   const writingPrompt = "Write a clear Business Analyst requirement statement. Use: The system must + verb + object + condition.";
   const writingSample = "The system must flexible for all user and make report faster.";
   document.getElementById("writingView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Writing Evaluator</p>
-        <h2>Latihan writing profesional.</h2>
-        <p>Tulis requirement statement atau ringkasan meeting, lalu dapatkan feedback awal.</p>
-      </div>
-      <button id="writingHelpButton" class="ghost-button">Bantu susun kalimat</button>
-    </header>
+    ${pageHeaderTemplate({
+      eyebrow: "Writing Evaluator",
+      title: "Latihan writing profesional.",
+      description: "Tulis requirement statement atau ringkasan meeting, lalu dapatkan feedback yang dipisah menjadi score, issue, revised sentence, dan next practice.",
+      actions: `<button id="writingHelpButton" class="ghost-button">Bantu susun kalimat</button>`
+    })}
     ${journeyPanel("Writing")}
-    <section class="content-grid">
-      <form id="writingForm" class="panel form-grid">
+    <section class="module-grid two writing-layout">
+      <form id="writingForm" class="module-surface form-grid">
         ${beginnerTip("Formula writing basic", "Gunakan pola: The system must + verb + object + condition. Tambahkan ukuran agar requirement jelas.")}
         <div class="helper-banner">
           <strong>Prompt writing</strong>
@@ -4341,7 +4395,9 @@ function renderWriting() {
         ${renderContextualHelpButton("writing", "writing_sentence", writingSample)}
         <button class="primary-button" type="submit">Evaluate Writing</button>
       </form>
-      <div id="writingResult" class="panel"><p class="muted">Feedback akan muncul di sini.</p></div>
+      <div id="writingResult" class="module-surface">
+        ${emptyStateTemplate("Feedback akan muncul di sini", "Submit tulisan untuk melihat score, grammar issue, suggestion, dan revised sentence.")}
+      </div>
     </section>
   `;
 
@@ -4373,12 +4429,7 @@ function renderWriting() {
     addActivity("Writing", "Requirement statement feedback", feedback.score);
     saveState();
     await refreshIntegratedJourney();
-    document.getElementById("writingResult").innerHTML = `
-      <h3>Score: ${feedback.score}</h3>
-      <p><strong>Main issue:</strong> ${feedback.issues.join(" ")}</p>
-      <p><strong>Revised:</strong> ${feedback.revised} ${renderContextualHelpButton("writing", "writing_feedback", feedback.revised)}</p>
-      <p><strong>Next practice:</strong> ${feedback.recommendation}</p>
-    `;
+    document.getElementById("writingResult").innerHTML = writingFeedbackTemplate(feedback);
     bindContextualHelpButtons(document.getElementById("writingResult"));
     renderDashboard();
     renderJourney();
@@ -4386,24 +4437,50 @@ function renderWriting() {
   bindContextualHelpButtons(document.getElementById("writingView"));
 }
 
+function writingFeedbackTemplate(feedback) {
+  return `
+    <div class="writing-feedback-grid">
+      <article class="analytics-card">
+        <span>Score</span>
+        <strong>${Math.round(feedback.score || 0)}</strong>
+        <div class="progress-bar"><span style="width:${Math.min(Math.max(feedback.score || 0, 0), 100)}%"></span></div>
+      </article>
+      <article class="module-card soft">
+        <h3>Grammar issue</h3>
+        <p>${escapeHtml((feedback.issues || []).join(" ") || "Belum ada issue utama.")}</p>
+      </article>
+      <article class="module-card">
+        <h3>Revised sentence</h3>
+        <p>${escapeHtml(feedback.revised || "")} ${renderContextualHelpButton("writing", "writing_feedback", feedback.revised || "")}</p>
+      </article>
+      <article class="module-card">
+        <h3>Next practice</h3>
+        <p>${escapeHtml(feedback.recommendation || "Tulis ulang satu kalimat dengan ukuran yang jelas.")}</p>
+      </article>
+    </div>
+  `;
+}
+
 function renderListening() {
   document.getElementById("listeningView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">AI Listening Engine</p>
-        <h2>${listeningScenario.title}</h2>
-        <p>Baca transcript pelan-pelan. Tujuan awalnya bukan menangkap semua kata, tapi menemukan masalah utama dalam meeting.</p>
-      </div>
-      <button id="listeningHelpButton" class="ghost-button">Jelaskan transcript</button>
-    </header>
+    ${pageHeaderTemplate({
+      eyebrow: "AI Listening Engine",
+      title: listeningScenario.title,
+      description: "Latihan listening masih mock, tetapi alurnya dibuat seperti latihan nyata: dengar/scan transcript, pahami pertanyaan, lalu jawab.",
+      actions: `<button id="listeningHelpButton" class="ghost-button">Jelaskan transcript</button>`
+    })}
     ${journeyPanel("Listening")}
-    <section class="content-grid">
-      <div class="panel">
+    <section class="module-grid two listening-layout">
+      <div class="module-surface">
+        <div class="audio-placeholder">
+          <strong>Mock Audio</strong>
+          <span>Transcript tersedia untuk latihan basic</span>
+        </div>
         ${beginnerTip("Cara memahami listening", "Cari kata yang diulang atau ditekankan: late, delay, data, different formats. Biasanya itu petunjuk masalah utama.")}
         <h3>Transcript</h3>
         <p>${listeningScenario.transcript} ${renderContextualHelpButton("listening", "listening_transcript", listeningScenario.transcript, listeningHelpContext())}</p>
       </div>
-      <form id="listeningForm" class="panel form-grid">
+      <form id="listeningForm" class="module-surface form-grid">
         <label>
           ${listeningScenario.question} ${renderContextualHelpButton("listening", "listening_question", listeningScenario.question, listeningHelpContext())}
           <textarea id="listeningInput"></textarea>
@@ -4463,16 +4540,14 @@ function listeningHelpContext() {
 
 function renderScenario() {
   document.getElementById("scenarioView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Scenario-Based BA Practice</p>
-        <h2>Latih keputusan Business Analyst dalam bahasa Inggris.</h2>
-        <p>Pilih tindakan terbaik untuk situasi kerja BA. Modul ini menggabungkan reasoning BA, reading comprehension, dan vocabulary profesional.</p>
-      </div>
-      <button id="scenarioHelpButton" class="ghost-button">Bantu pahami skenario</button>
-    </header>
+    ${pageHeaderTemplate({
+      eyebrow: "Scenario-Based BA Practice",
+      title: "Latih keputusan Business Analyst dalam bahasa Inggris.",
+      description: "Pisahkan konteks kasus, pertanyaan, opsi, dan alasan. Jangan langsung memilih solusi sebelum memahami masalah bisnis.",
+      actions: `<button id="scenarioHelpButton" class="ghost-button">Bantu pahami skenario</button>`
+    })}
     ${beginnerTip("Cara menjawab scenario", "Sebagai BA, jangan langsung membuat solusi. Biasanya langkah pertama adalah clarify, elicit, validate, atau align.")}
-    <section class="lesson-list">
+    <section class="scenario-list">
       ${scenarioQuestions.map(scenarioTemplate).join("")}
     </section>
   `;
@@ -4520,14 +4595,20 @@ function scenarioTemplate(item) {
   const answered = selected !== undefined;
   const isCorrect = selected === item.answer;
   return `
-    <article class="lesson-card">
+    <article class="scenario-card">
       <div class="pill-row">
         <span class="pill">BA Decision</span>
         <span class="pill">Scenario</span>
       </div>
       <h3>${item.title}</h3>
-      <p>${item.context} ${renderContextualHelpButton("scenario", "scenario_case", item.context, scenarioHelpContext(item))}</p>
-      <p><strong>${item.question}</strong> ${renderContextualHelpButton("scenario", "scenario_question", item.question, scenarioHelpContext(item))}</p>
+      <div class="case-box">
+        <strong>Konteks kasus</strong>
+        <p>${item.context} ${renderContextualHelpButton("scenario", "scenario_case", item.context, scenarioHelpContext(item))}</p>
+      </div>
+      <div class="case-box soft">
+        <strong>Pertanyaan BA</strong>
+        <p>${item.question} ${renderContextualHelpButton("scenario", "scenario_question", item.question, scenarioHelpContext(item))}</p>
+      </div>
       <div class="question-options">
         ${item.options
           .map(
@@ -4563,15 +4644,13 @@ function scenarioHelpContext(item) {
 
 function renderAdmin() {
   document.getElementById("adminView").innerHTML = `
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Admin CMS</p>
-        <h2>Kelola konten latihan awal.</h2>
-        <p>CMS lokal ini menyimpan konten tambahan di browser. Pada tahap backend, struktur ini bisa dipindahkan ke PostgreSQL dan endpoint lesson/vocabulary.</p>
-      </div>
-    </header>
-    <section class="content-grid">
-      <form id="lessonForm" class="panel form-grid">
+    ${pageHeaderTemplate({
+      eyebrow: "Admin CMS",
+      title: "Kelola konten latihan awal.",
+      description: "CMS lokal ini menyimpan konten tambahan di browser dan backend jika API aktif. Edit/delete penuh masih roadmap, jadi UI hanya menampilkan tambah dan daftar konten."
+    })}
+    <section class="module-grid two admin-editor-grid">
+      <form id="lessonForm" class="module-surface form-grid">
         <h3>Tambah Reading Lesson</h3>
         <label>Judul<input id="lessonTitle" required value="Solution Evaluation Memo" /></label>
         <label>Level
@@ -4585,7 +4664,7 @@ function renderAdmin() {
         <label>Passage<textarea id="lessonPassage" required>The analyst evaluates whether the proposed solution improves reporting accuracy and supports stakeholder decision-making.</textarea></label>
         <button class="primary-button" type="submit">Simpan Lesson</button>
       </form>
-      <form id="vocabForm" class="panel form-grid">
+      <form id="vocabForm" class="module-surface form-grid">
         <h3>Tambah Vocabulary</h3>
         <label>Word<input id="vocabWord" required value="assess" /></label>
         <label>Part of speech<input id="vocabPart" required value="verb" /></label>
@@ -4595,16 +4674,16 @@ function renderAdmin() {
         <button class="primary-button" type="submit">Simpan Vocabulary</button>
       </form>
     </section>
-    <section class="panel">
+    <section class="module-surface">
       <h3>Konten Tambahan</h3>
-      <div class="content-grid">
+      <div class="module-grid two">
         <div>
           <p class="muted">Lessons: ${state.adminContent.lessons.length}</p>
           <div class="lesson-list compact-list">
             ${
               state.adminContent.lessons
                 .map((lesson) => `<div class="activity-row"><strong>${lesson.title}</strong><span>${lesson.context}</span><small>${lesson.level}</small></div>`)
-                .join("") || "<p class='muted'>Belum ada lesson tambahan.</p>"
+                .join("") || emptyStateTemplate("Belum ada lesson tambahan", "Tambah lesson dari form di atas. Edit/delete akan ditambahkan pada fase CMS berikutnya.")
             }
           </div>
         </div>
@@ -4614,7 +4693,7 @@ function renderAdmin() {
             ${
               state.adminContent.vocabulary
                 .map((item) => `<div class="activity-row"><strong>${item.word}</strong><span>${item.meaningId}</span><small>${item.part}</small></div>`)
-                .join("") || "<p class='muted'>Belum ada vocabulary tambahan.</p>"
+                .join("") || emptyStateTemplate("Belum ada vocabulary tambahan", "Tambah vocabulary dari form di atas. Edit/delete belum aktif.")
             }
           </div>
         </div>
