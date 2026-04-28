@@ -44,6 +44,7 @@ const defaultState = {
     vocabulary: null
   },
   integratedJourney: null,
+  readingJourney: null,
   adaptivePractice: null,
   chat: [
     {
@@ -732,9 +733,11 @@ async function hydrateFromApi() {
     });
     state.latestAnalytics = analyticsResponse.analytics;
     await refreshIntegratedJourney();
+    await refreshReadingJourney();
   } catch (error) {
     apiOnline = false;
     state.integratedJourney = localJourneySummary();
+    state.readingJourney = localReadingJourney();
   }
 }
 
@@ -750,6 +753,22 @@ async function refreshIntegratedJourney() {
   } catch (error) {
     apiOnline = false;
     state.integratedJourney = localJourneySummary();
+  }
+}
+
+async function refreshReadingJourney() {
+  if (!apiOnline) {
+    state.readingJourney = localReadingJourney();
+    return;
+  }
+  try {
+    const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
+    const response = await apiRequest(`/reading/journey${query}`);
+    state.readingJourney = response.reading_journey;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    apiOnline = false;
+    state.readingJourney = localReadingJourney();
   }
 }
 
@@ -1350,6 +1369,57 @@ function localAdaptivePractice(summary) {
       { title: "Catat kesalahan", instruction: "Tulis satu hal yang masih membingungkan untuk direview." }
     ]
   };
+}
+
+function localReadingJourney() {
+  const score = state.progress.Reading || 0;
+  const completed = state.activity.filter((item) => item.module === "Reading").length;
+  const subskills = [
+    { subskill: "general_meaning", label: "Arti umum", mastery_score: score, attempt_count: completed, status: completed ? "developing" : "not_started" },
+    { subskill: "main_idea", label: "Main idea", mastery_score: score, attempt_count: completed, status: completed ? "developing" : "not_started" },
+    { subskill: "detail_information", label: "Detail informasi", mastery_score: Math.max(0, score - 5), attempt_count: completed, status: completed ? "developing" : "not_started" },
+    { subskill: "vocabulary_context", label: "Vocabulary in context", mastery_score: Math.max(0, score - 10), attempt_count: completed, status: completed ? "developing" : "not_started" }
+  ];
+  const weak = [...subskills].sort((a, b) => a.mastery_score - b.mastery_score).slice(0, 2);
+  const strong = [...subskills].sort((a, b) => b.mastery_score - a.mastery_score).slice(0, 2);
+  return {
+    reading_level: readingScoreLevel(score),
+    reading_level_step: Math.max(1, Math.min(10, Math.ceil(score / 10))),
+    reading_score: score,
+    completed_passages: completed,
+    current_stage: "Reading Foundation",
+    weak_subskills: weak,
+    strong_subskills: strong,
+    sub_skill_mastery: subskills,
+    last_passage_id: state.selectedReadingLessonId,
+    last_activity_at: "",
+    next_recommended_action: completed
+      ? `Fokus berikutnya: ${weak[0].label}. ${localReadingAction(weak[0].subskill)}`
+      : "Mulai dari satu passage pendek. Baca judul, kalimat pertama, lalu cari arti umum bacaan."
+  };
+}
+
+function readingScoreLevel(score) {
+  if (score >= 95) return "TOEFL Reading Simulation";
+  if (score >= 90) return "BA Case Reading";
+  if (score >= 84) return "Author Purpose and Logic";
+  if (score >= 78) return "Inference";
+  if (score >= 70) return "Complex Sentence Breakdown";
+  if (score >= 60) return "Reference and Pronoun";
+  if (score >= 50) return "Vocabulary in Context";
+  if (score >= 35) return "Find Supporting Details";
+  if (score >= 20) return "Find Main Idea";
+  return "Understand Simple Meaning";
+}
+
+function localReadingAction(subskill) {
+  const actions = {
+    general_meaning: "Pahami arti umum passage pendek sebelum melihat pilihan jawaban.",
+    main_idea: "Pilih jawaban yang merangkum seluruh passage, bukan detail kecil.",
+    detail_information: "Cocokkan pertanyaan dengan kalimat bukti di passage.",
+    vocabulary_context: "Pahami arti kata dari kalimatnya, bukan hanya arti kamus."
+  };
+  return actions[subskill] || actions.main_idea;
 }
 
 function scoreLevel(score) {
@@ -1974,6 +2044,7 @@ function renderReading() {
       <button id="readingHelpButton" class="ghost-button">Jelaskan bacaan ini</button>
     </header>
     ${journeyPanel("Reading")}
+    ${readingJourneySummary()}
 
     <section class="content-grid">
       <div class="panel">
@@ -2018,9 +2089,10 @@ function renderReading() {
   document.getElementById("submitReading").addEventListener("click", async () => {
     let score = scoreReading(selectedLesson);
     let details = [];
+    let readingResponse = null;
     if (apiOnline) {
       try {
-        const response = await apiRequest("/reading/submit-answer", {
+        readingResponse = await apiRequest("/reading/submit-answer", {
           method: "POST",
           body: {
             user_id: state.user?.id || "default-user",
@@ -2028,8 +2100,8 @@ function renderReading() {
             answers: state.readingAnswers
           }
         });
-        score = response.score;
-        details = response.details || [];
+        score = readingResponse.score;
+        details = readingResponse.details || [];
       } catch (error) {
         apiOnline = false;
       }
@@ -2037,8 +2109,12 @@ function renderReading() {
     state.progress.Reading = Math.max(state.progress.Reading, score);
     state.completedExercises += 1;
     addActivity("Reading", selectedLesson.title, score);
+    if (readingResponse?.reading_journey_update) {
+      state.readingJourney = readingResponse.reading_journey_update;
+    }
     saveState();
     await refreshIntegratedJourney();
+    await refreshReadingJourney();
     document.getElementById("readingResult").innerHTML = resultTemplate(
       score >= 70 ? "success" : "warning",
       `Skor Reading: ${score}`,
@@ -2049,7 +2125,54 @@ function renderReading() {
     renderDashboard();
     renderJourney();
   });
+  document.getElementById("continueReadingButton")?.addEventListener("click", () => {
+    document.getElementById("readingResult")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
   bindContextualHelpButtons(document.getElementById("readingView"));
+}
+
+function readingJourneySummary() {
+  const journey = state.readingJourney || localReadingJourney();
+  const strongest = journey.strong_subskills?.[0];
+  const weakest = journey.weak_subskills?.[0];
+  return `
+    <section class="panel">
+      <div class="journey-summary">
+        <div>
+          <p class="eyebrow">Reading Journey Foundation</p>
+          <h3>${escapeHtml(journey.reading_level || "Understand Simple Meaning")}</h3>
+          <p>${escapeHtml(journey.next_recommended_action || "Mulai dari memahami arti umum passage.")}</p>
+        </div>
+        <div class="journey-score">
+          <span>Reading Score</span>
+          <strong>${Math.round(journey.reading_score || 0)}</strong>
+        </div>
+      </div>
+      <div class="drill-result-grid">
+        <div class="metric">
+          <span class="muted">Completed Passages</span>
+          <strong>${journey.completed_passages || 0}</strong>
+          <small>Passage yang sudah disubmit</small>
+        </div>
+        <div class="metric">
+          <span class="muted">Strongest Sub-skill</span>
+          <strong class="metric-word">${escapeHtml(strongest?.label || "Belum ada")}</strong>
+          <small>${Math.round(strongest?.mastery_score || 0)}%</small>
+        </div>
+        <div class="metric">
+          <span class="muted">Weakest Sub-skill</span>
+          <strong class="metric-word">${escapeHtml(weakest?.label || "Belum ada")}</strong>
+          <small>${Math.round(weakest?.mastery_score || 0)}%</small>
+        </div>
+        <div class="metric">
+          <span class="muted">Last Passage</span>
+          <strong class="metric-word">${escapeHtml(journey.last_passage_id || state.selectedReadingLessonId || "-")}</strong>
+          <small>${journey.last_activity_at ? formatDate(journey.last_activity_at) : "Belum ada aktivitas backend"}</small>
+        </div>
+      </div>
+      <button id="continueReadingButton" class="primary-button" type="button">Lanjutkan Reading</button>
+    </section>
+  `;
 }
 
 function readingQuestionTemplate(question, index, lesson) {

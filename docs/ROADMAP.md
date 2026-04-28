@@ -14,6 +14,7 @@ Phase 1:
 - Reading Journey Foundation.
 - Reading level, score, sub-skill mastery, and next action.
 - Initial sub-skills: `general_meaning`, `main_idea`, `detail_information`, `vocabulary_context`.
+- Status: implemented as initial foundation.
 
 Phase 2:
 - Reading Sub-skill Trainer.

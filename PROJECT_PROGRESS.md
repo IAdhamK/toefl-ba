@@ -124,6 +124,15 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Reading documentation foundation:
   - `docs/READING_PROGRESS.md` untuk melacak vision, fase implementasi, status, deliverables, testing checklist, dan prompt Codex berikutnya
   - `docs/READING_SPEC.md` untuk mendefinisikan target Reading Journey, Guided Reading, Question Trainer, Answer Review, Reading Review, dan TOEFL Simulation
+- Reading Journey Foundation:
+  - service `backend/services/reading_service.py`
+  - router `backend/routers/reading.py`
+  - endpoint `GET /api/reading/journey`
+  - endpoint `GET /api/reading/levels`
+  - endpoint `GET /api/reading/recommendation`
+  - endpoint `POST /api/reading/attempt`
+  - halaman Reading menampilkan Reading level, score, completed passages, strongest/weakest sub-skill, dan next recommended action
+  - sub-skill Phase 1: `general_meaning`, `main_idea`, `detail_information`, `vocabulary_context`
 
 ## Verifikasi
 
@@ -139,6 +148,7 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
 - Smoke test diperluas lagi untuk adaptive practice, mentor summary, dan complete adaptive practice.
 - Smoke test diperluas untuk Bantuan ID kontekstual di Reading, Grammar, Vocabulary, Listening, Scenario, reading main idea question, reading correct/wrong/contradictory option, dan scenario problem statement.
 - Dokumentasi Reading foundation dibuat tanpa mengubah behavior frontend/backend.
+- Smoke test diperluas untuk Reading Journey, Reading levels, Reading recommendation, dan save Reading attempt.
 
 ## Cara Menjalankan Saat Ini
 
@@ -172,11 +182,11 @@ python3 scripts/smoke_api.py
 - Real LLM integration di production.
 - TTS/STT provider nyata untuk Listening Engine.
 - Auth production-grade dan role-based access control.
-- Implementasi Phase 1 Reading Journey Foundation berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
+- Reading Sub-skill Trainer Phase 2 berdasarkan `docs/READING_PROGRESS.md` dan `docs/READING_SPEC.md`.
 
 ## Rekomendasi Step Berikutnya
 
-1. Implementasikan Phase 1 Reading Journey Foundation.
+1. Implementasikan Phase 2 Reading Sub-skill Trainer.
 2. Tambahkan edit/delete di Admin CMS frontend.
 3. Tambahkan E2E browser tests untuk alur utama.
 4. Tambahkan API tests dengan SQLite test database.

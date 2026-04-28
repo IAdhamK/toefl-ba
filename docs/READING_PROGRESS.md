@@ -29,6 +29,13 @@ Yang sudah tersedia:
 - Journey panel umum untuk Reading.
 - Contextual Bantuan ID untuk passage, question, option, vocabulary, dan grammar insight.
 - Backend scoring sudah mengirim journey update.
+- Reading Journey Foundation Phase 1:
+  - endpoint `GET /api/reading/journey`
+  - endpoint `GET /api/reading/levels`
+  - endpoint `GET /api/reading/recommendation`
+  - endpoint `POST /api/reading/attempt`
+  - panel Reading Journey Summary di halaman Reading
+  - tracking awal sub-skill `general_meaning`, `main_idea`, `detail_information`, dan `vocabulary_context`
 
 Yang belum tersedia:
 
@@ -65,12 +72,15 @@ Completed:
 - Reading masuk Integrated User Learning Journey secara umum.
 - Scoring Reading sudah bisa memperbarui progress.
 - Contextual Bantuan ID Reading sudah lebih spesifik untuk question dan option.
+- Reading service dan router Phase 1 dibuat.
+- Reading page menampilkan Reading level, score, completed passages, strongest/weakest sub-skill, dan next action.
+- Smoke test membaca endpoint Reading Journey Foundation.
 
 Pending:
 
-- Tabel/kolom khusus Reading sub-skill mastery.
 - UI Reading Journey yang lebih detail.
-- API summary khusus Reading.
+- Reading-specific review history.
+- Evidence sentence dan distractor analysis.
 
 Testing checklist:
 
@@ -78,6 +88,7 @@ Testing checklist:
 - Reading journey tidak reset saat app dibuka ulang.
 - Response scoring tetap kompatibel dengan frontend lama.
 - Smoke test membaca summary Reading tanpa error.
+- Smoke test menyimpan reading attempt tanpa error.
 
 ### Phase 2 — Reading Sub-skill Trainer
 
@@ -243,8 +254,7 @@ Testing checklist:
 ## Pending Items
 
 - Reading-specific data model.
-- Reading-specific service layer.
-- Reading-specific API endpoints.
+- Reading-specific data model yang lebih detail untuk fase lanjut.
 - Guided Reading UI.
 - Question Trainer UI.
 - Answer Review UI.
@@ -254,23 +264,22 @@ Testing checklist:
 
 ## Next Codex Prompt Recommendation
 
-Gunakan prompt ini untuk Phase 1:
+Gunakan prompt ini untuk Phase 2:
 
 ```text
 You are working inside repository IAdhamK/toefl-ba.
 
-Task: Implement Phase 1 — Reading Journey Foundation.
+Task: Implement Phase 2 — Reading Sub-skill Trainer.
 
 Use docs/READING_PROGRESS.md and docs/READING_SPEC.md as the source of truth.
 
 Goals:
-- Add Reading-specific journey summary without breaking current MVP.
-- Track Reading sub-skills:
-  general_meaning, main_idea, detail_information, vocabulary_context.
-- Preserve existing Reading Analyzer UI and scoring behavior.
-- Add backend service functions for Reading progress summary.
-- Add API endpoint GET /api/reading/journey or similar.
-- Add frontend Reading Journey panel if safe, or expose API first.
+- Preserve Reading Journey Foundation.
+- Add trainer mode for question types:
+  main_idea, detail, vocabulary, reference, inference, purpose.
+- Add question_type and sub_skill handling without breaking existing lessons.
+- Add API endpoint for Reading trainer if needed.
+- Add beginner-friendly Indonesian feedback per question type.
 - Keep Indonesian beginner-friendly wording.
 - Add smoke tests.
 - Update documentation.

@@ -5,6 +5,7 @@ from backend.services.listening_service import evaluate_listening
 from backend.services.scoring_service import evaluate_writing, score_reading, score_scenario, score_vocabulary
 from backend.repository import get_vocabulary_item
 from backend.services.journey_service import save_learning_attempt, update_skill_mastery, update_vocabulary_memory
+from backend.services.reading_service import get_reading_journey, update_reading_subskills_from_quiz
 
 
 router = APIRouter(tags=["scoring"])
@@ -35,7 +36,13 @@ def reading_score(payload: dict) -> dict:
         result.get("score", 0) >= 75,
         result.get("score", 0),
     )
+    update_reading_subskills_from_quiz(
+        payload.get("user_id") or payload.get("userId") or "default-user",
+        lesson,
+        result,
+    )
     result["journey_update"] = compact_journey_update(update)
+    result["reading_journey_update"] = get_reading_journey(payload.get("user_id") or payload.get("userId") or "default-user")
     return result
 
 

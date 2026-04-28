@@ -232,12 +232,17 @@ Use SQLite first. Do not require PostgreSQL yet.
 
 ## API Direction
 
-Possible future endpoints:
+Implemented in Phase 1:
 
 - `GET /api/reading/journey`
+- `GET /api/reading/levels`
+- `GET /api/reading/recommendation`
+- `POST /api/reading/attempt`
+
+Possible future endpoints:
+
 - `GET /api/reading/lessons`
 - `GET /api/reading/lessons/{lesson_id}`
-- `POST /api/reading/attempt`
 - `GET /api/reading/review`
 - `GET /api/reading/trainer?question_type=main_idea`
 - `POST /api/reading/trainer/submit`

@@ -11,6 +11,7 @@ TOEFL Analyst AI adalah aplikasi belajar TOEFL dengan konteks kerja Business Ana
 - Reading Analyzer, Grammar Breakdown, Vocabulary Drill 25 kata/hari, Writing Evaluator, Listening scenario, Scenario BA, AI Tutor mock, Bantuan ID kontekstual, Admin CMS dasar.
 - Safe AI fallback: tanpa API key, aplikasi tetap menjawab memakai mock rule-based.
 - Integrated User Learning Journey: satu progress terpadu untuk Reading, Grammar, Vocabulary, Writing, Listening, dan Scenario BA.
+- Reading Journey Foundation: level Reading, score, completed passages, sub-skill mastery awal, dan rekomendasi langkah berikutnya.
 
 ## Struktur Folder
 
@@ -120,6 +121,28 @@ Adaptive mentor sederhana juga tersedia. Ia membaca weakest skill, recent attemp
 GET /api/journey/adaptive-practice
 POST /api/journey/adaptive-practice/complete
 ```
+
+## Reading Journey Foundation
+
+Reading sekarang punya summary khusus agar user tidak mulai dari nol. Data yang ditampilkan:
+
+- Current Reading Level.
+- Reading Score.
+- Completed Passages.
+- Strongest dan Weakest Reading sub-skill.
+- Last passage.
+- Next Recommended Action.
+
+Endpoint:
+
+```text
+GET /api/reading/journey
+GET /api/reading/levels
+GET /api/reading/recommendation
+POST /api/reading/attempt
+```
+
+Phase 1 memakai tabel journey yang sudah ada: `skill_journeys`, `learning_attempts`, dan `skill_mastery`.
 
 ## Bantuan ID Kontekstual
 

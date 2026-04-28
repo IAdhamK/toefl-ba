@@ -59,6 +59,43 @@ Compatibility endpoint lama tetap tersedia:
 - `POST /api/listening/submit-answer`
 - `POST /api/scenario/submit-answer`
 
+## Reading
+
+- `GET /api/reading/journey`
+- `GET /api/reading/levels`
+- `GET /api/reading/recommendation`
+- `POST /api/reading/attempt`
+
+Example Reading attempt:
+
+```json
+{
+  "user_id": "default-user",
+  "passage_id": "reading-1",
+  "score": 82,
+  "max_score": 100,
+  "subskill_scores": {
+    "general_meaning": 90,
+    "main_idea": 80,
+    "detail_information": 75,
+    "vocabulary_context": 70
+  },
+  "feedback": "Reading attempt tersimpan."
+}
+```
+
+Reading Journey response includes:
+
+- `reading_level`
+- `reading_score`
+- `completed_passages`
+- `current_stage`
+- `weak_subskills`
+- `strong_subskills`
+- `sub_skill_mastery`
+- `last_passage_id`
+- `next_recommended_action`
+
 ## AI
 
 - `POST /api/ai/chat`

@@ -89,7 +89,40 @@ def main():
     lesson = lessons["lessons"][0]
     answers = {question["id"]: question["answer"] for question in lesson["questions"]}
     status, reading = call("/reading/submit-answer", {"lessonId": lesson["id"], "answers": answers})
-    assert_ok("reading scoring", status == 200 and reading["score"] == 100)
+    assert_ok("reading scoring", status == 200 and reading["score"] == 100 and "reading_journey_update" in reading)
+
+    status, reading_journey = call("/reading/journey")
+    assert_ok(
+        "reading journey",
+        status == 200
+        and "reading_journey" in reading_journey
+        and "reading_level" in reading_journey["reading_journey"]
+        and "sub_skill_mastery" in reading_journey["reading_journey"],
+    )
+
+    status, reading_levels = call("/reading/levels")
+    assert_ok("reading levels", status == 200 and len(reading_levels["levels"]) == 10)
+
+    status, reading_recommendation = call("/reading/recommendation")
+    assert_ok("reading recommendation", status == 200 and "recommended_action" in reading_recommendation["recommendation"])
+
+    status, reading_attempt = call(
+        "/reading/attempt",
+        {
+            "user_id": "default-user",
+            "passage_id": "smoke-reading-phase-1",
+            "score": 82,
+            "max_score": 100,
+            "subskill_scores": {
+                "general_meaning": 90,
+                "main_idea": 80,
+                "detail_information": 75,
+                "vocabulary_context": 70,
+            },
+            "feedback": "Smoke Reading Journey attempt.",
+        },
+    )
+    assert_ok("save reading attempt", status == 201 and "reading_journey" in reading_attempt)
 
     first_vocab = daily_vocab["items"][0]
     status, vocab_score = call("/scoring/vocabulary", {"itemId": first_vocab["id"], "answer": first_vocab["answer"]})
