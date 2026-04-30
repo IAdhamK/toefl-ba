@@ -497,6 +497,29 @@ select:hover {
   line-height: 1.55;
 }
 
+.alert {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+}
+
+.alert.success {
+  border-color: #9ad4b7;
+  background: #f0fdf4;
+}
+
+.alert.warning {
+  border-color: #f2c879;
+  background: #fffbeb;
+}
+
+.alert p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .module-surface {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -526,6 +549,12 @@ select:hover {
 .module-card-list {
   display: grid;
   gap: 12px;
+}
+
+.helper-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .module-card {

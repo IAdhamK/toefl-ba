@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.repository import get_state, set_state
-from backend.routers import admin, ai_tutor, auth, journey, lessons, progress, reading, scoring, vocabulary
+from backend.routers import admin, ai_tutor, auth, grammar, journey, lessons, progress, reading, scoring, vocabulary
 from backend.seed import seed_database
 from backend.services.listening_service import generate_listening_scenario
 from backend.services.scoring_service import SCENARIO_QUESTIONS
@@ -82,6 +82,7 @@ app.include_router(lessons.router)
 app.include_router(vocabulary.router)
 app.include_router(progress.router)
 app.include_router(reading.router)
+app.include_router(grammar.router)
 app.include_router(scoring.router)
 app.include_router(ai_tutor.router)
 app.include_router(admin.router)

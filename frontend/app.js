@@ -72,6 +72,54 @@ const defaultState = {
     startedAtMs: null,
     history: []
   },
+  grammarTrainer: {
+    selectedTopic: "subject_verb",
+    topics: [],
+    trainer: null,
+    answers: {},
+    result: null
+  },
+  intermediateGrammarTrainer: {
+    selectedTopic: "gerund_vs_main_verb",
+    topics: [],
+    trainer: null,
+    answers: {},
+    result: null
+  },
+  grammarErrorCorrection: {
+    selectedErrorType: "missing_be_after_modal",
+    categories: [],
+    category: null,
+    items: [],
+    answers: {},
+    result: null
+  },
+  grammarSentenceBuilder: {
+    selectedLevel: "basic",
+    selectedMode: "arrange_words",
+    levels: [],
+    items: [],
+    answers: {},
+    result: null
+  },
+  grammarAdvancedLab: {
+    selectedTopic: "nominalization",
+    topics: [],
+    topic: null,
+    practiceAnswers: {},
+    rewriteAnswers: {},
+    practiceResult: null,
+    rewriteResult: null
+  },
+  grammarReview: null,
+  grammarSimulation: {
+    mode: "short",
+    modes: [],
+    session: null,
+    answers: {},
+    result: null,
+    history: []
+  },
   adaptivePractice: null,
   chat: [
     {
@@ -713,6 +761,13 @@ function loadState() {
     },
     readingReview: parsed.readingReview || null,
     readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(parsed.readingTrainer || {}) },
+    grammarTrainer: { ...structuredClone(defaultState.grammarTrainer), ...(parsed.grammarTrainer || {}) },
+    intermediateGrammarTrainer: { ...structuredClone(defaultState.intermediateGrammarTrainer), ...(parsed.intermediateGrammarTrainer || {}) },
+    grammarErrorCorrection: { ...structuredClone(defaultState.grammarErrorCorrection), ...(parsed.grammarErrorCorrection || {}) },
+    grammarSentenceBuilder: { ...structuredClone(defaultState.grammarSentenceBuilder), ...(parsed.grammarSentenceBuilder || {}) },
+    grammarAdvancedLab: { ...structuredClone(defaultState.grammarAdvancedLab), ...(parsed.grammarAdvancedLab || {}) },
+    grammarReview: parsed.grammarReview || null,
+    grammarSimulation: { ...structuredClone(defaultState.grammarSimulation), ...(parsed.grammarSimulation || {}) },
     guidedReading: { ...structuredClone(defaultState.guidedReading), ...(parsed.guidedReading || {}) },
     readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(parsed.readingSimulation || {}) },
     chat: parsed.chat || structuredClone(defaultState.chat)
@@ -752,6 +807,13 @@ async function hydrateFromApi() {
         },
         readingReview: stateResponse.state.readingReview || state.readingReview || null,
         readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(stateResponse.state.readingTrainer || state.readingTrainer || {}) },
+        grammarTrainer: { ...structuredClone(defaultState.grammarTrainer), ...(stateResponse.state.grammarTrainer || state.grammarTrainer || {}) },
+        intermediateGrammarTrainer: { ...structuredClone(defaultState.intermediateGrammarTrainer), ...(stateResponse.state.intermediateGrammarTrainer || state.intermediateGrammarTrainer || {}) },
+        grammarErrorCorrection: { ...structuredClone(defaultState.grammarErrorCorrection), ...(stateResponse.state.grammarErrorCorrection || state.grammarErrorCorrection || {}) },
+        grammarSentenceBuilder: { ...structuredClone(defaultState.grammarSentenceBuilder), ...(stateResponse.state.grammarSentenceBuilder || state.grammarSentenceBuilder || {}) },
+        grammarAdvancedLab: { ...structuredClone(defaultState.grammarAdvancedLab), ...(stateResponse.state.grammarAdvancedLab || state.grammarAdvancedLab || {}) },
+        grammarReview: stateResponse.state.grammarReview || state.grammarReview || null,
+        grammarSimulation: { ...structuredClone(defaultState.grammarSimulation), ...(stateResponse.state.grammarSimulation || state.grammarSimulation || {}) },
         guidedReading: { ...structuredClone(defaultState.guidedReading), ...(stateResponse.state.guidedReading || state.guidedReading || {}) },
         readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(stateResponse.state.readingSimulation || state.readingSimulation || {}) }
       };
@@ -3960,6 +4022,13 @@ function renderGrammar() {
         ${emptyStateTemplate("Hasil breakdown akan muncul di sini", "Submit satu kalimat untuk melihat Subject, Main Verb, Phrase, Pattern, dan terjemahan.")}
       </div>
     </section>
+    ${basicGrammarTrainerPanel()}
+    ${intermediateGrammarTrainerPanel()}
+    ${grammarErrorCorrectionPanel()}
+    ${grammarSentenceBuilderPanel()}
+    ${grammarAdvancedLabPanel()}
+    ${grammarReviewPanel()}
+    ${grammarSimulationPanel()}
   `;
 
   document.getElementById("grammarHelpButton").addEventListener("click", () => {
@@ -3991,6 +4060,195 @@ function renderGrammar() {
     renderDashboard();
     renderJourney();
   });
+
+  document.querySelectorAll("[data-grammar-trainer-topic]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadBasicGrammarTrainer(button.dataset.grammarTrainerTopic);
+      renderGrammar();
+    });
+  });
+
+  document.querySelectorAll("[data-grammar-quiz-answer]").forEach((select) => {
+    select.addEventListener("change", () => {
+      state.grammarTrainer.answers[select.dataset.grammarQuizAnswer] = select.value;
+      state.grammarTrainer.result = null;
+      saveState();
+    });
+  });
+
+  const trainerForm = document.getElementById("basicGrammarTrainerForm");
+  if (trainerForm) {
+    trainerForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitBasicGrammarTrainer();
+      renderGrammar();
+    });
+  }
+
+  document.querySelectorAll("[data-intermediate-grammar-topic]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadIntermediateGrammarTrainer(button.dataset.intermediateGrammarTopic);
+      renderGrammar();
+    });
+  });
+
+  document.querySelectorAll("[data-intermediate-grammar-answer]").forEach((select) => {
+    select.addEventListener("change", () => {
+      state.intermediateGrammarTrainer.answers[select.dataset.intermediateGrammarAnswer] = select.value;
+      state.intermediateGrammarTrainer.result = null;
+      saveState();
+    });
+  });
+
+  const intermediateTrainerForm = document.getElementById("intermediateGrammarTrainerForm");
+  if (intermediateTrainerForm) {
+    intermediateTrainerForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitIntermediateGrammarTrainer();
+      renderGrammar();
+    });
+  }
+
+  document.querySelectorAll("[data-grammar-error-type]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadGrammarErrorCorrection(button.dataset.grammarErrorType);
+      renderGrammar();
+    });
+  });
+
+  document.querySelectorAll("[data-grammar-error-answer]").forEach((select) => {
+    select.addEventListener("change", () => {
+      state.grammarErrorCorrection.answers[select.dataset.grammarErrorAnswer] = select.value;
+      state.grammarErrorCorrection.result = null;
+      saveState();
+    });
+  });
+
+  const errorCorrectionForm = document.getElementById("grammarErrorCorrectionForm");
+  if (errorCorrectionForm) {
+    errorCorrectionForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitGrammarErrorCorrection();
+      renderGrammar();
+    });
+  }
+
+  document.querySelectorAll("[data-sentence-builder-level]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadGrammarSentenceBuilder(button.dataset.sentenceBuilderLevel, state.grammarSentenceBuilder.selectedMode);
+      renderGrammar();
+    });
+  });
+
+  document.querySelectorAll("[data-sentence-builder-mode]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadGrammarSentenceBuilder(state.grammarSentenceBuilder.selectedLevel, button.dataset.sentenceBuilderMode);
+      renderGrammar();
+    });
+  });
+
+  document.querySelectorAll("[data-sentence-builder-answer]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.grammarSentenceBuilder.answers[input.dataset.sentenceBuilderAnswer] = input.value;
+      state.grammarSentenceBuilder.result = null;
+      saveState();
+    });
+  });
+
+  const sentenceBuilderForm = document.getElementById("grammarSentenceBuilderForm");
+  if (sentenceBuilderForm) {
+    sentenceBuilderForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitGrammarSentenceBuilder();
+      renderGrammar();
+    });
+  }
+
+  document.querySelectorAll("[data-advanced-grammar-topic]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await loadGrammarAdvancedLab(button.dataset.advancedGrammarTopic);
+      renderGrammar();
+    });
+  });
+
+  document.querySelectorAll("[data-advanced-practice-answer]").forEach((select) => {
+    select.addEventListener("change", () => {
+      state.grammarAdvancedLab.practiceAnswers[select.dataset.advancedPracticeAnswer] = select.value;
+      state.grammarAdvancedLab.practiceResult = null;
+      saveState();
+    });
+  });
+
+  document.querySelectorAll("[data-advanced-rewrite-answer]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.grammarAdvancedLab.rewriteAnswers[input.dataset.advancedRewriteAnswer] = input.value;
+      state.grammarAdvancedLab.rewriteResult = null;
+      saveState();
+    });
+  });
+
+  const advancedPracticeForm = document.getElementById("advancedGrammarPracticeForm");
+  if (advancedPracticeForm) {
+    advancedPracticeForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitAdvancedGrammarPractice();
+      renderGrammar();
+    });
+  }
+
+  const advancedRewriteForm = document.getElementById("advancedGrammarRewriteForm");
+  if (advancedRewriteForm) {
+    advancedRewriteForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitAdvancedGrammarRewrite();
+      renderGrammar();
+    });
+  }
+
+  const refreshGrammarReviewButton = document.getElementById("refreshGrammarReviewButton");
+  if (refreshGrammarReviewButton) {
+    refreshGrammarReviewButton.addEventListener("click", async () => {
+      await loadGrammarReview();
+      renderGrammar();
+    });
+  }
+
+  document.querySelectorAll("[data-grammar-simulation-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.grammarSimulation.mode = button.dataset.grammarSimulationMode;
+      state.grammarSimulation.session = null;
+      state.grammarSimulation.result = null;
+      state.grammarSimulation.answers = {};
+      saveState();
+      renderGrammar();
+    });
+  });
+
+  const startGrammarSimulationButton = document.getElementById("startGrammarSimulationButton");
+  if (startGrammarSimulationButton) {
+    startGrammarSimulationButton.addEventListener("click", async () => {
+      await startGrammarSimulation();
+      renderGrammar();
+    });
+  }
+
+  document.querySelectorAll("[data-grammar-simulation-answer]").forEach((input) => {
+    const eventName = input.tagName === "SELECT" ? "change" : "input";
+    input.addEventListener(eventName, () => {
+      state.grammarSimulation.answers[input.dataset.grammarSimulationAnswer] = input.value;
+      state.grammarSimulation.result = null;
+      saveState();
+    });
+  });
+
+  const grammarSimulationForm = document.getElementById("grammarSimulationForm");
+  if (grammarSimulationForm) {
+    grammarSimulationForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await submitGrammarSimulation();
+      renderGrammar();
+    });
+  }
   bindContextualHelpButtons(document.getElementById("grammarView"));
 }
 
@@ -4020,12 +4278,15 @@ function grammarAnalysis(sentence) {
 }
 
 function grammarApiTemplate(analysis) {
+  const hasDeepFields = Boolean(analysis.sentence_level || analysis.grammar_patterns || analysis.structure_steps);
   return `
     <div class="grammar-breakdown-grid">
       ${grammarChip("Subject", analysis.subject)}
       ${grammarChip("Main Verb", analysis.mainVerb)}
       ${grammarChip("Phrase", analysis.phrase)}
       ${grammarChip("Pattern", analysis.pattern)}
+      ${hasDeepFields ? grammarChip("Level", analysis.sentence_level) : ""}
+      ${hasDeepFields ? grammarChip("Type", analysis.sentence_type) : ""}
     </div>
     <div class="module-card soft">
       <h3>Penjelasan sederhana</h3>
@@ -4034,6 +4295,69 @@ function grammarApiTemplate(analysis) {
     <div class="module-card">
       <h3>Terjemahan natural</h3>
       <p>${analysis.translation}</p>
+    </div>
+    ${hasDeepFields ? `
+      <div class="module-card">
+        <h3>Deep Grammar Breakdown</h3>
+        <div class="grammar-breakdown-grid">
+          ${grammarChip("Main Subject", analysis.main_subject)}
+          ${grammarChip("Main Verb", analysis.main_verb)}
+          ${grammarChip("Object/Complement", analysis.object_or_complement)}
+          ${grammarChip("Recommended Topic", analysis.recommended_topic_id)}
+        </div>
+      </div>
+      ${analysis.simple_meaning_id ? `
+        <div class="module-card soft">
+          <h3>Arti sederhana</h3>
+          <p>${escapeHtml(analysis.simple_meaning_id)}</p>
+        </div>
+      ` : ""}
+      ${analysis.ba_context_meaning ? `
+        <div class="module-card">
+          <h3>Makna dalam konteks BA</h3>
+          <p>${escapeHtml(analysis.ba_context_meaning)}</p>
+        </div>
+      ` : ""}
+      ${grammarDeepList("Modifier Phrases", analysis.modifier_phrases, (item) => `<strong>${escapeHtml(item.text || "-")}</strong><p>${escapeHtml(item.explanation_id || item.function || "")}</p><small>${escapeHtml(item.function || "")}</small>`)}
+      ${grammarDeepList("Clauses", analysis.clauses, (item) => `<strong>${escapeHtml(item.type || "-")}</strong><p>${escapeHtml(item.text || "")}</p><small>${escapeHtml(item.explanation_id || "")}</small>`)}
+      ${grammarSimpleList("Grammar Patterns", analysis.grammar_patterns)}
+      ${analysis.common_trap ? `
+        <div class="module-card">
+          <h3>Common Trap</h3>
+          <p>${escapeHtml(analysis.common_trap)}</p>
+        </div>
+      ` : ""}
+      ${grammarSimpleList("Langkah memahami struktur", analysis.structure_steps)}
+      ${grammarSimpleList("Detected Keywords", analysis.detected_keywords)}
+      <div class="module-card soft">
+        <h3>Next Practice</h3>
+        <p>${escapeHtml(analysis.next_practice || "Practice Subject and Verb foundation.")}</p>
+        <small>${escapeHtml(analysis.confidence_note || "")}</small>
+      </div>
+    ` : ""}
+  `;
+}
+
+function grammarDeepList(title, items, renderItem) {
+  if (!Array.isArray(items) || !items.length) return "";
+  return `
+    <div class="module-card">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="module-card-list">
+        ${items.map((item) => `<div class="case-box soft">${renderItem(item)}</div>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function grammarSimpleList(title, items) {
+  if (!Array.isArray(items) || !items.length) return "";
+  return `
+    <div class="module-card">
+      <h3>${escapeHtml(title)}</h3>
+      <div class="helper-list">
+        ${items.map((item) => `<span class="soft-pill">${escapeHtml(item)}</span>`).join("")}
+      </div>
     </div>
   `;
 }
@@ -4045,6 +4369,1690 @@ function grammarChip(label, value) {
       <strong>${escapeHtml(value || "-")}</strong>
     </article>
   `;
+}
+
+function basicGrammarTrainerPanel() {
+  const topics = state.grammarTrainer.topics?.length ? state.grammarTrainer.topics : localBasicGrammarTrainerTopics();
+  const trainer = state.grammarTrainer.trainer || localBasicGrammarTrainer(state.grammarTrainer.selectedTopic || "subject_verb");
+  const result = state.grammarTrainer.result;
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Basic Grammar Trainer</p>
+          <h2>Latihan grammar dasar bertahap</h2>
+          <p>Pilih topic, baca contoh, lalu jawab quiz pendek. Skor akan masuk ke Grammar Journey jika backend aktif.</p>
+        </div>
+        <span class="pill">Learn -> Practice -> Quiz</span>
+      </div>
+      <div class="quick-actions">
+        ${topics.map((topic) => `
+          <button class="ghost-button ${topic.topic_id === trainer.topic_id ? "selected-control" : ""}" type="button" data-grammar-trainer-topic="${escapeHtml(topic.topic_id)}">
+            ${escapeHtml(topic.title)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="module-grid two">
+        <article class="module-card soft">
+          <span class="soft-pill">${escapeHtml(trainer.level)} · ${escapeHtml(trainer.title)}</span>
+          <h3>${escapeHtml(trainer.learning_objective)}</h3>
+          <p>${escapeHtml(trainer.explanation_id)}</p>
+          <p><strong>Tips pemula:</strong> ${escapeHtml(trainer.beginner_tip)}</p>
+          <p><strong>Konteks BA:</strong> ${escapeHtml(trainer.ba_context)}</p>
+        </article>
+        <article class="module-card">
+          <h3>Contoh breakdown</h3>
+          ${(trainer.examples || []).map((item) => `
+            <div class="case-box soft">
+              <p><strong>${escapeHtml(item.sentence)}</strong> ${renderContextualHelpButton("grammar", "grammar_sentence", item.sentence)}</p>
+              <p>${escapeHtml(item.simple_meaning_id)}</p>
+              <small>${escapeHtml(item.grammar_focus)}</small>
+              <div class="grammar-breakdown-grid">
+                ${Object.entries(item.breakdown || {}).map(([key, value]) => grammarChip(labelFromKey(key), value)).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </article>
+      </div>
+      <div class="module-grid two">
+        <article class="module-card">
+          <h3>Guided Practice</h3>
+          ${(trainer.guided_items || []).map((item) => `
+            <div class="case-box soft">
+              <span class="soft-pill">${escapeHtml(item.target_part)}</span>
+              <p><strong>${escapeHtml(item.instruction_id)}</strong></p>
+              <p>${escapeHtml(item.sentence)} ${renderContextualHelpButton("grammar", "grammar_sentence", item.sentence)}</p>
+              <p><strong>Jawaban:</strong> ${escapeHtml(item.correct_answer)}</p>
+              <p>${escapeHtml(item.explanation_id)}</p>
+              <small>${escapeHtml(item.beginner_tip)}</small>
+            </div>
+          `).join("")}
+        </article>
+        <form id="basicGrammarTrainerForm" class="module-card">
+          <h3>Quiz pendek</h3>
+          ${(trainer.quiz_items || []).map((item) => `
+            <label>
+              ${escapeHtml(item.instruction_id)}
+              <span class="muted">${escapeHtml(item.sentence)}</span>
+              <strong>${escapeHtml(item.question)}</strong>
+              <select data-grammar-quiz-answer="${escapeHtml(item.id)}">
+                <option value="">Pilih jawaban</option>
+                ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${state.grammarTrainer.answers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+              </select>
+            </label>
+          `).join("")}
+          <button class="primary-button" type="submit">Submit Basic Trainer</button>
+          ${result ? grammarTrainerResultTemplate(result) : emptyStateTemplate("Belum submit quiz", "Pilih jawaban pada quiz pendek, lalu submit untuk melihat skor dan rekomendasi.")}
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+async function loadBasicGrammarTrainer(topicId = "subject_verb") {
+  const selectedTopic = topicId || "subject_verb";
+  if (apiOnline) {
+    try {
+      const [topicsResponse, trainerResponse] = await Promise.all([
+        apiRequest("/grammar/trainer/basic"),
+        apiRequest(`/grammar/trainer/basic/${encodeURIComponent(selectedTopic)}`)
+      ]);
+      state.grammarTrainer = {
+        selectedTopic,
+        topics: topicsResponse.topics || [],
+        trainer: trainerResponse.trainer,
+        answers: {},
+        result: null
+      };
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.grammarTrainer = {
+    selectedTopic,
+    topics: localBasicGrammarTrainerTopics(),
+    trainer: localBasicGrammarTrainer(selectedTopic),
+    answers: {},
+    result: null
+  };
+  saveState();
+}
+
+async function submitBasicGrammarTrainer() {
+  const topicId = state.grammarTrainer.selectedTopic || "subject_verb";
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/grammar/trainer/basic/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          topic_id: topicId,
+          answers: state.grammarTrainer.answers || {}
+        }
+      });
+      state.grammarTrainer.result = response;
+      await refreshIntegratedJourney();
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  const trainer = state.grammarTrainer.trainer || localBasicGrammarTrainer(topicId);
+  const details = (trainer.quiz_items || []).map((item) => {
+    const userAnswer = state.grammarTrainer.answers?.[item.id] || "";
+    return {
+      question_id: item.id,
+      is_correct: userAnswer === item.correct_answer,
+      user_answer: userAnswer,
+      correct_answer: item.correct_answer,
+      explanation_id: item.explanation_id
+    };
+  });
+  const correctCount = details.filter((item) => item.is_correct).length;
+  const totalQuestions = details.length || 1;
+  const score = Math.round((correctCount / totalQuestions) * 100);
+  state.grammarTrainer.result = {
+    result: {
+      topic_id: topicId,
+      score,
+      max_score: 100,
+      correct_count: correctCount,
+      total_questions: details.length,
+      is_passed: score >= 70,
+      details
+    },
+    recommendation: {
+      next_action: score >= 70 ? "Lanjut ke topic Basic berikutnya." : "Ulangi contoh dan guided practice dulu.",
+      next_topic_id: "object_complement",
+      mentor_message: score >= 70 ? "Bagus. Kamu sudah memahami latihan dasar ini." : "Tidak apa-apa. Ulangi pelan-pelan dari subject dan verb."
+    }
+  };
+  saveState();
+}
+
+function grammarTrainerResultTemplate(response) {
+  const result = response.result || {};
+  const recommendation = response.recommendation || {};
+  return `
+    <div class="alert ${result.is_passed ? "success" : "warning"}">
+      <strong>Score ${Math.round(result.score || 0)}/${result.max_score || 100}</strong>
+      <p>${escapeHtml(recommendation.mentor_message || "Quiz selesai.")}</p>
+      <p>${escapeHtml(recommendation.next_action || "")}</p>
+    </div>
+    <div class="module-card-list">
+      ${(result.details || []).map((item) => `
+        <div class="case-box ${item.is_correct ? "soft" : ""}">
+          <strong>${item.is_correct ? "Benar" : "Perlu review"} · ${escapeHtml(item.question_id)}</strong>
+          <p>Jawaban Anda: ${escapeHtml(item.user_answer || "-")}</p>
+          <p>Jawaban benar: ${escapeHtml(item.correct_answer || "-")}</p>
+          <small>${escapeHtml(item.explanation_id || "")}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function intermediateGrammarTrainerPanel() {
+  const data = state.intermediateGrammarTrainer;
+  const topics = data.topics?.length ? data.topics : localIntermediateGrammarTrainerTopics();
+  const trainer = data.trainer || localIntermediateGrammarTrainer(data.selectedTopic || "gerund_vs_main_verb");
+  const result = data.result;
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Intermediate Grammar Trainer</p>
+          <h2>Latihan kalimat panjang TOEFL + BA</h2>
+          <p>Fokus pada jebakan grammar: -ing bukan main verb, relative clause, passive voice, parallel structure, dan connector logic.</p>
+        </div>
+        <span class="pill">Trap-aware practice</span>
+      </div>
+      <div class="quick-actions">
+        ${topics.map((topic) => `
+          <button class="ghost-button ${topic.topic_id === trainer.topic_id ? "selected-control" : ""}" type="button" data-intermediate-grammar-topic="${escapeHtml(topic.topic_id)}">
+            ${escapeHtml(topic.title)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="module-grid two">
+        <article class="module-card soft">
+          <span class="soft-pill">${escapeHtml(trainer.level)} · ${escapeHtml(trainer.title)}</span>
+          <h3>${escapeHtml(trainer.learning_objective)}</h3>
+          <p>${escapeHtml(trainer.explanation_id)}</p>
+          <p><strong>Common trap:</strong> ${escapeHtml(trainer.common_trap || "")}</p>
+          <p><strong>Tips:</strong> ${escapeHtml(trainer.beginner_tip)}</p>
+          <p><strong>Konteks BA:</strong> ${escapeHtml(trainer.ba_context)}</p>
+        </article>
+        <article class="module-card">
+          <h3>Contoh intermediate breakdown</h3>
+          ${(trainer.examples || []).map((item) => `
+            <div class="case-box soft">
+              <p><strong>${escapeHtml(item.sentence)}</strong> ${renderContextualHelpButton("grammar", "grammar_sentence", item.sentence)}</p>
+              <p>${escapeHtml(item.simple_meaning_id)}</p>
+              <small>${escapeHtml(item.grammar_focus)}</small>
+              <p><strong>Mengapa membingungkan:</strong> ${escapeHtml(item.why_it_is_confusing || "")}</p>
+              <div class="grammar-breakdown-grid">
+                ${Object.entries(item.breakdown || {}).map(([key, value]) => grammarChip(labelFromKey(key), value)).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </article>
+      </div>
+      <div class="module-grid two">
+        <article class="module-card">
+          <h3>Guided + Trap Practice</h3>
+          ${(trainer.guided_items || []).map((item) => intermediatePracticeCard(item)).join("")}
+          ${(trainer.trap_items || []).map((item) => `
+            <div class="case-box">
+              <span class="soft-pill">${escapeHtml(item.trap_type)}</span>
+              <p><strong>${escapeHtml(item.question)}</strong></p>
+              <p>${escapeHtml(item.sentence)}</p>
+              <p><strong>Jawaban:</strong> ${escapeHtml(item.correct_answer)}</p>
+              <p>${escapeHtml(item.explanation_id)}</p>
+            </div>
+          `).join("")}
+        </article>
+        <form id="intermediateGrammarTrainerForm" class="module-card">
+          <h3>Quiz + Trap Check</h3>
+          ${[...(trainer.quiz_items || []), ...(trainer.trap_items || [])].map((item) => `
+            <label>
+              ${escapeHtml(item.instruction_id || item.trap_type || "Trap check")}
+              <span class="muted">${escapeHtml(item.sentence)}</span>
+              <strong>${escapeHtml(item.question)}</strong>
+              <select data-intermediate-grammar-answer="${escapeHtml(item.id)}">
+                <option value="">Pilih jawaban</option>
+                ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${data.answers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+              </select>
+            </label>
+          `).join("")}
+          <button class="primary-button" type="submit">Submit Intermediate Trainer</button>
+          ${result ? grammarTrainerResultTemplate(result) : emptyStateTemplate("Belum submit intermediate quiz", "Jawab quiz dan trap check untuk melihat skor, mistakes, dan rekomendasi.")}
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+function intermediatePracticeCard(item) {
+  return `
+    <div class="case-box soft">
+      <span class="soft-pill">${escapeHtml(item.target_part)}</span>
+      <p><strong>${escapeHtml(item.instruction_id)}</strong></p>
+      <p>${escapeHtml(item.sentence)} ${renderContextualHelpButton("grammar", "grammar_sentence", item.sentence)}</p>
+      <p><strong>Jawaban:</strong> ${escapeHtml(item.correct_answer)}</p>
+      <p>${escapeHtml(item.explanation_id)}</p>
+      <small>${escapeHtml(item.common_trap || item.beginner_tip || "")}</small>
+    </div>
+  `;
+}
+
+async function loadIntermediateGrammarTrainer(topicId = "gerund_vs_main_verb") {
+  const selectedTopic = topicId || "gerund_vs_main_verb";
+  if (apiOnline) {
+    try {
+      const [topicsResponse, trainerResponse] = await Promise.all([
+        apiRequest("/grammar/trainer/intermediate"),
+        apiRequest(`/grammar/trainer/intermediate/${encodeURIComponent(selectedTopic)}`)
+      ]);
+      state.intermediateGrammarTrainer = {
+        selectedTopic,
+        topics: topicsResponse.topics || [],
+        trainer: trainerResponse.trainer,
+        answers: {},
+        result: null
+      };
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.intermediateGrammarTrainer = {
+    selectedTopic,
+    topics: localIntermediateGrammarTrainerTopics(),
+    trainer: localIntermediateGrammarTrainer(selectedTopic),
+    answers: {},
+    result: null
+  };
+  saveState();
+}
+
+async function submitIntermediateGrammarTrainer() {
+  const topicId = state.intermediateGrammarTrainer.selectedTopic || "gerund_vs_main_verb";
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/grammar/trainer/intermediate/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          topic_id: topicId,
+          answers: state.intermediateGrammarTrainer.answers || {}
+        }
+      });
+      state.intermediateGrammarTrainer.result = response;
+      await refreshIntegratedJourney();
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  const trainer = state.intermediateGrammarTrainer.trainer || localIntermediateGrammarTrainer(topicId);
+  const items = [...(trainer.quiz_items || []), ...(trainer.trap_items || [])];
+  const details = items.map((item) => {
+    const userAnswer = state.intermediateGrammarTrainer.answers?.[item.id] || "";
+    return {
+      question_id: item.id,
+      is_correct: userAnswer === item.correct_answer,
+      user_answer: userAnswer,
+      correct_answer: item.correct_answer,
+      explanation_id: item.explanation_id
+    };
+  });
+  const correctCount = details.filter((item) => item.is_correct).length;
+  const totalQuestions = details.length || 1;
+  const score = Math.round((correctCount / totalQuestions) * 100);
+  state.intermediateGrammarTrainer.result = {
+    result: {
+      topic_id: topicId,
+      level: "intermediate",
+      score,
+      max_score: 100,
+      correct_count: correctCount,
+      total_questions: details.length,
+      is_passed: score >= 70,
+      details,
+      mistakes: details.filter((item) => !item.is_correct)
+    },
+    recommendation: {
+      next_action: score >= 70 ? "Lanjut ke topic intermediate berikutnya." : "Ulangi trap item sebelum lanjut.",
+      next_topic_id: topicId,
+      mentor_message: score >= 70 ? "Bagus. Kamu mulai menguasai kalimat panjang." : "Fokus dulu membedakan main verb dan phrase tambahan.",
+      review_topic_id: topicId
+    }
+  };
+  saveState();
+}
+
+function localIntermediateGrammarTrainerTopics() {
+  return [
+    { topic_id: "gerund_vs_main_verb", title: "Gerund vs Main Verb", level: "intermediate", learning_objective: "Bedakan -ing phrase dan main verb.", estimated_minutes: 12 },
+    { topic_id: "relative_clause", title: "Relative Clause", level: "intermediate", learning_objective: "Pahami clause yang menjelaskan noun.", estimated_minutes: 12 },
+    { topic_id: "passive_voice", title: "Passive Voice", level: "intermediate", learning_objective: "Kenali be + V3.", estimated_minutes: 12 }
+  ];
+}
+
+function localIntermediateGrammarTrainer(topicId = "gerund_vs_main_verb") {
+  return {
+    topic_id: topicId,
+    level: "intermediate",
+    title: topicId === "passive_voice" ? "Passive Voice" : topicId === "relative_clause" ? "Relative Clause" : "Gerund vs Main Verb",
+    learning_objective: "Latihan memahami kalimat panjang TOEFL + BA.",
+    explanation_id: "Pisahkan main subject, modifier phrase, dan main verb.",
+    beginner_tip: "Cari main verb setelah subject utama.",
+    common_trap: "Jangan menganggap semua kata -ing sebagai main verb.",
+    ba_context: "Dipakai dalam requirement, process, dan stakeholder analysis.",
+    examples: [
+      {
+        sentence: "The analyst working with stakeholders must clarify priorities.",
+        simple_meaning_id: "Analis yang bekerja dengan stakeholder harus memperjelas prioritas.",
+        grammar_focus: "Reduced phrase + modal verb",
+        breakdown: { main_subject: "The analyst", modifier_phrase: "working with stakeholders", main_verb: "must clarify", object: "priorities" },
+        why_it_is_confusing: "working terlihat seperti verb, tetapi hanya modifier.",
+        ba_context_note: "Menjelaskan tugas BA dengan stakeholder."
+      }
+    ],
+    guided_items: [
+      {
+        id: `${topicId}_guided_1`,
+        instruction_id: "Pilih main verb.",
+        sentence: "The analyst working with stakeholders must clarify priorities.",
+        target_part: "main_verb",
+        options: ["working", "must clarify", "stakeholders", "priorities"],
+        correct_answer: "must clarify",
+        explanation_id: "Main verb adalah must clarify.",
+        common_trap: "working bukan main verb.",
+        beginner_tip: "Cari modal must."
+      }
+    ],
+    quiz_items: [
+      {
+        id: `${topicId}_quiz_1`,
+        question_type: "identify_main_verb",
+        instruction_id: "Pilih main verb.",
+        sentence: "The analyst working with stakeholders must clarify priorities.",
+        question: "Mana main verb?",
+        options: ["working", "must clarify", "stakeholders", "priorities"],
+        correct_answer: "must clarify",
+        explanation_id: "Main verb adalah must clarify.",
+        difficulty: "intermediate",
+        grammar_trap: "working hanya modifier.",
+        ba_context_note: "BA perlu clarify priorities.",
+        recommended_review_topic: topicId
+      }
+    ],
+    trap_items: [
+      {
+        id: `${topicId}_trap_1`,
+        trap_type: "ing_as_main_verb",
+        incorrect_assumption: "working adalah main verb",
+        sentence: "The analyst working with stakeholders must clarify priorities.",
+        question: "Why is working not the main verb?",
+        options: ["Because it is only describing the analyst", "Because it is the object", "Because it is a noun"],
+        correct_answer: "Because it is only describing the analyst",
+        explanation_id: "working with stakeholders menjelaskan analyst.",
+        why_wrong_answers_are_wrong: ["Object adalah priorities.", "working bukan noun di sini."]
+      }
+    ]
+  };
+}
+
+function grammarErrorCorrectionPanel() {
+  const data = state.grammarErrorCorrection;
+  const categories = data.categories?.length ? data.categories : localGrammarErrorCategories();
+  const category = data.category || localGrammarErrorCategory(data.selectedErrorType || "missing_be_after_modal");
+  const items = data.items?.length ? data.items : localGrammarErrorItems(category.error_type);
+  const result = data.result;
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Grammar Error Correction</p>
+          <h2>Perbaiki kalimat yang salah</h2>
+          <p>Pilih jenis error, pahami aturan, lalu pilih kalimat yang benar. Fokusnya adalah tahu kenapa kalimat salah.</p>
+        </div>
+        <span class="pill">Error -> Rule -> Correction</span>
+      </div>
+      <div class="quick-actions">
+        ${categories.map((item) => `
+          <button class="ghost-button ${item.error_type === category.error_type ? "selected-control" : ""}" type="button" data-grammar-error-type="${escapeHtml(item.error_type)}">
+            ${escapeHtml(item.title)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="module-grid two">
+        <article class="module-card soft">
+          <span class="soft-pill">${escapeHtml(category.level)} · ${escapeHtml(category.error_type)}</span>
+          <h3>${escapeHtml(category.title)}</h3>
+          <p>${escapeHtml(category.learning_objective)}</p>
+          <p><strong>Aturan:</strong> ${escapeHtml(category.explanation_id)}</p>
+          <p><strong>Trap:</strong> ${escapeHtml(category.common_trap)}</p>
+          <p><strong>Konteks BA:</strong> ${escapeHtml(category.ba_context)}</p>
+        </article>
+        <article class="module-card">
+          <h3>Contoh koreksi</h3>
+          ${(category.examples || []).map((item) => `
+            <div class="case-box soft">
+              <p><strong>Salah:</strong> ${escapeHtml(item.incorrect_sentence)}</p>
+              <p><strong>Benar:</strong> ${escapeHtml(item.corrected_sentence)}</p>
+              <p>${escapeHtml(item.why_wrong_id)}</p>
+              <small>${escapeHtml(item.correction_rule_id)}</small>
+            </div>
+          `).join("")}
+        </article>
+      </div>
+      <form id="grammarErrorCorrectionForm" class="module-card">
+        <h3>Correction quiz</h3>
+        ${items.map((item) => `
+          <label>
+            ${escapeHtml(item.instruction_id)}
+            <span class="muted">Salah: ${escapeHtml(item.incorrect_sentence)}</span>
+            <strong>${escapeHtml(item.question)}</strong>
+            <select data-grammar-error-answer="${escapeHtml(item.id)}">
+              <option value="">Pilih jawaban</option>
+              ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${data.answers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+            </select>
+            <small>${escapeHtml(item.hint_id || "")}</small>
+          </label>
+        `).join("")}
+        <button class="primary-button" type="submit">Submit Error Correction</button>
+        ${result ? grammarErrorCorrectionResultTemplate(result) : emptyStateTemplate("Belum submit correction", "Pilih kalimat yang benar untuk melihat skor, corrected sentence, dan rekomendasi.")}
+      </form>
+    </section>
+  `;
+}
+
+async function loadGrammarErrorCorrection(errorType = "missing_be_after_modal") {
+  const selectedErrorType = errorType || "missing_be_after_modal";
+  if (apiOnline) {
+    try {
+      const [categoriesResponse, detailResponse] = await Promise.all([
+        apiRequest("/grammar/error-correction/categories"),
+        apiRequest(`/grammar/error-correction/${encodeURIComponent(selectedErrorType)}`)
+      ]);
+      state.grammarErrorCorrection = {
+        selectedErrorType,
+        categories: categoriesResponse.categories || [],
+        category: detailResponse.category,
+        items: detailResponse.items || [],
+        answers: {},
+        result: null
+      };
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  const category = localGrammarErrorCategory(selectedErrorType);
+  state.grammarErrorCorrection = {
+    selectedErrorType,
+    categories: localGrammarErrorCategories(),
+    category,
+    items: localGrammarErrorItems(selectedErrorType),
+    answers: {},
+    result: null
+  };
+  saveState();
+}
+
+async function submitGrammarErrorCorrection() {
+  const errorType = state.grammarErrorCorrection.selectedErrorType || "missing_be_after_modal";
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/grammar/error-correction/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          error_type: errorType,
+          answers: state.grammarErrorCorrection.answers || {}
+        }
+      });
+      state.grammarErrorCorrection.result = response;
+      await refreshIntegratedJourney();
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  const items = state.grammarErrorCorrection.items?.length ? state.grammarErrorCorrection.items : localGrammarErrorItems(errorType);
+  const details = items.map((item) => {
+    const userAnswer = state.grammarErrorCorrection.answers?.[item.id] || "";
+    return {
+      item_id: item.id,
+      is_correct: userAnswer === item.correct_answer,
+      user_answer: userAnswer,
+      correct_answer: item.correct_answer,
+      incorrect_sentence: item.incorrect_sentence,
+      corrected_sentence: item.corrected_sentence,
+      explanation_id: item.explanation_id
+    };
+  });
+  const correctCount = details.filter((item) => item.is_correct).length;
+  const totalQuestions = details.length || 1;
+  const score = Math.round((correctCount / totalQuestions) * 100);
+  state.grammarErrorCorrection.result = {
+    result: {
+      score,
+      max_score: 100,
+      correct_count: correctCount,
+      total_questions: details.length,
+      is_passed: score >= 70,
+      details,
+      mistakes: details.filter((item) => !item.is_correct)
+    },
+    recommendation: {
+      next_action: score >= 70 ? "Lanjut ke error type berikutnya." : "Ulangi aturan dan corrected sentence dulu.",
+      review_error_type: errorType,
+      review_topic_id: "modal_verb",
+      mentor_message: score >= 70 ? "Bagus. Kamu mulai bisa mengenali grammar error umum." : "Pelan-pelan. Bandingkan kalimat salah dan benar."
+    }
+  };
+  saveState();
+}
+
+function grammarErrorCorrectionResultTemplate(response) {
+  const result = response.result || {};
+  const recommendation = response.recommendation || {};
+  return `
+    <div class="alert ${result.is_passed ? "success" : "warning"}">
+      <strong>Score ${Math.round(result.score || 0)}/${result.max_score || 100}</strong>
+      <p>${escapeHtml(recommendation.mentor_message || "Correction selesai.")}</p>
+      <p>${escapeHtml(recommendation.next_action || "")}</p>
+    </div>
+    <div class="module-card-list">
+      ${(result.details || []).map((item) => `
+        <div class="case-box ${item.is_correct ? "soft" : ""}">
+          <strong>${item.is_correct ? "Benar" : "Perlu koreksi"} · ${escapeHtml(item.item_id)}</strong>
+          <p><strong>Salah:</strong> ${escapeHtml(item.incorrect_sentence || "-")}</p>
+          <p><strong>Jawaban Anda:</strong> ${escapeHtml(item.user_answer || "-")}</p>
+          <p><strong>Corrected:</strong> ${escapeHtml(item.corrected_sentence || item.correct_answer || "-")}</p>
+          <small>${escapeHtml(item.explanation_id || "")}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function localGrammarErrorCategories() {
+  return [
+    { error_type: "missing_be_after_modal", level: "basic", title: "Missing be after modal", learning_objective: "Gunakan must be + adjective.", related_topic_id: "modal_verb" },
+    { error_type: "subject_verb_agreement", level: "basic", title: "Subject-Verb Agreement", learning_objective: "Cocokkan subject dan verb.", related_topic_id: "subject_verb" },
+    { error_type: "passive_voice_error", level: "intermediate", title: "Passive Voice Error", learning_objective: "Gunakan be + V3.", related_topic_id: "passive_voice" }
+  ];
+}
+
+function localGrammarErrorCategory(errorType = "missing_be_after_modal") {
+  const match = localGrammarErrorCategories().find((item) => item.error_type === errorType) || localGrammarErrorCategories()[0];
+  return {
+    ...match,
+    explanation_id: "Pilih struktur grammar yang benar dan bandingkan dengan kalimat salah.",
+    beginner_tip: "Cari subject, modal/verb, lalu bentuk kata setelahnya.",
+    common_trap: "Pemula sering menerjemahkan langsung dari Bahasa Indonesia.",
+    ba_context: "Error correction membantu requirement dan report writing lebih profesional.",
+    examples: [
+      {
+        incorrect_sentence: "The system must flexible for all users.",
+        corrected_sentence: "The system must be flexible for all users.",
+        why_wrong_id: "Setelah must dan sebelum adjective flexible, perlu be.",
+        correction_rule_id: "Subject + modal + be + adjective"
+      }
+    ]
+  };
+}
+
+function localGrammarErrorItems(errorType = "missing_be_after_modal") {
+  const category = localGrammarErrorCategory(errorType);
+  return [
+    {
+      id: `${errorType}_1`,
+      error_type: errorType,
+      level: category.level,
+      instruction_id: "Pilih perbaikan kalimat yang paling tepat.",
+      incorrect_sentence: "The system must flexible for all users.",
+      question: "Which sentence is correct?",
+      options: ["The system must flexible for all users.", "The system must be flexible for all users.", "The system must is flexible for all users."],
+      correct_answer: "The system must be flexible for all users.",
+      corrected_sentence: "The system must be flexible for all users.",
+      explanation_id: "Setelah modal must, gunakan be sebelum adjective.",
+      hint_id: "must + be + adjective",
+      related_topic_id: category.related_topic_id
+    }
+  ];
+}
+
+function grammarSentenceBuilderPanel() {
+  const data = state.grammarSentenceBuilder;
+  const levels = data.levels?.length ? data.levels : localSentenceBuilderLevels();
+  const selectedLevel = data.selectedLevel || "basic";
+  const selectedMode = data.selectedMode || "arrange_words";
+  const activeLevel = levels.find((level) => level.id === selectedLevel) || levels[0];
+  const modes = activeLevel?.modes || ["arrange_words", "complete_sentence", "fix_word_order"];
+  const activeMode = modes.includes(selectedMode) ? selectedMode : modes[0];
+  const items = data.items?.length ? data.items : localSentenceBuilderItems(selectedLevel, activeMode);
+  const result = data.result;
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Grammar Sentence Builder</p>
+          <h2>Bangun kalimat BA yang benar</h2>
+          <p>Latihan aktif untuk menyusun word order, melengkapi pola grammar, menggabungkan ide, dan menulis kalimat BA yang lebih formal.</p>
+        </div>
+        <span class="pill">Build -> Check -> Improve</span>
+      </div>
+      <div class="quick-actions">
+        ${levels.map((level) => `
+          <button class="ghost-button ${level.id === selectedLevel ? "selected-control" : ""}" type="button" data-sentence-builder-level="${escapeHtml(level.id)}">
+            ${escapeHtml(level.title)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="quick-actions">
+        ${modes.map((mode) => `
+          <button class="ghost-button ${mode === activeMode ? "selected-control" : ""}" type="button" data-sentence-builder-mode="${escapeHtml(mode)}">
+            ${escapeHtml(sentenceBuilderModeLabel(mode))}
+          </button>
+        `).join("")}
+      </div>
+      <article class="module-card soft">
+        <span class="soft-pill">${escapeHtml(activeLevel?.id || selectedLevel)} · ${escapeHtml(activeMode)}</span>
+        <h3>${escapeHtml(activeLevel?.description || "Latihan membangun kalimat.")}</h3>
+        <p>Isi jawaban dengan kalimat atau kata yang menurutmu paling tepat. Untuk rewrite formal, sistem menerima partial credit berdasarkan kata kunci penting.</p>
+      </article>
+      <form id="grammarSentenceBuilderForm" class="module-card">
+        <h3>Sentence builder practice</h3>
+        <div class="module-card-list">
+          ${items.map((item) => `
+            <label class="case-box soft">
+              <span class="soft-pill">${escapeHtml(sentenceBuilderModeLabel(item.mode))} · ${escapeHtml(item.related_topic_id)}</span>
+              <strong>${escapeHtml(item.instruction_id)}</strong>
+              <span class="muted">${escapeHtml(item.prompt_text)}</span>
+              ${(item.input_parts || []).length ? `<small>Input parts: ${escapeHtml(item.input_parts.join(" / "))}</small>` : ""}
+              <input type="text" data-sentence-builder-answer="${escapeHtml(item.id)}" value="${escapeHtml(data.answers?.[item.id] || "")}" placeholder="Tulis jawaban kamu di sini" />
+              <small>${escapeHtml(item.beginner_tip || "")}</small>
+            </label>
+          `).join("")}
+        </div>
+        <button class="primary-button" type="submit">Submit Sentence Builder</button>
+        ${result ? grammarSentenceBuilderResultTemplate(result) : emptyStateTemplate("Belum submit Sentence Builder", "Tulis jawabanmu, lalu submit untuk melihat expected answer, grammar rule, dan rekomendasi.")}
+      </form>
+    </section>
+  `;
+}
+
+function sentenceBuilderModeLabel(mode) {
+  const labels = {
+    arrange_words: "Arrange Words",
+    complete_sentence: "Complete Sentence",
+    combine_sentences: "Combine Sentences",
+    rewrite_formal_ba_sentence: "Rewrite Formal BA",
+    fix_word_order: "Fix Word Order"
+  };
+  return labels[mode] || labelFromKey(mode);
+}
+
+async function loadGrammarSentenceBuilder(level = "basic", mode = null) {
+  const selectedLevel = level || "basic";
+  const fallbackLevel = localSentenceBuilderLevels().find((item) => item.id === selectedLevel) || localSentenceBuilderLevels()[0];
+  const selectedMode = mode && fallbackLevel.modes.includes(mode) ? mode : fallbackLevel.modes[0];
+  if (apiOnline) {
+    try {
+      const [levelsResponse, itemsResponse] = await Promise.all([
+        apiRequest("/grammar/sentence-builder/levels"),
+        apiRequest(`/grammar/sentence-builder?level=${encodeURIComponent(selectedLevel)}&mode=${encodeURIComponent(selectedMode)}`)
+      ]);
+      state.grammarSentenceBuilder = {
+        selectedLevel,
+        selectedMode,
+        levels: levelsResponse.levels || [],
+        items: itemsResponse.items || [],
+        answers: {},
+        result: null
+      };
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.grammarSentenceBuilder = {
+    selectedLevel,
+    selectedMode,
+    levels: localSentenceBuilderLevels(),
+    items: localSentenceBuilderItems(selectedLevel, selectedMode),
+    answers: {},
+    result: null
+  };
+  saveState();
+}
+
+async function submitGrammarSentenceBuilder() {
+  const level = state.grammarSentenceBuilder.selectedLevel || "basic";
+  const mode = state.grammarSentenceBuilder.selectedMode || "arrange_words";
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/grammar/sentence-builder/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          level,
+          mode,
+          answers: state.grammarSentenceBuilder.answers || {}
+        }
+      });
+      state.grammarSentenceBuilder.result = response;
+      await refreshIntegratedJourney();
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  const items = state.grammarSentenceBuilder.items?.length ? state.grammarSentenceBuilder.items : localSentenceBuilderItems(level, mode);
+  const details = items.map((item) => {
+    const userAnswer = state.grammarSentenceBuilder.answers?.[item.id] || "";
+    const isCorrect = normalizeLocalSentence(userAnswer) === normalizeLocalSentence(item.expected_answer);
+    return {
+      item_id: item.id,
+      is_correct: isCorrect,
+      partial_score: isCorrect ? 100 : 0,
+      user_answer: userAnswer,
+      expected_answer: item.expected_answer,
+      explanation_id: item.explanation_id,
+      grammar_rule_id: item.grammar_rule_id,
+      related_topic_id: item.related_topic_id
+    };
+  });
+  const correctCount = details.filter((item) => item.is_correct).length;
+  const score = details.length ? Math.round((correctCount / details.length) * 100) : 0;
+  state.grammarSentenceBuilder.result = {
+    result: {
+      score,
+      max_score: 100,
+      correct_count: correctCount,
+      total_questions: details.length,
+      is_passed: score >= 70,
+      details,
+      mistakes: details.filter((item) => !item.is_correct)
+    },
+    recommendation: {
+      next_action: score >= 70 ? "Lanjutkan ke mode Sentence Builder berikutnya." : "Ulangi word order dasar: subject, verb, object.",
+      review_topic_id: details.find((item) => !item.is_correct)?.related_topic_id || "modal_verb",
+      mentor_message: score >= 70 ? "Bagus. Kamu mulai bisa membangun kalimat yang rapi." : "Tidak apa-apa. Bangun kalimat dari bagian paling kecil dulu."
+    }
+  };
+  saveState();
+}
+
+function grammarSentenceBuilderResultTemplate(response) {
+  const result = response.result || {};
+  const recommendation = response.recommendation || {};
+  return `
+    <div class="alert ${result.is_passed ? "success" : "warning"}">
+      <strong>Score ${Math.round(result.score || 0)}/${result.max_score || 100}</strong>
+      <p>${escapeHtml(recommendation.mentor_message || "Sentence Builder selesai.")}</p>
+      <p>${escapeHtml(recommendation.next_action || "")}</p>
+    </div>
+    <div class="module-card-list">
+      ${(result.details || []).map((item) => `
+        <div class="case-box ${item.partial_score >= 70 ? "soft" : ""}">
+          <strong>${item.partial_score >= 70 ? "Cukup baik" : "Perlu review"} · ${escapeHtml(item.item_id)}</strong>
+          <p><strong>Jawaban Anda:</strong> ${escapeHtml(item.user_answer || "-")}</p>
+          <p><strong>Expected:</strong> ${escapeHtml(item.expected_answer || "-")}</p>
+          <p><strong>Rule:</strong> ${escapeHtml(item.grammar_rule_id || "-")}</p>
+          <small>${escapeHtml(item.explanation_id || "")}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function localSentenceBuilderLevels() {
+  return [
+    { id: "basic", title: "Basic Sentence Builder", description: "Susun kalimat dasar Subject + Verb + Object.", modes: ["arrange_words", "complete_sentence", "fix_word_order"] },
+    { id: "intermediate", title: "Intermediate Sentence Builder", description: "Gabungkan ide dan phrase kalimat panjang.", modes: ["combine_sentences", "arrange_words", "complete_sentence", "fix_word_order"] },
+    { id: "advanced_preview", title: "Advanced Preview", description: "Preview menulis kalimat BA formal.", modes: ["rewrite_formal_ba_sentence", "combine_sentences"] }
+  ];
+}
+
+function localSentenceBuilderItems(level = "basic", mode = "arrange_words") {
+  const items = [
+    {
+      id: "arrange_basic_modal_1",
+      level: "basic",
+      mode: "arrange_words",
+      related_topic_id: "modal_verb",
+      instruction_id: "Susun kata berikut menjadi kalimat yang benar.",
+      prompt_text: "must / requirements / elicit / A business analyst",
+      input_parts: ["must", "requirements", "elicit", "A business analyst"],
+      expected_answer: "A business analyst must elicit requirements.",
+      explanation_id: "Pola yang benar adalah Subject + modal + verb + object.",
+      grammar_rule_id: "Subject + modal + base verb + object",
+      beginner_tip: "Cari subject dulu, lalu modal, lalu verb utama."
+    },
+    {
+      id: "complete_basic_be_1",
+      level: "basic",
+      mode: "complete_sentence",
+      related_topic_id: "modal_verb",
+      instruction_id: "Isi bagian kosong.",
+      prompt_text: "The system must ___ flexible for all users.",
+      input_parts: ["The system must", "___", "flexible"],
+      expected_answer: "be",
+      explanation_id: "Setelah modal must dan sebelum adjective, gunakan be.",
+      grammar_rule_id: "modal + be + adjective",
+      beginner_tip: "must be flexible adalah pola benar."
+    },
+    {
+      id: "fix_order_basic_modal_1",
+      level: "basic",
+      mode: "fix_word_order",
+      related_topic_id: "modal_verb",
+      instruction_id: "Perbaiki word order.",
+      prompt_text: "Must the system generate reports automatically.",
+      input_parts: ["Must", "the system", "generate", "reports", "automatically"],
+      expected_answer: "The system must generate reports automatically.",
+      explanation_id: "Untuk pernyataan, subject muncul sebelum modal.",
+      grammar_rule_id: "Subject + modal + base verb + object",
+      beginner_tip: "Jangan mulai dengan modal jika bukan pertanyaan."
+    },
+    {
+      id: "combine_intermediate_parallel_1",
+      level: "intermediate",
+      mode: "combine_sentences",
+      related_topic_id: "parallel_structure",
+      instruction_id: "Gabungkan dua kalimat.",
+      prompt_text: "The analyst interviews users. The analyst documents requirements.",
+      input_parts: ["The analyst interviews users.", "The analyst documents requirements."],
+      expected_answer: "The analyst interviews users and documents requirements.",
+      explanation_id: "Dua aksi dengan subject sama bisa digabung memakai and.",
+      grammar_rule_id: "Subject + verb + object + and + verb + object",
+      beginner_tip: "Jangan ulangi subject jika pelakunya sama."
+    },
+    {
+      id: "rewrite_advanced_formal_1",
+      level: "advanced_preview",
+      mode: "rewrite_formal_ba_sentence",
+      related_topic_id: "formal_ba_writing",
+      instruction_id: "Tulis ulang menjadi kalimat BA formal.",
+      prompt_text: "The system helps users make reports faster.",
+      input_parts: ["The system helps users make reports faster."],
+      expected_answer: "The system helps users generate reports more efficiently.",
+      explanation_id: "generate reports dan more efficiently terdengar lebih formal.",
+      grammar_rule_id: "formal verb + professional adverb",
+      beginner_tip: "Ganti kata umum dengan kata profesional yang tetap jelas."
+    }
+  ];
+  return items.filter((item) => (!level || item.level === level) && (!mode || item.mode === mode));
+}
+
+function normalizeLocalSentence(value) {
+  return String(value || "").trim().toLowerCase().replace(/[.?!]+$/, "").replace(/\s+/g, " ");
+}
+
+function grammarAdvancedLabPanel() {
+  const data = state.grammarAdvancedLab;
+  const topics = data.topics?.length ? data.topics : localAdvancedGrammarTopics();
+  const topic = data.topic || localAdvancedGrammarTopic(data.selectedTopic || "nominalization");
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Advanced Grammar Lab</p>
+          <h2>Grammar formal untuk TOEFL + dokumen BA</h2>
+          <p>Pahami pola advanced seperti nominalization, hedging, inversion, conditional, connector akademik, dan formal BA writing.</p>
+        </div>
+        <span class="pill">Advanced but guided</span>
+      </div>
+      <div class="quick-actions">
+        ${topics.map((item) => `
+          <button class="ghost-button ${item.topic_id === topic.topic_id ? "selected-control" : ""}" type="button" data-advanced-grammar-topic="${escapeHtml(item.topic_id)}">
+            ${escapeHtml(item.title)}
+          </button>
+        `).join("")}
+      </div>
+      <div class="module-grid two">
+        <article class="module-card soft">
+          <span class="soft-pill">${escapeHtml(topic.level)} · ${escapeHtml(topic.topic_id)}</span>
+          <h3>${escapeHtml(topic.title)}</h3>
+          <p>${escapeHtml(topic.learning_objective)}</p>
+          <p><strong>Bridge pemula:</strong> ${escapeHtml(topic.beginner_bridge)}</p>
+          <p><strong>Professional usage:</strong> ${escapeHtml(topic.professional_usage)}</p>
+          <p><strong>Trap:</strong> ${escapeHtml(topic.common_trap)}</p>
+        </article>
+        <article class="module-card">
+          <h3>Contoh advanced</h3>
+          ${(topic.examples || []).slice(0, 2).map((item) => `
+            <div class="case-box soft">
+              <p><strong>${escapeHtml(item.sentence)}</strong> ${renderContextualHelpButton("grammar", "grammar_sentence", item.sentence)}</p>
+              <p>${escapeHtml(item.simple_meaning_id)}</p>
+              <small>Simpler: ${escapeHtml(item.simpler_version)}</small>
+              <div class="grammar-breakdown-grid">
+                ${Object.entries(item.breakdown || {}).map(([key, value]) => grammarChip(labelFromKey(key), value)).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </article>
+      </div>
+      <div class="module-grid two">
+        <form id="advancedGrammarPracticeForm" class="module-card">
+          <h3>Advanced practice</h3>
+          ${(topic.practice_items || []).slice(0, 4).map((item) => `
+            <label>
+              ${escapeHtml(item.instruction_id)}
+              <span class="muted">${escapeHtml(item.sentence)}</span>
+              <strong>${escapeHtml(item.question)}</strong>
+              <select data-advanced-practice-answer="${escapeHtml(item.id)}">
+                <option value="">Pilih jawaban</option>
+                ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${data.practiceAnswers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+              </select>
+            </label>
+          `).join("")}
+          <button class="primary-button" type="submit">Submit Advanced Practice</button>
+          ${data.practiceResult ? advancedGrammarResultTemplate(data.practiceResult, "practice") : emptyStateTemplate("Belum submit advanced practice", "Jawab soal pilihan untuk melihat score dan feedback advanced grammar.")}
+        </form>
+        <form id="advancedGrammarRewriteForm" class="module-card">
+          <h3>Advanced rewrite</h3>
+          ${(topic.rewrite_items || []).slice(0, 4).map((item) => `
+            <label>
+              ${escapeHtml(item.instruction_id)}
+              <span class="muted">${escapeHtml(item.original_sentence)}</span>
+              <input type="text" data-advanced-rewrite-answer="${escapeHtml(item.id)}" value="${escapeHtml(data.rewriteAnswers?.[item.id] || "")}" placeholder="Tulis versi formal kamu" />
+              <small>Keyword penting: ${escapeHtml((item.required_keywords || []).join(", "))}</small>
+            </label>
+          `).join("")}
+          <button class="primary-button" type="submit">Submit Advanced Rewrite</button>
+          ${data.rewriteResult ? advancedGrammarResultTemplate(data.rewriteResult, "rewrite") : emptyStateTemplate("Belum submit advanced rewrite", "Tulis ulang kalimat informal menjadi kalimat BA yang lebih formal.")}
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+async function loadGrammarAdvancedLab(topicId = "nominalization") {
+  const selectedTopic = topicId || "nominalization";
+  if (apiOnline) {
+    try {
+      const [topicsResponse, topicResponse] = await Promise.all([
+        apiRequest("/grammar/advanced/topics"),
+        apiRequest(`/grammar/advanced/topics/${encodeURIComponent(selectedTopic)}`)
+      ]);
+      state.grammarAdvancedLab = {
+        selectedTopic,
+        topics: topicsResponse.topics || [],
+        topic: topicResponse.topic,
+        practiceAnswers: {},
+        rewriteAnswers: {},
+        practiceResult: null,
+        rewriteResult: null
+      };
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.grammarAdvancedLab = {
+    selectedTopic,
+    topics: localAdvancedGrammarTopics(),
+    topic: localAdvancedGrammarTopic(selectedTopic),
+    practiceAnswers: {},
+    rewriteAnswers: {},
+    practiceResult: null,
+    rewriteResult: null
+  };
+  saveState();
+}
+
+async function submitAdvancedGrammarPractice() {
+  const topicId = state.grammarAdvancedLab.selectedTopic || "nominalization";
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/grammar/advanced/practice/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          topic_id: topicId,
+          answers: state.grammarAdvancedLab.practiceAnswers || {}
+        }
+      });
+      state.grammarAdvancedLab.practiceResult = response;
+      await refreshIntegratedJourney();
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.grammarAdvancedLab.practiceResult = localAdvancedResult(state.grammarAdvancedLab.practiceAnswers || {}, state.grammarAdvancedLab.topic?.practice_items || []);
+  saveState();
+}
+
+async function submitAdvancedGrammarRewrite() {
+  const topicId = state.grammarAdvancedLab.selectedTopic || "nominalization";
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/grammar/advanced/rewrite/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          topic_id: topicId,
+          answers: state.grammarAdvancedLab.rewriteAnswers || {}
+        }
+      });
+      state.grammarAdvancedLab.rewriteResult = response;
+      await refreshIntegratedJourney();
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.grammarAdvancedLab.rewriteResult = localAdvancedResult(state.grammarAdvancedLab.rewriteAnswers || {}, state.grammarAdvancedLab.topic?.rewrite_items || []);
+  saveState();
+}
+
+function advancedGrammarResultTemplate(response, type = "practice") {
+  const result = response.result || {};
+  const recommendation = response.recommendation || {};
+  return `
+    <div class="alert ${result.is_passed ? "success" : "warning"}">
+      <strong>Score ${Math.round(result.score || 0)}/${result.max_score || 100}</strong>
+      <p>${escapeHtml(recommendation.mentor_message || "Advanced Grammar selesai.")}</p>
+      <p>${escapeHtml(recommendation.next_action || "")}</p>
+    </div>
+    <div class="module-card-list">
+      ${(result.details || []).map((item) => `
+        <div class="case-box ${item.is_correct || item.partial_score >= 70 ? "soft" : ""}">
+          <strong>${item.is_correct || item.partial_score >= 70 ? "Cukup baik" : "Perlu review"} · ${escapeHtml(item.item_id)}</strong>
+          <p><strong>Jawaban Anda:</strong> ${escapeHtml(item.user_answer || "-")}</p>
+          <p><strong>${type === "rewrite" ? "Expected" : "Correct"}:</strong> ${escapeHtml(item.expected_answer || item.correct_answer || "-")}</p>
+          ${item.required_keywords ? `<small>Required keywords: ${escapeHtml(item.required_keywords.join(", "))}</small>` : ""}
+          <small>${escapeHtml(item.explanation_id || "")}</small>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function localAdvancedGrammarTopics() {
+  return [
+    { topic_id: "nominalization", level: "advanced", title: "Nominalization", learning_objective: "Ubah action menjadi noun formal.", professional_usage: "Formal reports.", estimated_minutes: 15 },
+    { topic_id: "formal_ba_writing", level: "advanced", title: "Formal BA Writing", learning_objective: "Tulis kalimat BA profesional.", professional_usage: "SRS, BRD, proposals.", estimated_minutes: 18 },
+    { topic_id: "academic_connectors", level: "advanced", title: "Academic Connectors", learning_objective: "Pilih connector logika.", professional_usage: "TOEFL writing and reports.", estimated_minutes: 15 }
+  ];
+}
+
+function localAdvancedGrammarTopic(topicId = "nominalization") {
+  const topic = localAdvancedGrammarTopics().find((item) => item.topic_id === topicId) || localAdvancedGrammarTopics()[0];
+  return {
+    ...topic,
+    explanation_id: "Pahami versi sederhana dulu, lalu lihat pola formalnya.",
+    ba_context: "Dipakai dalam dokumen Business Analyst formal.",
+    common_trap: "Kalimat advanced sering terlihat sulit karena subject-nya panjang.",
+    beginner_bridge: "Ubah kalimat advanced menjadi versi sederhana dulu. Setelah paham makna, pelajari pola formalnya.",
+    examples: [
+      {
+        sentence: "The implementation of the system is expected to improve traceability.",
+        simpler_version: "The team implements the system to improve traceability.",
+        simple_meaning_id: "Implementasi sistem diharapkan meningkatkan traceability.",
+        breakdown: { subject: "The implementation of the system", main_verb: "is expected to improve", object: "traceability" }
+      }
+    ],
+    practice_items: [
+      {
+        id: `${topic.topic_id}_practice_1`,
+        instruction_id: "Pilih jawaban yang paling tepat.",
+        sentence: "The implementation of the system is expected to improve traceability.",
+        question: "Which word is nominalization?",
+        options: ["implementation", "system", "expected", "traceability"],
+        correct_answer: "implementation",
+        explanation_id: "Implementation berasal dari verb implement."
+      }
+    ],
+    rewrite_items: [
+      {
+        id: `${topic.topic_id}_rewrite_1`,
+        instruction_id: "Rewrite this sentence into a formal BA sentence.",
+        original_sentence: "The system helps users make reports faster.",
+        expected_answer: "The system enables users to generate reports more efficiently.",
+        required_keywords: ["system", "users", "generate", "reports", "efficiently"],
+        explanation_id: "Generate reports more efficiently lebih formal."
+      }
+    ]
+  };
+}
+
+function localAdvancedResult(answers, items) {
+  const details = (items || []).map((item) => {
+    const userAnswer = answers[item.id] || "";
+    const correct = item.correct_answer || item.expected_answer || "";
+    const isCorrect = normalizeLocalSentence(userAnswer) === normalizeLocalSentence(correct);
+    return {
+      item_id: item.id,
+      is_correct: isCorrect,
+      partial_score: isCorrect ? 100 : 0,
+      user_answer: userAnswer,
+      correct_answer: item.correct_answer,
+      expected_answer: item.expected_answer,
+      required_keywords: item.required_keywords,
+      explanation_id: item.explanation_id,
+      related_topic_id: "formal_ba_writing"
+    };
+  });
+  const score = details.length ? Math.round((details.filter((item) => item.is_correct).length / details.length) * 100) : 0;
+  return {
+    result: {
+      score,
+      max_score: 100,
+      correct_count: details.filter((item) => item.is_correct).length,
+      total_questions: details.length,
+      is_passed: score >= 70,
+      details,
+      mistakes: details.filter((item) => !item.is_correct)
+    },
+    recommendation: {
+      next_action: score >= 70 ? "Lanjutkan ke advanced topic lain." : "Baca beginner bridge dan simpler version dulu.",
+      review_topic_id: "formal_ba_writing",
+      mentor_message: score >= 70 ? "Bagus. Kamu mulai memahami grammar advanced." : "Pecah kalimat advanced menjadi versi sederhana dulu."
+    }
+  };
+}
+
+function grammarReviewPanel() {
+  const review = state.grammarReview || localGrammarReview();
+  const weakness = review.weakness_summary || {};
+  const primary = weakness.primary_weakness || {};
+  const secondary = weakness.secondary_weakness || {};
+  const recommended = review.recommended_practice || {};
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Grammar Review</p>
+          <h2>Pola salah dan latihan ulang</h2>
+          <p>Review ini merangkum topik grammar yang masih lemah, pola kesalahan berulang, dan latihan yang sebaiknya diulang berikutnya.</p>
+        </div>
+        <button id="refreshGrammarReviewButton" class="ghost-button" type="button">Refresh Review</button>
+      </div>
+      <div class="alert ${weakness.review_priority === "high" ? "warning" : "success"}">
+        <strong>${escapeHtml(review.mentor_message || "Mulai kerjakan beberapa latihan grammar agar review lebih akurat.")}</strong>
+        <p>Recommended: ${escapeHtml(recommended.next_action || "Latihan ulang grammar foundation.")}</p>
+      </div>
+      <div class="module-grid three">
+        <article class="module-card soft">
+          <span class="soft-pill">Primary weakness</span>
+          <h3>${escapeHtml(primary.title || "Subject and Verb")}</h3>
+          <p>Mastery: <strong>${Math.round(primary.mastery_score || 0)}%</strong></p>
+          <small>${escapeHtml(primary.reason || "Belum cukup data attempt.")}</small>
+        </article>
+        <article class="module-card">
+          <span class="soft-pill">Secondary weakness</span>
+          <h3>${escapeHtml(secondary.title || "Modal Verb")}</h3>
+          <p>Mastery: <strong>${Math.round(secondary.mastery_score || 0)}%</strong></p>
+          <small>${escapeHtml(secondary.reason || "Topik cadangan untuk review.")}</small>
+        </article>
+        <article class="module-card">
+          <span class="soft-pill">${escapeHtml(weakness.readiness_level || "Basic 1")}</span>
+          <h3>${Math.round(weakness.average_grammar_score || 0)}% avg score</h3>
+          <p>${Number(weakness.completed_grammar_attempts || 0)} grammar attempts</p>
+          <small>Review priority: ${escapeHtml(weakness.review_priority || "high")}</small>
+        </article>
+      </div>
+      <div class="module-grid two">
+        <article class="module-card">
+          <h3>Mistake patterns</h3>
+          <div class="module-card-list">
+            ${(review.mistake_patterns || []).slice(0, 4).map((pattern) => `
+              <div class="case-box soft">
+                <span class="soft-pill">${escapeHtml(pattern.severity || "medium")} · ${escapeHtml(pattern.related_phase_module || "Grammar")}</span>
+                <strong>${escapeHtml(pattern.title)}</strong>
+                <p>${escapeHtml(pattern.pattern_explanation_id || "")}</p>
+                <small>Frequency: ${Number(pattern.frequency || 0)} · ${escapeHtml(pattern.example_mistake || "")}</small>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+        <article class="module-card">
+          <h3>Review queue</h3>
+          <div class="module-card-list">
+            ${(review.review_queue || []).slice(0, 5).map((item) => `
+              <div class="case-box">
+                <span class="soft-pill">Priority ${Number(item.priority || 1)} · ${escapeHtml(item.status || "pending")}</span>
+                <strong>${escapeHtml(item.title)}</strong>
+                <p>${escapeHtml(item.reason || "")}</p>
+                <small>${escapeHtml(item.action_label || "")} · ${Number(item.estimated_minutes || 10)} menit</small>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+      </div>
+      <article class="module-card soft">
+        <h3>Recommended practice</h3>
+        <p><strong>${escapeHtml(recommended.recommended_module || "basic_trainer")}</strong> · ${escapeHtml(recommended.recommended_topic_id || "subject_verb")}</p>
+        <p>${escapeHtml(recommended.reason || "Latihan ini dipilih dari weakness dan mistake pattern.")}</p>
+        <small>Endpoint: ${escapeHtml(recommended.target_endpoint || "/api/grammar/trainer/basic/subject_verb")}</small>
+      </article>
+    </section>
+  `;
+}
+
+async function loadGrammarReview() {
+  if (apiOnline) {
+    try {
+      state.grammarReview = await apiRequest(`/grammar/review?user_id=${encodeURIComponent(state.user?.id || "default-user")}`);
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.grammarReview = localGrammarReview();
+  saveState();
+}
+
+function localGrammarReview() {
+  return {
+    weakness_summary: {
+      primary_weakness: {
+        topic_id: "subject_verb",
+        title: "Subject and Verb",
+        mastery_score: 0,
+        reason: "Belum cukup data attempt. Mulai dari subject dan verb."
+      },
+      secondary_weakness: {
+        topic_id: "modal_verb",
+        title: "Modal Verb",
+        mastery_score: 0,
+        reason: "Modal verb menjadi fondasi requirement sentence."
+      },
+      average_grammar_score: state.progress?.Grammar || 0,
+      completed_grammar_attempts: 0,
+      review_priority: "high",
+      readiness_level: "Basic 1 - Sentence Foundation"
+    },
+    mistake_patterns: [
+      {
+        pattern_id: "pattern_subject_verb",
+        topic_id: "subject_verb",
+        title: "Grammar foundation belum cukup data",
+        mistake_type: "unknown_grammar_issue",
+        frequency: 1,
+        severity: "medium",
+        pattern_explanation_id: "Kerjakan beberapa latihan grammar agar pola kesalahan bisa dianalisis.",
+        example_mistake: "Belum cukup attempt.",
+        recommended_action: "Latihan ulang mencari subject dan main verb.",
+        recommended_endpoint: "/api/grammar/trainer/basic/subject_verb",
+        related_phase_module: "Basic Grammar Trainer"
+      }
+    ],
+    review_queue: [
+      {
+        review_id: "review_subject_verb",
+        priority: 1,
+        topic_id: "subject_verb",
+        title: "Review Subject and Verb",
+        reason: "Fondasi awal grammar.",
+        action_label: "Latihan ulang Subject and Verb",
+        target_endpoint: "/api/grammar/trainer/basic/subject_verb",
+        estimated_minutes: 10,
+        source: "fallback",
+        status: "pending"
+      }
+    ],
+    recommended_practice: {
+      recommended_topic_id: "subject_verb",
+      recommended_module: "basic_trainer",
+      reason: "Mulai dari fondasi grammar.",
+      next_action: "Latihan ulang mencari subject dan main verb.",
+      target_endpoint: "/api/grammar/trainer/basic/subject_verb",
+      estimated_minutes: 10,
+      difficulty: "basic"
+    },
+    mentor_message: "Belum cukup data review. Kerjakan latihan Grammar dulu agar analisis lebih akurat.",
+    recent_attempts: []
+  };
+}
+
+function grammarSimulationPanel() {
+  const data = state.grammarSimulation;
+  const modes = data.modes?.length ? data.modes : localGrammarSimulationModes();
+  const activeMode = modes.find((mode) => mode.id === data.mode) || modes[0];
+  const session = data.session;
+  const result = data.result?.result || data.result;
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Grammar Simulation</p>
+          <h2>Timed Grammar readiness test</h2>
+          <p>Simulasi ini mencampur Basic, Intermediate, Advanced, Error Correction, Sentence Builder, dan Grammar Meaning. Bantuan ID dibatasi supaya terasa seperti tes.</p>
+        </div>
+        <span class="pill">No Bantuan ID during test</span>
+      </div>
+      <div class="module-grid three">
+        ${modes.map((mode) => `
+          <button class="module-card text-left ${mode.id === activeMode.id ? "selected-control" : ""}" type="button" data-grammar-simulation-mode="${escapeHtml(mode.id)}">
+            <span class="soft-pill">${escapeHtml(mode.id)}</span>
+            <h3>${escapeHtml(mode.title)}</h3>
+            <p>${Number(mode.question_count)} soal · ${Number(mode.duration_minutes)} menit</p>
+            <small>${escapeHtml(mode.description)}</small>
+          </button>
+        `).join("")}
+      </div>
+      <button id="startGrammarSimulationButton" class="primary-button" type="button">Mulai Simulasi Grammar</button>
+      ${session ? grammarSimulationSessionTemplate(session) : emptyStateTemplate("Belum ada simulasi aktif", "Pilih mode lalu mulai simulasi untuk mengerjakan soal grammar campuran.")}
+      ${result ? grammarSimulationResultTemplate(result) : ""}
+      ${(data.history || []).length ? `
+        <article class="module-card">
+          <h3>Riwayat simulasi</h3>
+          <div class="module-card-list">
+            ${data.history.slice(0, 5).map((item) => `
+              <div class="case-box soft">
+                <strong>${escapeHtml(item.mode)} · score ${Math.round(item.total_score || 0)}</strong>
+                <p>${escapeHtml(item.recommended_next_practice || "")}</p>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+      ` : ""}
+    </section>
+  `;
+}
+
+function grammarSimulationSessionTemplate(session) {
+  return `
+    <form id="grammarSimulationForm" class="module-card">
+      <div class="section-heading">
+        <div>
+          <h3>${escapeHtml(session.title)}</h3>
+          <p>${Number(session.question_count)} soal · ${Number(session.duration_minutes)} menit · ${escapeHtml(session.instructions_id)}</p>
+        </div>
+        <span class="pill">${escapeHtml(session.mode)}</span>
+      </div>
+      <div class="module-card-list">
+        ${(session.questions || []).map((question, index) => `
+          <label class="case-box soft">
+            <span class="soft-pill">Soal ${index + 1} · ${escapeHtml(question.level)} · ${escapeHtml(question.skill_area)}</span>
+            <strong>${escapeHtml(question.instruction_id)}</strong>
+            <span class="muted">${escapeHtml(question.sentence || "")}</span>
+            <p>${escapeHtml(question.question)}</p>
+            ${(question.options || []).length ? `
+              <select data-grammar-simulation-answer="${escapeHtml(question.id)}">
+                <option value="">Pilih jawaban</option>
+                ${question.options.map((option) => `<option value="${escapeHtml(option)}" ${state.grammarSimulation.answers?.[question.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+              </select>
+            ` : `
+              <input type="text" data-grammar-simulation-answer="${escapeHtml(question.id)}" value="${escapeHtml(state.grammarSimulation.answers?.[question.id] || "")}" placeholder="Tulis jawaban simulasi" />
+            `}
+          </label>
+        `).join("")}
+      </div>
+      <button class="primary-button" type="submit">Submit Grammar Simulation</button>
+    </form>
+  `;
+}
+
+function grammarSimulationResultTemplate(result) {
+  return `
+    <article class="module-card soft">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Simulation result</p>
+          <h2>Score ${Math.round(result.total_score || 0)}/${result.max_score || 100}</h2>
+          <p>${Number(result.correct_count || 0)}/${Number(result.total_questions || 0)} benar · ${Number(result.time_spent_seconds || 0)} detik</p>
+        </div>
+        <span class="pill">${escapeHtml(result.mode || "simulation")}</span>
+      </div>
+      <p><strong>Next practice:</strong> ${escapeHtml(result.recommended_next_practice || "")}</p>
+      <div class="module-grid two">
+        <div class="module-card">
+          <h3>Level breakdown</h3>
+          ${(result.level_breakdown || []).map((item) => `<p>${escapeHtml(item.level)}: <strong>${Math.round(item.score || 0)}%</strong> (${Number(item.correct_count)}/${Number(item.total_questions)})</p>`).join("")}
+        </div>
+        <div class="module-card">
+          <h3>Sub-skill breakdown</h3>
+          ${(result.subskill_breakdown || []).map((item) => `<p>${escapeHtml(item.skill_area)}: <strong>${Math.round(item.score || 0)}%</strong> · ${escapeHtml(item.status)}</p>`).join("")}
+        </div>
+      </div>
+      <div class="module-card">
+        <h3>Answer review summary</h3>
+        <div class="module-card-list">
+          ${(result.answer_review_summary || []).slice(0, 8).map((item) => `
+            <div class="case-box ${item.is_correct ? "soft" : ""}">
+              <strong>${item.is_correct ? "Benar" : "Review"} · ${escapeHtml(item.question_id)}</strong>
+              <p>Jawaban Anda: ${escapeHtml(item.user_answer || "-")}</p>
+              <p>Correct: ${escapeHtml(item.correct_answer || "-")}</p>
+              <small>${escapeHtml(item.explanation_id || "")}</small>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+async function startGrammarSimulation() {
+  const mode = state.grammarSimulation.mode || "short";
+  if (apiOnline) {
+    try {
+      const [modesResponse, sessionResponse] = await Promise.all([
+        apiRequest("/grammar/simulation/modes"),
+        apiRequest("/grammar/simulation/start", {
+          method: "POST",
+          body: { user_id: state.user?.id || "default-user", mode }
+        })
+      ]);
+      state.grammarSimulation = {
+        mode,
+        modes: modesResponse.modes || [],
+        session: sessionResponse.session,
+        answers: {},
+        result: null,
+        history: state.grammarSimulation.history || []
+      };
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  state.grammarSimulation = {
+    mode,
+    modes: localGrammarSimulationModes(),
+    session: localGrammarSimulationSession(mode),
+    answers: {},
+    result: null,
+    history: state.grammarSimulation.history || []
+  };
+  saveState();
+}
+
+async function submitGrammarSimulation() {
+  const session = state.grammarSimulation.session;
+  if (!session) return;
+  if (apiOnline) {
+    try {
+      const response = await apiRequest("/grammar/simulation/submit", {
+        method: "POST",
+        body: {
+          user_id: state.user?.id || "default-user",
+          session_id: session.session_id,
+          mode: session.mode,
+          session,
+          answers: state.grammarSimulation.answers || {},
+          time_spent_seconds: 120
+        }
+      });
+      const historyResponse = await apiRequest(`/grammar/simulation/history?user_id=${encodeURIComponent(state.user?.id || "default-user")}`);
+      state.grammarSimulation.result = response.result;
+      state.grammarSimulation.history = historyResponse.history || [];
+      await refreshIntegratedJourney();
+      saveState();
+      return;
+    } catch (error) {
+      apiOnline = false;
+    }
+  }
+  const details = (session.questions || []).map((question) => {
+    const answer = state.grammarSimulation.answers?.[question.id] || "";
+    const isCorrect = normalizeLocalSentence(answer) === normalizeLocalSentence(question.correct_answer);
+    return {
+      question_id: question.id,
+      is_correct: isCorrect,
+      partial_score: isCorrect ? 100 : 0,
+      user_answer: answer,
+      correct_answer: question.correct_answer,
+      explanation_id: question.explanation_id,
+      topic_id: question.topic_id,
+      skill_area: question.skill_area,
+      level: question.level
+    };
+  });
+  const score = details.length ? Math.round(details.filter((item) => item.is_correct).length / details.length * 100) : 0;
+  state.grammarSimulation.result = {
+    session_id: session.session_id,
+    user_id: state.user?.id || "default-user",
+    mode: session.mode,
+    total_score: score,
+    max_score: 100,
+    correct_count: details.filter((item) => item.is_correct).length,
+    total_questions: details.length,
+    time_spent_seconds: 120,
+    level_breakdown: [],
+    subskill_breakdown: [],
+    answer_review_summary: details,
+    recommended_next_practice: "Ulangi Grammar Review untuk melihat area lemah.",
+    recommendation: { next_action: "Ulangi Grammar Review untuk melihat area lemah." }
+  };
+  saveState();
+}
+
+function localGrammarSimulationModes() {
+  return [
+    { id: "short", title: "Short Grammar Simulation", duration_minutes: 10, question_count: 10, description: "Quick mixed grammar review." },
+    { id: "medium", title: "Medium Grammar Simulation", duration_minutes: 20, question_count: 20, description: "Mixed practice." },
+    { id: "full", title: "Full Grammar Readiness Simulation", duration_minutes: 40, question_count: 40, description: "Complete readiness test." }
+  ];
+}
+
+function localGrammarSimulationSession(mode = "short") {
+  return {
+    session_id: `local-grammar-sim-${Date.now()}`,
+    user_id: state.user?.id || "default-user",
+    mode,
+    title: "Local Grammar Simulation",
+    duration_minutes: mode === "full" ? 40 : mode === "medium" ? 20 : 10,
+    question_count: 2,
+    started_at: new Date().toISOString(),
+    instructions_id: "Jawab semua soal Grammar.",
+    help_policy: { bantuan_id_allowed: false, show_explanation_during_test: false, show_explanation_after_submit: true },
+    questions: [
+      {
+        id: "local_grammar_sim_1",
+        level: "basic",
+        question_type: "identify_subject",
+        topic_id: "subject_verb",
+        instruction_id: "Pilih subject.",
+        sentence: "A business analyst must elicit requirements.",
+        question: "Which part is the subject?",
+        options: ["A business analyst", "must elicit", "requirements"],
+        correct_answer: "A business analyst",
+        explanation_id: "Subject adalah pelaku utama.",
+        skill_area: "subject_detection"
+      },
+      {
+        id: "local_grammar_sim_2",
+        level: "intermediate",
+        question_type: "identify_main_verb",
+        topic_id: "gerund_vs_main_verb",
+        instruction_id: "Pilih main verb.",
+        sentence: "The analyst working with stakeholders must clarify priorities.",
+        question: "Which one is the main verb?",
+        options: ["working", "must clarify", "stakeholders"],
+        correct_answer: "must clarify",
+        explanation_id: "working hanya modifier.",
+        skill_area: "main_verb_detection"
+      }
+    ]
+  };
+}
+
+function localBasicGrammarTrainerTopics() {
+  return [
+    { topic_id: "subject_verb", title: "Subject and Verb", level: "basic", learning_objective: "Temukan pelaku dan aksi utama.", estimated_minutes: 10 },
+    { topic_id: "object_complement", title: "Object and Complement", level: "basic", learning_objective: "Bedakan object dan complement.", estimated_minutes: 10 },
+    { topic_id: "modal_verb", title: "Modal Verb", level: "basic", learning_objective: "Pahami must, should, can.", estimated_minutes: 8 }
+  ];
+}
+
+function localBasicGrammarTrainer(topicId = "subject_verb") {
+  const base = {
+    topic_id: topicId,
+    level: "basic",
+    title: topicId === "object_complement" ? "Object and Complement" : topicId === "modal_verb" ? "Modal Verb" : "Subject and Verb",
+    learning_objective: "Latihan grammar dasar untuk membaca kalimat BA.",
+    explanation_id: "Cari struktur utama kalimat sebelum menerjemahkan detail.",
+    beginner_tip: "Mulai dari subject, verb, lalu object atau complement.",
+    ba_context: "Dipakai saat membaca requirement dan stakeholder statement.",
+    examples: [
+      {
+        sentence: "A business analyst must elicit requirements.",
+        simple_meaning_id: "Seorang business analyst harus menggali kebutuhan.",
+        grammar_focus: "Subject + modal + verb + object",
+        breakdown: { subject: "A business analyst", main_verb: "must elicit", object: "requirements" }
+      }
+    ],
+    guided_items: [
+      {
+        id: `${topicId}_guided_1`,
+        instruction_id: "Pilih main verb dalam kalimat ini.",
+        sentence: "A business analyst must elicit requirements.",
+        target_part: "main_verb",
+        options: ["A business analyst", "must elicit", "requirements"],
+        correct_answer: "must elicit",
+        explanation_id: "\"must elicit\" adalah aksi utama.",
+        beginner_tip: "Modal must diikuti verb dasar."
+      }
+    ],
+    quiz_items: [
+      {
+        id: `${topicId}_quiz_1`,
+        question_type: "identify_main_verb",
+        instruction_id: "Pilih main verb.",
+        sentence: "A business analyst must elicit requirements.",
+        question: "Mana main verb kalimat ini?",
+        options: ["A business analyst", "must elicit", "requirements"],
+        correct_answer: "must elicit",
+        explanation_id: "\"must elicit\" adalah main verb.",
+        difficulty: "basic",
+        grammar_trap: "Jangan pilih subject sebagai verb.",
+        ba_context_note: "Elicit berarti menggali requirement."
+      }
+    ]
+  };
+  return base;
+}
+
+function labelFromKey(key) {
+  return String(key || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function renderVocabulary() {

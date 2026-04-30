@@ -294,7 +294,561 @@ def main():
         "/grammar/breakdown",
         {"sentence": "A business analyst operating within a complex enterprise environment must elicit requirements."},
     )
-    assert_ok("grammar breakdown", status == 200 and "analysis" in grammar)
+    grammar_analysis = grammar.get("analysis", {})
+    old_fields = {"subject", "mainVerb", "phrase", "pattern", "translation", "explanation"}
+    deep_fields = {
+        "sentence_level",
+        "sentence_type",
+        "main_subject",
+        "main_verb",
+        "grammar_patterns",
+        "simple_meaning_id",
+        "next_practice",
+        "recommended_topic_id",
+    }
+    assert_ok(
+        "grammar breakdown",
+        status == 200
+        and "analysis" in grammar
+        and old_fields.issubset(grammar_analysis.keys())
+        and deep_fields.issubset(grammar_analysis.keys()),
+    )
+
+    status, grammar_sample_1 = call(
+        "/grammar/breakdown",
+        {"sentence": "A business analyst must elicit requirements from stakeholders."},
+    )
+    sample_1 = grammar_sample_1.get("analysis", {})
+    assert_ok(
+        "deep grammar sample modal",
+        status == 200
+        and old_fields.issubset(sample_1.keys())
+        and deep_fields.issubset(sample_1.keys())
+        and "modal verb" in sample_1.get("grammar_patterns", []),
+    )
+
+    complex_sentence = (
+        "A business analyst operating within a complex enterprise environment must not only elicit requirements "
+        "but also ensure alignment between stakeholder needs and organizational strategy."
+    )
+    status, grammar_sample_2 = call("/grammar/breakdown", {"sentence": complex_sentence})
+    sample_2 = grammar_sample_2.get("analysis", {})
+    assert_ok(
+        "deep grammar sample complex",
+        status == 200
+        and sample_2.get("sentence_level") in ("intermediate", "advanced")
+        and ("modal verb" in sample_2.get("grammar_patterns", []) or "parallel structure" in sample_2.get("grammar_patterns", []))
+        and ("operating" in sample_2.get("common_trap", "").lower() or "main verb" in sample_2.get("common_trap", "").lower())
+        and sample_2.get("recommended_topic_id") in ("gerund_vs_main_verb", "reduced_relative_clause", "parallel_structure"),
+    )
+
+    advanced_sentence = (
+        "The implementation of an integrated requirement management system is expected to improve traceability, "
+        "reduce ambiguity, and support strategic alignment."
+    )
+    status, grammar_sample_3 = call("/grammar/breakdown", {"sentence": advanced_sentence})
+    sample_3 = grammar_sample_3.get("analysis", {})
+    assert_ok(
+        "deep grammar sample advanced",
+        status == 200
+        and any(pattern in sample_3.get("grammar_patterns", []) for pattern in ("nominalization", "passive voice", "parallel structure"))
+        and sample_3.get("recommended_topic_id") in ("nominalization", "passive_voice", "parallel_structure")
+        and sample_3.get("ba_context_meaning"),
+    )
+
+    status, grammar_deep = call("/grammar/breakdown/deep", {"sentence": complex_sentence})
+    assert_ok(
+        "grammar deep endpoint",
+        status == 200
+        and "analysis" in grammar_deep
+        and grammar_deep["analysis"].get("recommended_topic_id") in ("gerund_vs_main_verb", "reduced_relative_clause", "parallel_structure"),
+    )
+
+    status, grammar_levels = call("/grammar/levels")
+    level_ids = {level["id"] for level in grammar_levels.get("levels", [])}
+    assert_ok(
+        "grammar levels",
+        status == 200 and {"basic", "intermediate", "advanced"}.issubset(level_ids),
+    )
+
+    status, grammar_topics = call("/grammar/topics")
+    assert_ok(
+        "grammar topics",
+        status == 200 and grammar_topics["total"] >= 21 and len(grammar_topics["topics"]) >= 21,
+    )
+
+    status, grammar_basic_topics = call("/grammar/topics?level=basic")
+    basic_topic_ids = {topic["id"] for topic in grammar_basic_topics.get("topics", [])}
+    assert_ok(
+        "grammar basic topics",
+        status == 200
+        and grammar_basic_topics["level"] == "basic"
+        and "subject_verb" in basic_topic_ids,
+    )
+
+    status, subject_verb_topic = call("/grammar/topics/subject_verb")
+    subject_verb = subject_verb_topic.get("topic", {})
+    assert_ok(
+        "grammar subject verb topic",
+        status == 200
+        and subject_verb.get("title")
+        and subject_verb.get("explanation_id")
+        and subject_verb.get("example_sentence")
+        and subject_verb.get("beginner_tip"),
+    )
+
+    status, grammar_topic_summary = call("/grammar/topic-summary")
+    summary = grammar_topic_summary.get("summary", {})
+    assert_ok(
+        "grammar topic summary",
+        status == 200
+        and summary.get("total_topics", 0) >= 21
+        and summary.get("levels", {}).get("basic") >= 7,
+    )
+
+    status, grammar_next_topic = call("/grammar/next-topic")
+    assert_ok(
+        "grammar next topic",
+        status == 200
+        and grammar_next_topic.get("next_topic", {}).get("id")
+        and grammar_next_topic.get("next_topic", {}).get("title"),
+    )
+
+    status, grammar_journey = call("/grammar/journey")
+    grammar_journey_data = grammar_journey.get("grammar_journey", {})
+    assert_ok(
+        "grammar journey",
+        status == 200
+        and "grammar_level" in grammar_journey_data
+        and "topic_mastery" in grammar_journey_data
+        and isinstance(grammar_journey_data["topic_mastery"], list)
+        and "next_recommended_topic" in grammar_journey_data,
+    )
+
+    status, grammar_attempt = call(
+        "/grammar/attempt",
+        {
+            "user_id": "default-user",
+            "topic_id": "subject_verb",
+            "activity_type": "grammar_topic_attempt",
+            "score": 80,
+            "max_score": 100,
+            "mistakes": [],
+            "feedback": "User can identify subject and main verb.",
+        },
+    )
+    assert_ok(
+        "save grammar attempt",
+        status == 201
+        and "grammar_attempt" in grammar_attempt
+        and "grammar_journey" in grammar_attempt
+        and grammar_attempt["grammar_attempt"]["topic_id"] == "subject_verb"
+        and grammar_attempt["grammar_attempt"]["accuracy"] == 80,
+    )
+
+    status, grammar_mastery = call("/grammar/mastery")
+    assert_ok(
+        "grammar mastery",
+        status == 200
+        and isinstance(grammar_mastery.get("topic_mastery"), list)
+        and "weakest_topic" in grammar_mastery
+        and "strongest_topic" in grammar_mastery
+        and "next_recommended_topic" in grammar_mastery,
+    )
+
+    status, grammar_recommendation = call("/grammar/recommendation")
+    recommendation = grammar_recommendation.get("recommendation", {})
+    assert_ok(
+        "grammar recommendation",
+        status == 200
+        and "recommended_topic" in recommendation
+        and "next_action" in recommendation
+        and "mentor_message" in recommendation,
+    )
+
+    status, grammar_basic_trainer_topics = call("/grammar/trainer/basic")
+    basic_trainer_topic_ids = {topic["topic_id"] for topic in grammar_basic_trainer_topics.get("topics", [])}
+    assert_ok(
+        "grammar basic trainer topics",
+        status == 200
+        and "subject_verb" in basic_trainer_topic_ids,
+    )
+
+    status, subject_verb_trainer = call("/grammar/trainer/basic/subject_verb")
+    trainer = subject_verb_trainer.get("trainer", {})
+    assert_ok(
+        "grammar basic trainer subject verb",
+        status == 200
+        and trainer.get("topic_id") == "subject_verb"
+        and len(trainer.get("examples", [])) > 0
+        and len(trainer.get("guided_items", [])) > 0
+        and len(trainer.get("quiz_items", [])) > 0,
+    )
+
+    trainer_answers = {item["id"]: item["correct_answer"] for item in trainer["quiz_items"]}
+    status, trainer_submit = call(
+        "/grammar/trainer/basic/submit",
+        {
+            "user_id": "default-user",
+            "topic_id": "subject_verb",
+            "answers": trainer_answers,
+        },
+    )
+    assert_ok(
+        "grammar basic trainer submit",
+        status == 200
+        and "result" in trainer_submit
+        and trainer_submit["result"]["score"] >= 70
+        and "recommendation" in trainer_submit
+        and "grammar_journey" in trainer_submit,
+    )
+
+    status, grammar_intermediate_topics = call("/grammar/trainer/intermediate")
+    intermediate_topic_ids = {topic["topic_id"] for topic in grammar_intermediate_topics.get("topics", [])}
+    assert_ok(
+        "grammar intermediate trainer topics",
+        status == 200
+        and "gerund_vs_main_verb" in intermediate_topic_ids,
+    )
+
+    status, gerund_trainer_response = call("/grammar/trainer/intermediate/gerund_vs_main_verb")
+    gerund_trainer = gerund_trainer_response.get("trainer", {})
+    assert_ok(
+        "grammar intermediate trainer gerund",
+        status == 200
+        and gerund_trainer.get("topic_id") == "gerund_vs_main_verb"
+        and len(gerund_trainer.get("examples", [])) > 0
+        and len(gerund_trainer.get("guided_items", [])) > 0
+        and len(gerund_trainer.get("quiz_items", [])) > 0
+        and len(gerund_trainer.get("trap_items", [])) > 0,
+    )
+
+    status, reduced_trainer_response = call("/grammar/trainer/intermediate/reduced_relative_clause")
+    reduced_trainer = reduced_trainer_response.get("trainer", {})
+    assert_ok(
+        "grammar intermediate trainer reduced relative",
+        status == 200
+        and reduced_trainer.get("topic_id") == "reduced_relative_clause"
+        and reduced_trainer.get("common_trap"),
+    )
+
+    intermediate_answers = {
+        item["id"]: item["correct_answer"]
+        for item in gerund_trainer.get("quiz_items", []) + gerund_trainer.get("trap_items", [])
+    }
+    status, intermediate_submit = call(
+        "/grammar/trainer/intermediate/submit",
+        {
+            "user_id": "default-user",
+            "topic_id": "gerund_vs_main_verb",
+            "answers": intermediate_answers,
+        },
+    )
+    assert_ok(
+        "grammar intermediate trainer submit",
+        status == 200
+        and "result" in intermediate_submit
+        and intermediate_submit["result"]["level"] == "intermediate"
+        and intermediate_submit["result"]["score"] >= 70
+        and "recommendation" in intermediate_submit
+        and "grammar_journey" in intermediate_submit,
+    )
+
+    status, error_categories = call("/grammar/error-correction/categories")
+    error_types = {category["error_type"] for category in error_categories.get("categories", [])}
+    assert_ok(
+        "grammar error correction categories",
+        status == 200 and "missing_be_after_modal" in error_types,
+    )
+
+    status, error_items = call("/grammar/error-correction")
+    assert_ok(
+        "grammar error correction items",
+        status == 200 and error_items.get("total", 0) > 0 and len(error_items.get("items", [])) > 0,
+    )
+
+    status, basic_error_items = call("/grammar/error-correction?level=basic")
+    assert_ok(
+        "grammar error correction basic filter",
+        status == 200
+        and len(basic_error_items.get("items", [])) > 0
+        and all(item["level"] == "basic" for item in basic_error_items["items"]),
+    )
+
+    status, missing_be_response = call("/grammar/error-correction/missing_be_after_modal")
+    missing_be_items = missing_be_response.get("items", [])
+    assert_ok(
+        "grammar error correction missing be",
+        status == 200
+        and missing_be_response.get("category", {}).get("error_type") == "missing_be_after_modal"
+        and len(missing_be_items) >= 1,
+    )
+
+    status, passive_error_response = call("/grammar/error-correction/passive_voice_error")
+    assert_ok(
+        "grammar error correction passive voice",
+        status == 200
+        and passive_error_response.get("category", {}).get("error_type") == "passive_voice_error"
+        and len(passive_error_response.get("items", [])) >= 1,
+    )
+
+    error_answers = {item["id"]: item["correct_answer"] for item in missing_be_items}
+    status, error_submit = call(
+        "/grammar/error-correction/submit",
+        {
+            "user_id": "default-user",
+            "error_type": "missing_be_after_modal",
+            "answers": error_answers,
+        },
+    )
+    error_details = error_submit.get("result", {}).get("details", [])
+    assert_ok(
+        "grammar error correction submit",
+        status == 200
+        and "result" in error_submit
+        and error_submit["result"]["score"] >= 70
+        and "recommendation" in error_submit
+        and len(error_details) > 0
+        and all("corrected_sentence" in item for item in error_details),
+    )
+
+    status, builder_levels = call("/grammar/sentence-builder/levels")
+    builder_level_ids = {level["id"] for level in builder_levels.get("levels", [])}
+    assert_ok(
+        "grammar sentence builder levels",
+        status == 200 and {"basic", "intermediate", "advanced_preview"}.issubset(builder_level_ids),
+    )
+
+    status, builder_items = call("/grammar/sentence-builder")
+    assert_ok(
+        "grammar sentence builder items",
+        status == 200 and builder_items.get("total", 0) > 0 and len(builder_items.get("items", [])) > 0,
+    )
+
+    status, basic_builder_items = call("/grammar/sentence-builder?level=basic")
+    assert_ok(
+        "grammar sentence builder basic filter",
+        status == 200
+        and len(basic_builder_items.get("items", [])) > 0
+        and all(item["level"] == "basic" for item in basic_builder_items["items"]),
+    )
+
+    status, arrange_builder_items = call("/grammar/sentence-builder?mode=arrange_words")
+    assert_ok(
+        "grammar sentence builder arrange filter",
+        status == 200
+        and len(arrange_builder_items.get("items", [])) > 0
+        and all(item["mode"] == "arrange_words" for item in arrange_builder_items["items"]),
+    )
+
+    status, builder_detail = call("/grammar/sentence-builder/arrange_basic_modal_1")
+    builder_item = builder_detail.get("item", {})
+    assert_ok(
+        "grammar sentence builder detail",
+        status == 200
+        and builder_item.get("expected_answer") == "A business analyst must elicit requirements."
+        and builder_item.get("explanation_id"),
+    )
+
+    status, builder_submit = call(
+        "/grammar/sentence-builder/submit",
+        {
+            "user_id": "default-user",
+            "level": "basic",
+            "mode": "arrange_words",
+            "answers": {
+                "arrange_basic_modal_1": "A business analyst must elicit requirements.",
+                "arrange_basic_report_1": "The system generates reports automatically.",
+                "arrange_basic_scope_1": "The analyst clarifies the scope.",
+            },
+        },
+    )
+    builder_details = builder_submit.get("result", {}).get("details", [])
+    assert_ok(
+        "grammar sentence builder submit",
+        status == 200
+        and "result" in builder_submit
+        and builder_submit["result"]["score"] >= 70
+        and "recommendation" in builder_submit
+        and len(builder_details) > 0
+        and all("expected_answer" in item for item in builder_details),
+    )
+
+    status, advanced_topics = call("/grammar/advanced/topics")
+    advanced_topic_ids = {topic["topic_id"] for topic in advanced_topics.get("topics", [])}
+    assert_ok(
+        "grammar advanced topics",
+        status == 200 and "nominalization" in advanced_topic_ids,
+    )
+
+    status, nominalization_response = call("/grammar/advanced/topics/nominalization")
+    nominalization_topic = nominalization_response.get("topic", {})
+    assert_ok(
+        "grammar advanced nominalization topic",
+        status == 200
+        and nominalization_topic.get("beginner_bridge")
+        and len(nominalization_topic.get("examples", [])) >= 3
+        and len(nominalization_topic.get("practice_items", [])) >= 4
+        and len(nominalization_topic.get("rewrite_items", [])) >= 2,
+    )
+
+    status, formal_ba_response = call("/grammar/advanced/topics/formal_ba_writing")
+    formal_ba_topic = formal_ba_response.get("topic", {})
+    assert_ok(
+        "grammar advanced formal BA topic",
+        status == 200
+        and formal_ba_topic.get("professional_usage")
+        and len(formal_ba_topic.get("rewrite_items", [])) >= 4,
+    )
+
+    status, advanced_practice = call("/grammar/advanced/practice?topic_id=nominalization")
+    practice_items = advanced_practice.get("items", [])
+    assert_ok(
+        "grammar advanced practice items",
+        status == 200 and len(practice_items) > 0,
+    )
+
+    status, advanced_rewrite = call("/grammar/advanced/rewrite?topic_id=formal_ba_writing")
+    rewrite_items = advanced_rewrite.get("items", [])
+    assert_ok(
+        "grammar advanced rewrite items",
+        status == 200 and len(rewrite_items) > 0,
+    )
+
+    advanced_practice_answers = {item["id"]: item["correct_answer"] for item in practice_items}
+    status, advanced_practice_submit = call(
+        "/grammar/advanced/practice/submit",
+        {
+            "user_id": "default-user",
+            "topic_id": "nominalization",
+            "answers": advanced_practice_answers,
+        },
+    )
+    assert_ok(
+        "grammar advanced practice submit",
+        status == 200
+        and "result" in advanced_practice_submit
+        and advanced_practice_submit["result"]["score"] >= 70
+        and "recommendation" in advanced_practice_submit,
+    )
+
+    advanced_rewrite_answers = {item["id"]: item["expected_answer"] for item in rewrite_items}
+    status, advanced_rewrite_submit = call(
+        "/grammar/advanced/rewrite/submit",
+        {
+            "user_id": "default-user",
+            "topic_id": "formal_ba_writing",
+            "answers": advanced_rewrite_answers,
+        },
+    )
+    rewrite_details = advanced_rewrite_submit.get("result", {}).get("details", [])
+    assert_ok(
+        "grammar advanced rewrite submit",
+        status == 200
+        and "result" in advanced_rewrite_submit
+        and advanced_rewrite_submit["result"]["score"] >= 70
+        and "recommendation" in advanced_rewrite_submit
+        and len(rewrite_details) > 0
+        and all("expected_answer" in item or "required_keywords" in item for item in rewrite_details),
+    )
+
+    status, grammar_review = call("/grammar/review")
+    assert_ok(
+        "grammar review",
+        status == 200
+        and "weakness_summary" in grammar_review
+        and "mistake_patterns" in grammar_review
+        and "review_queue" in grammar_review
+        and "recommended_practice" in grammar_review,
+    )
+
+    status, grammar_patterns = call("/grammar/mistake-patterns")
+    assert_ok(
+        "grammar mistake patterns",
+        status == 200
+        and isinstance(grammar_patterns.get("patterns"), list)
+        and "total" in grammar_patterns,
+    )
+
+    status, grammar_review_queue = call("/grammar/review-queue")
+    assert_ok(
+        "grammar review queue",
+        status == 200
+        and isinstance(grammar_review_queue.get("review_items"), list)
+        and "next_review" in grammar_review_queue,
+    )
+
+    status, grammar_weakness = call("/grammar/weakness-summary")
+    assert_ok(
+        "grammar weakness summary",
+        status == 200
+        and "weakness_summary" in grammar_weakness
+        and "primary_weakness" in grammar_weakness["weakness_summary"],
+    )
+
+    status, grammar_recommended_practice = call("/grammar/recommended-practice")
+    assert_ok(
+        "grammar recommended practice",
+        status == 200
+        and "recommended_practice" in grammar_recommended_practice
+        and grammar_recommended_practice["recommended_practice"].get("target_endpoint"),
+    )
+
+    status, grammar_sim_modes = call("/grammar/simulation/modes")
+    grammar_sim_mode_ids = {mode["id"] for mode in grammar_sim_modes.get("modes", [])}
+    assert_ok(
+        "grammar simulation modes",
+        status == 200 and {"short", "medium", "full"}.issubset(grammar_sim_mode_ids),
+    )
+
+    status, grammar_sim_start = call(
+        "/grammar/simulation/start",
+        {"user_id": "default-user", "mode": "short"},
+    )
+    grammar_session = grammar_sim_start.get("session", {})
+    assert_ok(
+        "grammar simulation start",
+        status == 200
+        and grammar_session.get("session_id")
+        and grammar_session.get("duration_minutes") == 10
+        and len(grammar_session.get("questions", [])) == 10,
+    )
+
+    grammar_sim_answers = {question["id"]: question["correct_answer"] for question in grammar_session["questions"]}
+    status, grammar_sim_submit = call(
+        "/grammar/simulation/submit",
+        {
+            "user_id": "default-user",
+            "session_id": grammar_session["session_id"],
+            "mode": "short",
+            "session": grammar_session,
+            "answers": grammar_sim_answers,
+            "time_spent_seconds": 420,
+        },
+    )
+    grammar_sim_result = grammar_sim_submit.get("result", {})
+    assert_ok(
+        "grammar simulation submit",
+        status == 200
+        and "total_score" in grammar_sim_result
+        and "level_breakdown" in grammar_sim_result
+        and "subskill_breakdown" in grammar_sim_result
+        and "answer_review_summary" in grammar_sim_result
+        and "recommendation" in grammar_sim_result,
+    )
+
+    status, grammar_sim_result_lookup = call(f"/grammar/simulation/result/{grammar_session['session_id']}")
+    assert_ok(
+        "grammar simulation result lookup",
+        status == 200
+        and grammar_sim_result_lookup.get("result", {}).get("session_id") == grammar_session["session_id"],
+    )
+
+    status, grammar_sim_history = call("/grammar/simulation/history?user_id=default-user")
+    assert_ok(
+        "grammar simulation history",
+        status == 200 and isinstance(grammar_sim_history.get("history"), list),
+    )
 
     status, writing = call("/writing/evaluate", {"text": "The system must flexible for all user and make report faster."})
     assert_ok("writing evaluate", status == 200 and writing["score"] < 82)
