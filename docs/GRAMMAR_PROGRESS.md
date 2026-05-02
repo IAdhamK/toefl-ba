@@ -1295,6 +1295,279 @@ Existing Grammar Breakdown, Basic Trainer, Intermediate Trainer, Error Correctio
 - Add analytics charts for Grammar readiness.
 - Add optional LLM scoring for open-ended formal rewrite answers.
 
+## Phase 12 - Grammar Hub Navigation Refactor
+
+Phase 12 selesai sebagai frontend UX refactor. Grammar page tidak lagi menampilkan semua fitur sekaligus saat pertama dibuka.
+
+### Problem Solved
+
+Sebelumnya Grammar page langsung merender semua fitur:
+
+- Grammar Breakdown
+- Basic Trainer
+- Intermediate Trainer
+- Error Correction
+- Sentence Builder
+- Advanced Lab
+- Review
+- Simulation
+
+Akibatnya halaman terasa terlalu panjang, padat, dan membingungkan untuk pemula.
+
+### Implemented Frontend Changes
+
+- Menambahkan state `grammarHub`.
+- Menambahkan active section flow:
+  - `menu`
+  - `breakdown`
+  - `basic_trainer`
+  - `intermediate_trainer`
+  - `error_correction`
+  - `sentence_builder`
+  - `advanced_lab`
+  - `review`
+  - `simulation`
+- Menambahkan Grammar Hub menu cards.
+- Menambahkan helper:
+  - `renderGrammarHub()`
+  - `setGrammarSection()`
+  - `grammarBackButton()`
+  - `renderGrammarSectionShell()`
+  - `grammarHubCard()`
+  - `grammarBreakdownPanel()`
+- Menambahkan tombol `Kembali ke Menu Grammar` di setiap sub-section.
+
+### New Navigation Behavior
+
+Saat user membuka Grammar page:
+
+1. User melihat Grammar Hub menu.
+2. User memilih satu fokus latihan.
+3. Hanya section yang dipilih yang muncul.
+4. User bisa kembali ke Grammar Hub melalui tombol back.
+
+Grammar page tidak lagi merender semua panel sekaligus.
+
+### Sub-menu Flow
+
+- Grammar Hub -> Grammar Breakdown
+- Grammar Hub -> Basic Grammar Trainer
+- Grammar Hub -> Intermediate Grammar Trainer
+- Grammar Hub -> Error Correction
+- Grammar Hub -> Sentence Builder
+- Grammar Hub -> Advanced Grammar Lab
+- Grammar Hub -> Grammar Review
+- Grammar Hub -> Grammar Simulation
+
+Setiap feature function lama tetap dipertahankan. Refactor ini hanya mengubah navigasi dan rendering.
+
+### Known Limitations
+
+- Section state masih disimpan di localStorage/API state sederhana.
+- Belum ada tab horizontal atau breadcrumb lanjutan.
+- Beberapa panel internal masih panjang dan bisa dipoles lagi setelah hub navigation stabil.
+- Belum ada lazy API preload per section.
+
+### Next Recommended Polish
+
+- Tambahkan visual grouping dalam section yang panjang.
+- Tambahkan progress mini card di Grammar Hub.
+- Tambahkan rekomendasi otomatis di Hub: `Lanjutkan latihan terakhir`.
+- Buat mobile navigation untuk Grammar Hub lebih compact.
+
+## Phase 12 - Guided Grammar Learning Path UX
+
+Status: Completed
+
+### Problem Solved
+
+Grammar Hub sebelumnya sudah memisahkan fitur, tetapi masih terasa seperti kumpulan tool yang setara. Pemula belum langsung tahu harus mulai dari mana, apa urutan belajarnya, dan kapan Grammar Lab dianggap selesai.
+
+### New Start Here Card
+
+Grammar Hub sekarang menampilkan kartu besar `Mulai dari Sini` di bagian paling atas. Kartu ini memperlihatkan:
+
+- level grammar saat ini jika tersedia
+- progress grammar sederhana
+- rekomendasi langkah berikutnya
+- penjelasan pemula tentang kenapa harus mulai dari langkah tersebut
+- tombol `Mulai Belajar Terarah`
+
+Jika data review atau journey belum tersedia, rekomendasi aman diarahkan ke `Basic Grammar Trainer`.
+
+### Recommended Learning Path
+
+Hub sekarang menampilkan roadmap `Alur Belajar yang Disarankan`:
+
+1. Basic Foundation
+2. Sentence Breakdown
+3. Intermediate Grammar
+4. Error Correction
+5. Sentence Builder
+6. Advanced Grammar
+7. Review Weakness
+8. Final Test
+
+Setiap langkah menjelaskan fungsi module, target belajar, dan tombol untuk membuka section tersebut.
+
+### Finish Target
+
+Ditambahkan section `Target Finish Grammar` dengan target jelas:
+
+> User dianggap selesai Grammar Lab jika mampu menyelesaikan Full Grammar Simulation dengan skor minimal 75%.
+
+Section ini juga menampilkan checklist ringkas agar user memahami posisi belajar saat ini dan finish line.
+
+### Improved Beginner Guidance
+
+Copy pada quick pick card diperjelas agar setiap fitur menjawab:
+
+- fitur ini dipakai untuk apa
+- kapan sebaiknya digunakan
+- hasil belajar apa yang diharapkan
+
+Tombol back pada sub-section juga diarahkan ke `Kembali ke Grammar Learning Path` agar konsep jalur belajar tetap konsisten.
+
+### Known Limitations
+
+- Progress checklist masih sederhana dan belum membaca seluruh riwayat simulasi secara detail.
+- Rekomendasi otomatis masih rule-based dari grammar review, grammar journey, atau fallback progress lokal.
+- Hub belum punya animasi stepper atau status selesai per module yang benar-benar granular.
+- Quick pick masih tersedia untuk user yang ingin lompat langsung ke fitur tertentu.
+
+### Next Recommended Polish
+
+- Tandai setiap langkah roadmap sebagai `Belum mulai`, `Sedang dipelajari`, atau `Selesai` dari data attempt.
+- Tambahkan last activity dan tombol `Lanjutkan terakhir`.
+- Tampilkan skor Full Grammar Simulation terakhir jika sudah ada.
+- Rapikan layout internal setiap sub-section agar terasa seperti satu workflow, bukan form panjang.
+
+## Phase 13 - Grammar Subfeature Progress Integration
+
+Status: Completed
+
+### Problem Solved
+
+Semua subfitur Grammar sudah ada, tetapi sebelumnya user belum bisa melihat status tiap module. Grammar Hub sekarang tidak hanya menjadi menu, tetapi juga menunjukkan progress nyata untuk setiap bagian Grammar Lab.
+
+### New Backend Progress Service
+
+Implemented file:
+
+- `backend/services/grammar_progress_service.py`
+
+Service ini menghitung progress dari data yang sudah ada:
+
+- `learning_attempts`
+- `skill_mastery`
+- Grammar Journey
+- Grammar Review
+- Grammar Simulation history jika tersedia
+
+Tidak ada database migration baru pada phase ini.
+
+### New Progress Endpoints
+
+New endpoints:
+
+- `GET /api/grammar/progress`
+- `GET /api/grammar/progress/summary`
+- `GET /api/grammar/progress/modules`
+- `GET /api/grammar/progress/path`
+- `GET /api/grammar/progress/recommended-section`
+- `GET /api/grammar/progress/finish-status`
+
+### Module Progress Rules
+
+Tracked modules:
+
+- `grammar_breakdown`
+- `basic_trainer`
+- `intermediate_trainer`
+- `error_correction`
+- `sentence_builder`
+- `advanced_lab`
+- `review`
+- `simulation`
+
+Each module returns:
+
+- status
+- progress percent
+- completed items
+- total items
+- last score
+- best score
+- attempt count
+- next action
+- recommended flag
+- target score
+- frontend section key
+
+Status labels:
+
+- `not_started`
+- `in_progress`
+- `need_review`
+- `completed`
+- `recommended`
+- `locked`
+
+### Frontend Progress Summary
+
+Grammar Hub now shows:
+
+- Overall Grammar Progress
+- Current Grammar Level
+- Active Module
+- Recommended Next Step
+- Finish Target
+- Completed Modules
+
+The `Mulai dari Sini` card now uses backend recommendation when available, with local fallback to Basic Grammar Trainer.
+
+### Learning Path Progress Cards
+
+Each Grammar roadmap card now shows:
+
+- status badge
+- progress bar
+- completed items / total items
+- last score
+- next action
+- contextual button label: `Mulai`, `Lanjutkan`, `Ulangi`, `Selesai`, or `Direkomendasikan`
+
+Quick Pick cards also display the same progress metadata so every feature visibly connects to Grammar Journey.
+
+### Finish Status Rule
+
+Finish rule:
+
+> Grammar Lab is finished when Full Grammar Simulation reaches at least 75%.
+
+The finish status endpoint returns whether the user has finished, the full simulation score if known, and a beginner-friendly message.
+
+### Testing Checklist
+
+- `python3 -m py_compile backend/main.py backend/routers/grammar.py backend/services/grammar_progress_service.py`
+- `node --check frontend/app.js`
+- `python3 scripts/smoke_api.py`
+
+### Known Limitations
+
+- Progress is calculated from existing attempts.
+- There is no dedicated grammar module progress table yet.
+- Some module progress depends on consistent `activity_type` and `activity_id`.
+- Simulation history may still be temporary if only in-memory session history is available.
+- Module completion is rule-based and can be refined after real user data accumulates.
+
+### Next Recommended Polish
+
+- Add per-topic completion state inside each Grammar subfeature.
+- Persist simulation mode in a dedicated table later.
+- Add `last activity` and `continue last exercise` inside each Grammar module card.
+- Improve mobile layout for progress-heavy Grammar Hub cards.
+
 ## Codex Next Prompt
 
 Use this prompt for the next improvement:

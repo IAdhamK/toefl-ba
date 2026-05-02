@@ -120,6 +120,17 @@ const defaultState = {
     result: null,
     history: []
   },
+  grammarHub: {
+    activeSection: "menu",
+    activeSubTopic: null
+  },
+  grammarProgress: {
+    summary: null,
+    modules: [],
+    learningPath: [],
+    recommendedSection: null,
+    finishStatus: null
+  },
   adaptivePractice: null,
   chat: [
     {
@@ -768,6 +779,8 @@ function loadState() {
     grammarAdvancedLab: { ...structuredClone(defaultState.grammarAdvancedLab), ...(parsed.grammarAdvancedLab || {}) },
     grammarReview: parsed.grammarReview || null,
     grammarSimulation: { ...structuredClone(defaultState.grammarSimulation), ...(parsed.grammarSimulation || {}) },
+    grammarHub: { ...structuredClone(defaultState.grammarHub), ...(parsed.grammarHub || {}) },
+    grammarProgress: { ...structuredClone(defaultState.grammarProgress), ...(parsed.grammarProgress || {}) },
     guidedReading: { ...structuredClone(defaultState.guidedReading), ...(parsed.guidedReading || {}) },
     readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(parsed.readingSimulation || {}) },
     chat: parsed.chat || structuredClone(defaultState.chat)
@@ -814,6 +827,8 @@ async function hydrateFromApi() {
         grammarAdvancedLab: { ...structuredClone(defaultState.grammarAdvancedLab), ...(stateResponse.state.grammarAdvancedLab || state.grammarAdvancedLab || {}) },
         grammarReview: stateResponse.state.grammarReview || state.grammarReview || null,
         grammarSimulation: { ...structuredClone(defaultState.grammarSimulation), ...(stateResponse.state.grammarSimulation || state.grammarSimulation || {}) },
+        grammarHub: { ...structuredClone(defaultState.grammarHub), ...(stateResponse.state.grammarHub || state.grammarHub || {}) },
+        grammarProgress: { ...structuredClone(defaultState.grammarProgress), ...(stateResponse.state.grammarProgress || state.grammarProgress || {}) },
         guidedReading: { ...structuredClone(defaultState.guidedReading), ...(stateResponse.state.guidedReading || state.guidedReading || {}) },
         readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(stateResponse.state.readingSimulation || state.readingSimulation || {}) }
       };
@@ -831,12 +846,14 @@ async function hydrateFromApi() {
     state.latestAnalytics = analyticsResponse.analytics;
     await refreshIntegratedJourney();
     await refreshReadingJourney();
+    await refreshGrammarProgress();
   } catch (error) {
     apiOnline = false;
     state.integratedJourney = localJourneySummary();
     state.readingJourney = localReadingJourney();
     state.readingReview = localReadingReview();
     state.readingTrainer = localReadingTrainerState();
+    state.grammarProgress = localGrammarProgress();
   }
 }
 
@@ -924,6 +941,27 @@ async function refreshReadingTrainer(subSkill = "main_idea") {
   }
 }
 
+async function refreshGrammarProgress() {
+  if (!apiOnline) {
+    state.grammarProgress = localGrammarProgress();
+    return;
+  }
+  try {
+    const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
+    const response = await apiRequest(`/grammar/progress${query}`);
+    state.grammarProgress = {
+      summary: response.summary || null,
+      modules: response.modules || [],
+      learningPath: response.learning_path || [],
+      recommendedSection: response.recommended_section || null,
+      finishStatus: response.finish_status || null
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    state.grammarProgress = localGrammarProgress();
+  }
+}
+
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     method: options.method || "GET",
@@ -972,8 +1010,11 @@ function bindShell() {
   });
 
   document.querySelectorAll(".nav-item").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       state.activeView = button.dataset.view;
+      if (state.activeView === "grammar") {
+        await refreshGrammarProgress();
+      }
       saveState();
       render();
     });
@@ -3999,67 +4040,67 @@ function localOptionWrongReason(option) {
 }
 
 function renderGrammar() {
-  const grammarSample = "A business analyst operating within a complex enterprise environment must not only elicit requirements but also ensure alignment between stakeholder needs and organizational strategy.";
+  const activeSection = state.grammarHub?.activeSection || "menu";
   document.getElementById("grammarView").innerHTML = `
     ${pageHeaderTemplate({
-      eyebrow: "Grammar Breakdown Engine",
-      title: "Bedah struktur kalimat profesional.",
-      description: "Masukkan kalimat BA untuk melihat subject, main verb, clause, phrase, pattern, dan terjemahan natural.",
-      actions: `<button id="grammarHelpButton" class="ghost-button">Bantu pahami grammar</button>`
+      eyebrow: "Grammar Lab",
+      title: activeSection === "menu" ? "Grammar Learning Path" : grammarSectionTitle(activeSection),
+      description: activeSection === "menu"
+        ? "Belajar grammar dari dasar sampai siap simulasi. Ikuti urutan yang disarankan agar tidak bingung mulai dari mana."
+        : "Kerjakan satu area grammar saja. Setelah selesai, kembali ke Grammar Learning Path untuk memilih langkah berikutnya.",
+      actions: ""
     })}
-    ${journeyPanel("Grammar")}
-    <section class="module-grid two">
-      <form id="grammarForm" class="module-surface form-grid">
-        ${beginnerTip("Cara membaca grammar", "Cari subject dulu, lalu verb utama. Abaikan sementara phrase panjang yang hanya menambahkan informasi.")}
-        <label>
-          Kalimat
-          <textarea id="grammarInput">${grammarSample}</textarea>
-        </label>
-        ${renderContextualHelpButton("grammar", "grammar_sentence", grammarSample)}
-        <button class="primary-button" type="submit">Analyze Grammar</button>
-      </form>
-      <div id="grammarResult" class="module-surface grammar-result-panel">
-        ${emptyStateTemplate("Hasil breakdown akan muncul di sini", "Submit satu kalimat untuk melihat Subject, Main Verb, Phrase, Pattern, dan terjemahan.")}
-      </div>
-    </section>
-    ${basicGrammarTrainerPanel()}
-    ${intermediateGrammarTrainerPanel()}
-    ${grammarErrorCorrectionPanel()}
-    ${grammarSentenceBuilderPanel()}
-    ${grammarAdvancedLabPanel()}
-    ${grammarReviewPanel()}
-    ${grammarSimulationPanel()}
+    ${renderGrammarActiveSection(activeSection)}
   `;
 
-  document.getElementById("grammarHelpButton").addEventListener("click", () => {
-    openHelpWith(document.getElementById("grammarInput").value);
+  document.querySelectorAll("[data-grammar-hub-section]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setGrammarSection(button.dataset.grammarHubSection);
+    });
   });
 
-  document.getElementById("grammarForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const sentence = document.getElementById("grammarInput").value.trim();
-    state.progress.Grammar = Math.max(state.progress.Grammar, 80);
-    state.completedExercises += 1;
-    addActivity("Grammar", "Sentence breakdown", 80);
-    saveState();
-    let analysisHtml = grammarAnalysis(sentence);
-    if (apiOnline) {
-      try {
-        const response = await apiRequest("/grammar/breakdown", {
-          method: "POST",
-          body: { sentence, user_id: state.user?.id || "default-user" }
-        });
-        analysisHtml = grammarApiTemplate(response.analysis);
-      } catch (error) {
-        apiOnline = false;
-      }
-    }
-    document.getElementById("grammarResult").innerHTML = analysisHtml;
-    bindContextualHelpButtons(document.getElementById("grammarResult"));
-    await refreshIntegratedJourney();
-    renderDashboard();
-    renderJourney();
+  document.querySelectorAll("[data-grammar-back]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setGrammarSection("menu");
+    });
   });
+
+  const grammarHelpButton = document.getElementById("grammarHelpButton");
+  if (grammarHelpButton) {
+    grammarHelpButton.addEventListener("click", () => {
+      openHelpWith(document.getElementById("grammarInput").value);
+    });
+  }
+
+  const grammarForm = document.getElementById("grammarForm");
+  if (grammarForm) {
+    grammarForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const sentence = document.getElementById("grammarInput").value.trim();
+      state.progress.Grammar = Math.max(state.progress.Grammar, 80);
+      state.completedExercises += 1;
+      addActivity("Grammar", "Sentence breakdown", 80);
+      saveState();
+      let analysisHtml = grammarAnalysis(sentence);
+      if (apiOnline) {
+        try {
+          const response = await apiRequest("/grammar/breakdown", {
+            method: "POST",
+            body: { sentence, user_id: state.user?.id || "default-user" }
+          });
+          analysisHtml = grammarApiTemplate(response.analysis);
+        } catch (error) {
+          apiOnline = false;
+        }
+      }
+      document.getElementById("grammarResult").innerHTML = analysisHtml;
+      bindContextualHelpButtons(document.getElementById("grammarResult"));
+      await refreshIntegratedJourney();
+      await refreshGrammarProgress();
+      renderDashboard();
+      renderJourney();
+    });
+  }
 
   document.querySelectorAll("[data-grammar-trainer-topic]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -4250,6 +4291,641 @@ function renderGrammar() {
     });
   }
   bindContextualHelpButtons(document.getElementById("grammarView"));
+}
+
+function renderGrammarActiveSection(activeSection) {
+  const sections = {
+    menu: renderGrammarHub,
+    breakdown: () => renderGrammarSectionShell(
+      "Grammar Breakdown",
+      "Bedah satu kalimat untuk menemukan subject, main verb, phrase, clause, dan makna Bahasa Indonesia.",
+      grammarBreakdownPanel()
+    ),
+    basic_trainer: () => renderGrammarSectionShell(
+      "Basic Grammar Trainer",
+      "Latihan dasar: parts of speech, subject, verb, object, modal, dan pola kalimat sederhana.",
+      basicGrammarTrainerPanel()
+    ),
+    intermediate_trainer: () => renderGrammarSectionShell(
+      "Intermediate Grammar Trainer",
+      "Latihan kalimat panjang: gerund, relative clause, reduced clause, passive voice, connector, dan parallel structure.",
+      intermediateGrammarTrainerPanel()
+    ),
+    error_correction: () => renderGrammarSectionShell(
+      "Grammar Error Correction",
+      "Cari kesalahan grammar dan pilih corrected sentence yang benar.",
+      grammarErrorCorrectionPanel()
+    ),
+    sentence_builder: () => renderGrammarSectionShell(
+      "Grammar Sentence Builder",
+      "Susun kata, lengkapi kalimat, gabungkan kalimat, dan tulis ulang kalimat BA.",
+      grammarSentenceBuilderPanel()
+    ),
+    advanced_lab: () => renderGrammarSectionShell(
+      "Advanced Grammar Lab",
+      "Latihan grammar formal: nominalization, hedging, inversion, conditional, academic connector, dan formal BA writing.",
+      grammarAdvancedLabPanel()
+    ),
+    review: () => renderGrammarSectionShell(
+      "Grammar Review",
+      "Lihat kelemahan grammar, pola salah berulang, dan rekomendasi latihan ulang.",
+      grammarReviewPanel()
+    ),
+    simulation: () => renderGrammarSectionShell(
+      "Grammar Simulation",
+      "Uji kemampuan grammar melalui simulasi short, medium, atau full.",
+      grammarSimulationPanel()
+    )
+  };
+  return (sections[activeSection] || sections.menu)();
+}
+
+function renderGrammarHub() {
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Grammar Hub</p>
+          <h2>Grammar Learning Path</h2>
+          <p>Belajar grammar dari dasar sampai siap simulasi. Lihat status tiap module, lanjutkan rekomendasi, lalu kejar target finish.</p>
+        </div>
+        <span class="pill">8 langkah belajar</span>
+      </div>
+      ${renderGrammarProgressSummary()}
+      ${renderGrammarStartHereCard()}
+      ${renderGrammarLearningPathWithProgress()}
+      ${renderGrammarFinishTarget()}
+      ${renderGrammarQuickPick()}
+    </section>
+  `;
+}
+
+function renderGrammarProgressSummary() {
+  const summary = getGrammarProgressSummary();
+  const recommended = state.grammarProgress?.recommendedSection || {};
+  return `
+    <article class="module-card">
+      <div class="section-heading compact">
+        <div>
+          <p class="eyebrow">Progress Grammar Kamu</p>
+          <h3>${summary.progressPercent}% selesai · ${escapeHtml(summary.level)}</h3>
+          <p>${escapeHtml(summary.nextAction || "Ikuti langkah yang direkomendasikan satu per satu.")}</p>
+        </div>
+        <span class="soft-pill">Finish: ${escapeHtml(summary.finishTarget || "Full Simulation 75%")}</span>
+      </div>
+      <div class="progress-bar" aria-label="Progress Grammar">
+        <span style="width: ${clampPercent(summary.progressPercent)}%"></span>
+      </div>
+      <div class="module-grid three">
+        <div class="module-card soft">
+          <span>Overall Grammar Progress</span>
+          <h3>${summary.progressPercent}%</h3>
+        </div>
+        <div class="module-card soft">
+          <span>Active Module</span>
+          <h3>${escapeHtml(recommended.title || grammarSectionMeta(summary.activeModule || "basic_trainer").title)}</h3>
+        </div>
+        <div class="module-card soft">
+          <span>Completed Modules</span>
+          <h3>${summary.completedModules}/${summary.totalModules}</h3>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderGrammarStartHereCard() {
+  const summary = getGrammarProgressSummary();
+  const recommendedSection = getGrammarRecommendedSection();
+  const recommendedMeta = grammarSectionMeta(recommendedSection);
+  const recommended = state.grammarProgress?.recommendedSection || {};
+  const hasStarted = summary.score > 0 || summary.completedTopics > 0;
+  const beginnerCopy = hasStarted
+    ? `Lanjutkan dari ${recommendedMeta.title}. ${recommended.reason || "Rekomendasi ini mengikuti progress grammar yang tersimpan."}`
+    : "Belum tahu harus mulai dari mana? Mulai dari Basic Grammar Trainer. Di tahap ini kamu akan belajar menemukan subject, main verb, object, dan pola kalimat dasar.";
+  return `
+    <article class="module-card soft">
+      <div class="section-heading compact">
+        <div>
+          <p class="eyebrow">Mulai dari Sini</p>
+          <h3>Belajar terarah, satu langkah dulu</h3>
+          <p>${escapeHtml(beginnerCopy)}</p>
+        </div>
+        <span class="soft-pill">${escapeHtml(summary.level)}</span>
+      </div>
+      <div class="module-grid three">
+        <div class="stat-tile">
+          <span>Level grammar</span>
+          <strong>${escapeHtml(summary.level)}</strong>
+        </div>
+        <div class="stat-tile">
+          <span>Progress</span>
+          <strong>${summary.progressPercent}%</strong>
+        </div>
+        <div class="stat-tile">
+          <span>Langkah berikutnya</span>
+          <strong>${escapeHtml(recommendedMeta.title)}</strong>
+        </div>
+      </div>
+      <button class="primary-button mt-3" type="button" data-grammar-hub-section="${escapeHtml(recommendedSection)}">Mulai Belajar Terarah</button>
+    </article>
+  `;
+}
+
+function renderGrammarLearningPath() {
+  const steps = [
+    {
+      number: 1,
+      title: "Basic Foundation",
+      module: "Basic Grammar Trainer",
+      description: "Belajar subject, verb, object, modal, dan pola kalimat sederhana.",
+      target: "Paham siapa melakukan apa.",
+      section: "basic_trainer",
+      badge: "Mulai di sini"
+    },
+    {
+      number: 2,
+      title: "Sentence Breakdown",
+      module: "Grammar Breakdown",
+      description: "Bedah satu kalimat untuk menemukan inti kalimat dan phrase tambahan.",
+      target: "Bisa menemukan main subject dan main verb.",
+      section: "breakdown",
+      badge: "Bedah kalimat"
+    },
+    {
+      number: 3,
+      title: "Intermediate Grammar",
+      module: "Intermediate Grammar Trainer",
+      description: "Latihan gerund, relative clause, reduced clause, passive voice, connector, dan parallel structure.",
+      target: "Tidak bingung saat membaca kalimat panjang.",
+      section: "intermediate_trainer",
+      badge: "Kalimat panjang"
+    },
+    {
+      number: 4,
+      title: "Error Correction",
+      module: "Grammar Error Correction",
+      description: "Cari kesalahan grammar dan pilih corrected sentence yang benar.",
+      target: "Bisa mengenali pola grammar yang salah.",
+      section: "error_correction",
+      badge: "Cari salah"
+    },
+    {
+      number: 5,
+      title: "Sentence Builder",
+      module: "Grammar Sentence Builder",
+      description: "Susun kata, lengkapi kalimat, gabungkan kalimat, dan tulis ulang kalimat BA.",
+      target: "Bisa membuat kalimat sendiri.",
+      section: "sentence_builder",
+      badge: "Buat kalimat"
+    },
+    {
+      number: 6,
+      title: "Advanced Grammar",
+      module: "Advanced Grammar Lab",
+      description: "Latihan nominalization, hedging, conditional sentence, academic connector, dan formal BA writing.",
+      target: "Bisa memahami kalimat akademik dan profesional.",
+      section: "advanced_lab",
+      badge: "Formal"
+    },
+    {
+      number: 7,
+      title: "Review Weakness",
+      module: "Grammar Review",
+      description: "Lihat kelemahan grammar dan pola salah yang sering berulang.",
+      target: "Tahu bagian mana yang harus diulang.",
+      section: "review",
+      badge: "Review"
+    },
+    {
+      number: 8,
+      title: "Final Test",
+      module: "Grammar Simulation",
+      description: "Uji kemampuan grammar melalui simulasi short, medium, atau full.",
+      target: "Finish jika full simulation minimal 75%.",
+      section: "simulation",
+      badge: "Finish line"
+    }
+  ];
+  return `
+    <div class="mt-4">
+      <div class="section-heading compact">
+        <div>
+          <p class="eyebrow">Roadmap</p>
+          <h3>Alur Belajar yang Disarankan</h3>
+          <p>Ikuti urutan ini jika kamu masih pemula. Kamu tetap bisa lompat ke bagian lain saat butuh latihan tertentu.</p>
+        </div>
+      </div>
+      <div class="module-grid two">
+        ${steps.map((step) => grammarPathStepCard(step)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderGrammarLearningPathWithProgress() {
+  const path = state.grammarProgress?.learningPath?.length
+    ? state.grammarProgress.learningPath
+    : localGrammarPathModules();
+  return `
+    <div class="mt-4">
+      <div class="section-heading compact">
+        <div>
+          <p class="eyebrow">Roadmap</p>
+          <h3>Alur Belajar yang Disarankan</h3>
+          <p>Setiap langkah sekarang punya status. Mulai dari yang direkomendasikan, ulangi yang lemah, lalu selesaikan simulasi.</p>
+        </div>
+      </div>
+      <div class="module-grid two">
+        ${path.map((step, index) => grammarPathStepCard({ step: step.step || index + 1, ...step })).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderGrammarFinishTarget() {
+  const summary = getGrammarProgressSummary();
+  const finish = state.grammarProgress?.finishStatus || {};
+  const modules = getGrammarProgressModules();
+  return `
+    <article class="module-card mt-4">
+      <div class="section-heading compact">
+        <div>
+          <p class="eyebrow">Target Finish Grammar</p>
+          <h3>Target selesai yang jelas</h3>
+          <p>${escapeHtml(finish.message || "Kamu dianggap selesai Grammar Lab jika sudah mampu menyelesaikan Full Grammar Simulation dengan skor minimal 75%. Jika belum sampai sana, cukup ikuti langkah yang direkomendasikan satu per satu.")}</p>
+        </div>
+        <span class="pill">${finish.is_finished ? "Finish" : `${summary.progressPercent}% progress`}</span>
+      </div>
+      <div class="tag-row">
+        ${modules.map((module) => `<span class="soft-pill">${escapeHtml(module.title)} · ${getModuleStatusLabel(module.status)}</span>`).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function renderGrammarQuickPick() {
+  const cards = [
+    ["basic_trainer", "1. Basic Grammar Trainer", "Mulai dari fondasi: subject, verb, object, modal, dan simple sentence. Cocok untuk kamu yang masih bingung menentukan verb utama.", "Mulai di sini"],
+    ["breakdown", "2. Grammar Breakdown", "Gunakan saat kamu menemukan kalimat panjang dan ingin tahu mana subject, main verb, phrase, clause, dan maknanya.", "Bedah Kalimat"],
+    ["intermediate_trainer", "3. Intermediate Grammar Trainer", "Latihan membedakan main verb, -ing phrase, relative clause, passive voice, connector, dan parallel structure.", "Kalimat Panjang"],
+    ["error_correction", "4. Error Correction", "Latihan menemukan grammar error seperti must be, subject-verb agreement, passive voice, dan connector yang salah.", "Cari Kesalahan"],
+    ["sentence_builder", "5. Sentence Builder", "Latihan menyusun dan menulis kalimat sendiri agar kamu tidak hanya paham grammar, tetapi juga bisa menggunakannya.", "Buat Kalimat"],
+    ["advanced_lab", "6. Advanced Grammar Lab", "Latihan grammar untuk kalimat TOEFL, akademik, dan Business Analyst formal seperti nominalization dan hedging.", "Formal & Akademik"],
+    ["review", "7. Grammar Review", "Lihat pola salah yang sering muncul dan dapatkan rekomendasi latihan berikutnya.", "Ulangi Kelemahan"],
+    ["simulation", "8. Grammar Simulation", "Uji seluruh kemampuan grammar. Target finish: Full Simulation minimal 75%.", "Finish Line"]
+  ];
+  return `
+    <div class="mt-4">
+      <div class="section-heading compact">
+        <div>
+          <p class="eyebrow">Pilih Cepat</p>
+          <h3>Butuh fitur tertentu?</h3>
+          <p>Pakai kartu ini kalau kamu sudah tahu bagian yang ingin dibuka.</p>
+        </div>
+      </div>
+      <div class="module-grid two">
+        ${cards.map(([section, title, description, badge]) => grammarHubCard(section, title, description, badge)).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function grammarPathStepCard(step) {
+  const module = step.module_id ? step : getGrammarModuleBySection(step.section);
+  const section = module.section || step.section;
+  const title = step.title || module.title;
+  const description = step.description || module.description;
+  const target = step.target || module.next_action;
+  const status = module.status || "not_started";
+  const buttonLabel = getModuleButtonLabel(status);
+  return `
+    <article class="module-card soft">
+      <div class="split-row">
+        <span class="pill">${step.number || step.step}</span>
+        <span class="soft-pill">${getModuleStatusLabel(status)}</span>
+      </div>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(description)}</p>
+      <div class="progress-bar" aria-label="Progress ${escapeHtml(title)}">
+        <span style="width: ${clampPercent(module.progress_percent)}%"></span>
+      </div>
+      <p><strong>Progress:</strong> ${module.completed_items || 0}/${module.total_items || 0} · <strong>Last score:</strong> ${formatScore(module.last_score)}</p>
+      <p><strong>Target:</strong> ${escapeHtml(target || "Ikuti latihan sampai mencapai target skor.")}</p>
+      <button class="ghost-button" type="button" data-grammar-hub-section="${escapeHtml(section)}">${escapeHtml(buttonLabel)}</button>
+    </article>
+  `;
+}
+
+function grammarHubCard(section, title, description, badge) {
+  const module = getGrammarModuleBySection(section);
+  const status = module.status || "not_started";
+  return `
+    <article class="module-card soft">
+      <div class="split-row">
+        <span class="soft-pill">${escapeHtml(badge)}</span>
+        <span class="soft-pill">${getModuleStatusLabel(status)}</span>
+      </div>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(description)}</p>
+      <div class="progress-bar" aria-label="Progress ${escapeHtml(title)}">
+        <span style="width: ${clampPercent(module.progress_percent)}%"></span>
+      </div>
+      <p><strong>Progress:</strong> ${module.completed_items || 0}/${module.total_items || 0} · <strong>Last score:</strong> ${formatScore(module.last_score)}</p>
+      <p>${escapeHtml(module.next_action || "Buka module ini untuk mulai latihan.")}</p>
+      <button class="primary-button" type="button" data-grammar-hub-section="${escapeHtml(section)}">${escapeHtml(getModuleButtonLabel(status))}</button>
+    </article>
+  `;
+}
+
+function getGrammarRecommendedSection() {
+  const progressRecommended = state.grammarProgress?.recommendedSection?.section;
+  if (progressRecommended) return progressRecommended;
+  const reviewPractice = state.grammarReview?.recommended_practice || null;
+  const mappedReviewSection = mapGrammarRecommendationToSection(reviewPractice);
+  if (mappedReviewSection) return mappedReviewSection;
+
+  const summary = getGrammarProgressSummary();
+  if (!summary.score || summary.score < 30) return "basic_trainer";
+  if (summary.score < 50) return "breakdown";
+  if (summary.score < 65) return "intermediate_trainer";
+  if (summary.score < 75) return "error_correction";
+  if (summary.score < 85) return "sentence_builder";
+  return "simulation";
+}
+
+function getGrammarProgressSummary() {
+  const progressSummary = state.grammarProgress?.summary;
+  if (progressSummary) {
+    return {
+      score: Math.round(Number(progressSummary.grammar_score || 0)),
+      level: progressSummary.grammar_level || "Basic 1 - Sentence Foundation",
+      completedTopics: Number(progressSummary.completed_modules || 0),
+      progressPercent: Math.round(Number(progressSummary.overall_progress_percent || 0)),
+      activeModule: progressSummary.active_module || "basic_trainer",
+      nextAction: progressSummary.next_action || "",
+      finishTarget: progressSummary.finish_target || "Full Grammar Simulation minimal 75%",
+      completedModules: Number(progressSummary.completed_modules || 0),
+      totalModules: Number(progressSummary.total_modules || 8)
+    };
+  }
+  const review = state.grammarReview || {};
+  const weakness = review.weakness_summary || {};
+  const journeySkills = Array.isArray(state.integratedJourney?.skills) ? state.integratedJourney.skills : [];
+  const grammarSkill = journeySkills.find((skill) => skill.skill_type === "grammar") || {};
+  const scoreCandidates = [
+    weakness.average_grammar_score,
+    state.grammarJourney?.grammar_score,
+    grammarSkill.average_score,
+    state.progress?.Grammar
+  ].map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  const score = Math.max(0, Math.min(100, Math.round(scoreCandidates.find((value) => value >= 0) || 0)));
+  const level = state.grammarJourney?.grammar_level
+    || weakness.readiness_level
+    || grammarSkill.current_level
+    || (score >= 85 ? "Advanced 1 - Professional Grammar Usage" : score >= 50 ? "Intermediate 1 - Phrase and Clause Awareness" : "Basic 1 - Sentence Foundation");
+  const completedTopics = Number(state.grammarJourney?.completed_topics || weakness.completed_grammar_attempts || grammarSkill.completed_count || 0);
+  return {
+    score,
+    level,
+    completedTopics,
+    progressPercent: score,
+    activeModule: score < 30 ? "basic_trainer" : score < 50 ? "breakdown" : score < 65 ? "intermediate_trainer" : score < 75 ? "error_correction" : score < 85 ? "sentence_builder" : "simulation",
+    nextAction: "Ikuti langkah Grammar yang direkomendasikan.",
+    finishTarget: "Full Grammar Simulation minimal 75%",
+    completedModules: 0,
+    totalModules: 8
+  };
+}
+
+function getGrammarProgressModules() {
+  const modules = state.grammarProgress?.modules || [];
+  return modules.length ? modules : localGrammarPathModules();
+}
+
+function getGrammarModuleBySection(section) {
+  return getGrammarProgressModules().find((module) => module.section === section) || {
+    module_id: section,
+    title: grammarSectionMeta(section).title,
+    description: "",
+    status: "not_started",
+    progress_percent: 0,
+    completed_items: 0,
+    total_items: section === "simulation" ? 3 : 1,
+    last_score: null,
+    best_score: null,
+    attempt_count: 0,
+    next_action: "Mulai module ini untuk mencatat progress.",
+    recommended: false,
+    section
+  };
+}
+
+function getModuleStatusLabel(status) {
+  const labels = {
+    not_started: "Belum mulai",
+    in_progress: "Sedang berjalan",
+    need_review: "Perlu diulang",
+    completed: "Selesai",
+    recommended: "Direkomendasikan",
+    locked: "Belum dibuka"
+  };
+  return labels[status] || labels.not_started;
+}
+
+function getModuleButtonLabel(status) {
+  const labels = {
+    not_started: "Mulai",
+    in_progress: "Lanjutkan",
+    need_review: "Ulangi",
+    completed: "Selesai",
+    recommended: "Direkomendasikan",
+    locked: "Belum dibuka"
+  };
+  return labels[status] || "Mulai";
+}
+
+function openGrammarModuleFromProgress(section) {
+  setGrammarSection(section || "basic_trainer");
+}
+
+function clampPercent(value) {
+  const number = Number(value || 0);
+  return Math.max(0, Math.min(100, Math.round(number)));
+}
+
+function formatScore(score) {
+  if (score === null || score === undefined || Number.isNaN(Number(score))) return "Belum ada";
+  return `${Math.round(Number(score))}%`;
+}
+
+function localGrammarProgress() {
+  const score = Number(state.progress?.Grammar || 0);
+  const recommendedSection = score < 30 ? "basic_trainer" : score < 50 ? "breakdown" : score < 65 ? "intermediate_trainer" : score < 75 ? "error_correction" : score < 85 ? "sentence_builder" : "simulation";
+  const modules = localGrammarPathModules().map((module) => ({
+    ...module,
+    status: module.section === recommendedSection ? "recommended" : module.status,
+    recommended: module.section === recommendedSection
+  }));
+  return {
+    summary: {
+      overall_progress_percent: score,
+      grammar_level: score >= 85 ? "Advanced 1 - Professional Grammar Usage" : score >= 50 ? "Intermediate 1 - Phrase and Clause Awareness" : "Basic 1 - Sentence Foundation",
+      grammar_score: score,
+      completed_modules: modules.filter((module) => module.status === "completed").length,
+      total_modules: modules.length,
+      active_module: recommendedSection,
+      next_action: grammarSectionMeta(recommendedSection).title,
+      finish_target: "Full Grammar Simulation minimal 75%"
+    },
+    modules,
+    learningPath: modules.map((module, index) => ({ step: index + 1, ...module })),
+    recommendedSection: {
+      section: recommendedSection,
+      title: grammarSectionMeta(recommendedSection).title,
+      reason: "Fallback lokal: mulai dari langkah yang sesuai progress saat ini.",
+      next_action: "Lanjutkan latihan Grammar yang direkomendasikan."
+    },
+    finishStatus: {
+      is_finished: false,
+      finish_rule: "Full Grammar Simulation minimal 75%",
+      full_simulation_score: 0,
+      message: "Belum finish. Ikuti rekomendasi berikutnya sampai siap full simulation minimal 75%."
+    }
+  };
+}
+
+function localGrammarPathModules() {
+  const data = [
+    ["basic_trainer", "Basic Grammar Trainer", "Latihan fondasi: subject, verb, object, modal, dan pola kalimat sederhana.", 7],
+    ["breakdown", "Grammar Breakdown", "Bedah kalimat untuk menemukan subject, main verb, phrase, clause, dan makna Bahasa Indonesia.", 5],
+    ["intermediate_trainer", "Intermediate Grammar Trainer", "Latihan kalimat panjang: gerund, relative clause, passive voice, connector, dan parallel structure.", 7],
+    ["error_correction", "Grammar Error Correction", "Cari kesalahan grammar dan pilih corrected sentence yang benar.", 12],
+    ["sentence_builder", "Grammar Sentence Builder", "Susun kata, lengkapi kalimat, gabungkan kalimat, dan tulis ulang kalimat BA.", 5],
+    ["advanced_lab", "Advanced Grammar Lab", "Latihan grammar formal untuk TOEFL, akademik, dan Business Analyst writing.", 7],
+    ["review", "Grammar Review", "Lihat kelemahan grammar, pola salah berulang, dan rekomendasi latihan ulang.", 1],
+    ["simulation", "Grammar Simulation", "Uji kemampuan grammar melalui simulasi short, medium, atau full.", 3]
+  ];
+  return data.map(([section, title, description, total], index) => ({
+    step: index + 1,
+    module_id: section === "breakdown" ? "grammar_breakdown" : section,
+    title,
+    description,
+    status: "not_started",
+    progress_percent: 0,
+    completed_items: 0,
+    total_items: total,
+    last_score: null,
+    best_score: null,
+    attempt_count: 0,
+    next_action: "Mulai latihan ini untuk mengisi progress.",
+    recommended: false,
+    target_score: section === "simulation" ? 75 : 70,
+    section
+  }));
+}
+
+function mapGrammarRecommendationToSection(recommendation) {
+  if (!recommendation) return null;
+  const raw = [
+    recommendation.recommended_module,
+    recommendation.related_phase_module,
+    recommendation.target_endpoint,
+    recommendation.next_action,
+    recommendation.reason
+  ].filter(Boolean).join(" ").toLowerCase();
+  if (!raw) return null;
+  if (raw.includes("sentence-builder") || raw.includes("sentence builder") || raw.includes("grammar_sentence_builder")) return "sentence_builder";
+  if (raw.includes("error-correction") || raw.includes("error correction")) return "error_correction";
+  if (raw.includes("trainer/intermediate") || raw.includes("intermediate")) return "intermediate_trainer";
+  if (raw.includes("trainer/basic") || raw.includes("basic")) return "basic_trainer";
+  if (raw.includes("advanced") || raw.includes("formal_ba_writing") || raw.includes("nominalization")) return "advanced_lab";
+  if (raw.includes("simulation")) return "simulation";
+  if (raw.includes("review")) return "review";
+  if (raw.includes("breakdown")) return "breakdown";
+  return null;
+}
+
+function grammarSectionMeta(section) {
+  const meta = {
+    breakdown: { title: "Grammar Breakdown" },
+    basic_trainer: { title: "Basic Grammar Trainer" },
+    intermediate_trainer: { title: "Intermediate Grammar Trainer" },
+    error_correction: { title: "Grammar Error Correction" },
+    sentence_builder: { title: "Grammar Sentence Builder" },
+    advanced_lab: { title: "Advanced Grammar Lab" },
+    review: { title: "Grammar Review" },
+    simulation: { title: "Grammar Simulation" }
+  };
+  return meta[section] || meta.basic_trainer;
+}
+
+function setGrammarSection(section) {
+  state.grammarHub = {
+    ...(state.grammarHub || {}),
+    activeSection: section || "menu",
+    activeSubTopic: null
+  };
+  saveState();
+  renderGrammar();
+  if ((section || "menu") === "menu") {
+    refreshGrammarProgress().then(() => renderGrammar()).catch(() => {});
+  }
+}
+
+function grammarBackButton() {
+  return `<button class="ghost-button" type="button" data-grammar-back>Kembali ke Grammar Learning Path</button>`;
+}
+
+function renderGrammarSectionShell(title, subtitle, content) {
+  return `
+    <section class="module-surface">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Grammar Focus</p>
+          <h2>${escapeHtml(title)}</h2>
+          <p>${escapeHtml(subtitle)}</p>
+        </div>
+        ${grammarBackButton()}
+      </div>
+    </section>
+    ${content}
+  `;
+}
+
+function grammarSectionTitle(activeSection) {
+  const titles = {
+    breakdown: "Grammar Breakdown",
+    basic_trainer: "Basic Grammar Trainer",
+    intermediate_trainer: "Intermediate Grammar Trainer",
+    error_correction: "Grammar Error Correction",
+    sentence_builder: "Grammar Sentence Builder",
+    advanced_lab: "Advanced Grammar Lab",
+    review: "Grammar Review",
+    simulation: "Grammar Simulation"
+  };
+  return titles[activeSection] || "Grammar Lab";
+}
+
+function grammarBreakdownPanel() {
+  const grammarSample = "A business analyst operating within a complex enterprise environment must not only elicit requirements but also ensure alignment between stakeholder needs and organizational strategy.";
+  return `
+    <section class="module-grid two">
+      <form id="grammarForm" class="module-surface form-grid">
+        ${beginnerTip("Cara membaca grammar", "Cari subject dulu, lalu verb utama. Abaikan sementara phrase panjang yang hanya menambahkan informasi.")}
+        <label>
+          Kalimat
+          <textarea id="grammarInput">${grammarSample}</textarea>
+        </label>
+        ${renderContextualHelpButton("grammar", "grammar_sentence", grammarSample)}
+        <button class="ghost-button" id="grammarHelpButton" type="button">Bantu pahami grammar</button>
+        <button class="primary-button" type="submit">Analyze Grammar</button>
+      </form>
+      <div id="grammarResult" class="module-surface grammar-result-panel">
+        ${emptyStateTemplate("Hasil breakdown akan muncul di sini", "Submit satu kalimat untuk melihat Subject, Main Verb, Phrase, Pattern, dan terjemahan.")}
+      </div>
+    </section>
+  `;
 }
 
 function grammarAnalysis(sentence) {
@@ -4494,6 +5170,7 @@ async function submitBasicGrammarTrainer() {
       });
       state.grammarTrainer.result = response;
       await refreshIntegratedJourney();
+      await refreshGrammarProgress();
       saveState();
       return;
     } catch (error) {
@@ -4694,6 +5371,7 @@ async function submitIntermediateGrammarTrainer() {
       });
       state.intermediateGrammarTrainer.result = response;
       await refreshIntegratedJourney();
+      await refreshGrammarProgress();
       saveState();
       return;
     } catch (error) {
@@ -4923,6 +5601,7 @@ async function submitGrammarErrorCorrection() {
       });
       state.grammarErrorCorrection.result = response;
       await refreshIntegratedJourney();
+      await refreshGrammarProgress();
       saveState();
       return;
     } catch (error) {
@@ -5157,6 +5836,7 @@ async function submitGrammarSentenceBuilder() {
       });
       state.grammarSentenceBuilder.result = response;
       await refreshIntegratedJourney();
+      await refreshGrammarProgress();
       saveState();
       return;
     } catch (error) {
@@ -5433,6 +6113,7 @@ async function submitAdvancedGrammarPractice() {
       });
       state.grammarAdvancedLab.practiceResult = response;
       await refreshIntegratedJourney();
+      await refreshGrammarProgress();
       saveState();
       return;
     } catch (error) {
@@ -5457,6 +6138,7 @@ async function submitAdvancedGrammarRewrite() {
       });
       state.grammarAdvancedLab.rewriteResult = response;
       await refreshIntegratedJourney();
+      await refreshGrammarProgress();
       saveState();
       return;
     } catch (error) {
@@ -5903,6 +6585,7 @@ async function submitGrammarSimulation() {
       state.grammarSimulation.result = response.result;
       state.grammarSimulation.history = historyResponse.history || [];
       await refreshIntegratedJourney();
+      await refreshGrammarProgress();
       saveState();
       return;
     } catch (error) {

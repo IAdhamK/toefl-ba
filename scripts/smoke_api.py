@@ -850,6 +850,61 @@ def main():
         status == 200 and isinstance(grammar_sim_history.get("history"), list),
     )
 
+    status, grammar_progress = call("/grammar/progress")
+    progress_modules = grammar_progress.get("modules", [])
+    progress_module_ids = {module.get("module_id") for module in progress_modules}
+    assert_ok(
+        "grammar progress",
+        status == 200
+        and "summary" in grammar_progress
+        and isinstance(progress_modules, list)
+        and "basic_trainer" in progress_module_ids
+        and "simulation" in progress_module_ids
+        and "recommended_section" in grammar_progress
+        and "finish_status" in grammar_progress,
+    )
+
+    status, grammar_progress_summary = call("/grammar/progress/summary")
+    assert_ok(
+        "grammar progress summary",
+        status == 200
+        and "summary" in grammar_progress_summary
+        and "overall_progress_percent" in grammar_progress_summary["summary"],
+    )
+
+    status, grammar_progress_modules = call("/grammar/progress/modules")
+    module_ids = {module.get("module_id") for module in grammar_progress_modules.get("modules", [])}
+    assert_ok(
+        "grammar progress modules",
+        status == 200
+        and "basic_trainer" in module_ids
+        and "simulation" in module_ids,
+    )
+
+    status, grammar_progress_path = call("/grammar/progress/path")
+    assert_ok(
+        "grammar progress path",
+        status == 200
+        and isinstance(grammar_progress_path.get("learning_path"), list)
+        and len(grammar_progress_path["learning_path"]) >= 8,
+    )
+
+    status, grammar_recommended_section = call("/grammar/progress/recommended-section")
+    assert_ok(
+        "grammar progress recommended section",
+        status == 200
+        and "recommended_section" in grammar_recommended_section
+        and grammar_recommended_section["recommended_section"].get("section"),
+    )
+
+    status, grammar_finish_status = call("/grammar/progress/finish-status")
+    assert_ok(
+        "grammar progress finish status",
+        status == 200
+        and "finish_status" in grammar_finish_status
+        and "is_finished" in grammar_finish_status["finish_status"],
+    )
+
     status, writing = call("/writing/evaluate", {"text": "The system must flexible for all user and make report faster."})
     assert_ok("writing evaluate", status == 200 and writing["score"] < 82)
 

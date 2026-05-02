@@ -46,6 +46,13 @@ from backend.services.grammar_review_service import (
     get_grammar_review_queue,
     get_grammar_weakness_summary,
 )
+from backend.services.grammar_progress_service import (
+    get_grammar_finish_status,
+    get_grammar_learning_path,
+    get_grammar_module_progress,
+    get_grammar_progress_summary,
+    get_recommended_grammar_section,
+)
 from backend.services.grammar_topic_service import (
     get_grammar_levels,
     get_grammar_topic,
@@ -151,6 +158,36 @@ def grammar_recommended_practice(user_id: str | None = Query(default=None)) -> d
         "weakness_summary": weakness,
         "primary_pattern": patterns[0] if patterns else {},
     }
+
+
+@router.get("/progress")
+def grammar_progress(user_id: str | None = Query(default=None)) -> dict:
+    return get_grammar_module_progress(user_id)
+
+
+@router.get("/progress/summary")
+def grammar_progress_summary(user_id: str | None = Query(default=None)) -> dict:
+    return {"summary": get_grammar_progress_summary(user_id)}
+
+
+@router.get("/progress/modules")
+def grammar_progress_modules(user_id: str | None = Query(default=None)) -> dict:
+    return {"modules": get_grammar_module_progress(user_id)["modules"]}
+
+
+@router.get("/progress/path")
+def grammar_progress_path(user_id: str | None = Query(default=None)) -> dict:
+    return get_grammar_learning_path(user_id)
+
+
+@router.get("/progress/recommended-section")
+def grammar_progress_recommended_section(user_id: str | None = Query(default=None)) -> dict:
+    return {"recommended_section": get_recommended_grammar_section(user_id)}
+
+
+@router.get("/progress/finish-status")
+def grammar_progress_finish_status(user_id: str | None = Query(default=None)) -> dict:
+    return {"finish_status": get_grammar_finish_status(user_id)}
 
 
 @router.get("/trainer/basic")
