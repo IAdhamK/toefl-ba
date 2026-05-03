@@ -298,6 +298,87 @@ Testing checklist:
 - User bisa submit simulation set. Done.
 - Final report menampilkan score dan sub-skill. Done.
 
+### Reading Subfeature Progress UI
+
+Status: Completed
+
+Completed:
+
+- Added `backend/services/reading_progress_service.py` to calculate progress per Reading subfeature.
+- Added Reading progress endpoints:
+  - `GET /api/reading/progress`
+  - `GET /api/reading/progress/summary`
+  - `GET /api/reading/progress/modules`
+  - `GET /api/reading/progress/path`
+  - `GET /api/reading/progress/recommended-section`
+  - `GET /api/reading/progress/finish-status`
+- Reading subfeatures now have visible status:
+  - `Belum mulai`
+  - `Sedang berjalan`
+  - `Perlu diulang`
+  - `Selesai`
+  - `Direkomendasikan`
+- Reading page now shows a progress summary, status board, recommended next step, and finish target.
+- Reading mode tabs now show status and progress percentage.
+- Reading roadmap/action cards now show progress, completed items, last score, and clear action labels.
+- Each Reading subfeature panel now shows its own progress banner.
+- Guided Reading completion now saves a support attempt with `activity_type = guided_reading`, so guided progress can move.
+
+Known limitations:
+
+- Progress is calculated from existing `learning_attempts` and `skill_mastery`, not from a dedicated Reading module progress table.
+- Some older local attempts may not include enough metadata to map perfectly to subfeatures.
+- Full finish target is still simple: Full Reading Simulation minimal 75%.
+
+### Guided Reading Progress Target Fix
+
+Status: Completed
+
+Completed:
+
+- Guided Reading progress now follows the number of active Reading passages available in the app, with a maximum target of 3 short passages.
+- If only 2 active passages exist, Guided Reading is considered complete at `2/2`.
+- If 3 or more passages exist, the target remains `3/3`.
+- The next action text now tells the user to finish available active passages instead of always saying minimal 3 passages.
+
+Problem solved:
+
+- Users no longer get stuck at `2/3 selesai` when the app currently only provides 2 active Reading passages.
+
+### Reading Review Completion Clarity
+
+Status: Completed
+
+Completed:
+
+- Reading Review progress now uses active Review Queue items instead of showing a misleading `1/1 selesai` while progress is still below 100%.
+- The Review banner now shows how many review items are completed and labels the score as weak-skill mastery.
+- The Reading Review panel now explains how to reach 100%:
+  - click `Latihan Ulang Skill Lemah`,
+  - practice the recommended trainer skill,
+  - raise the priority skill mastery to at least 70%,
+  - return to Review until the queue is resolved.
+- Review Queue items now include a completion rule so users know what counts as finished.
+
+Problem solved:
+
+- Users can now see that Review is completed by resolving weak-skill review items, not merely by opening the Review page.
+
+### Reading Review Mode Removed From Main UI
+
+Status: Completed
+
+Completed:
+
+- The standalone `Reading Review` mode is no longer shown in the Reading Lab navigation, roadmap cards, or progress module list.
+- Existing review-related backend endpoints remain available for compatibility and for answer explanation data.
+- If an older saved frontend state still points to `review`, the app now redirects the user to `Reading Trainer`.
+- Answer Review after submitting Reading questions remains available because it teaches why answers are correct or wrong.
+
+Problem solved:
+
+- Users no longer see a separate Review subfeature that feels unclear or hard to finish.
+
 ## Completed Items
 
 - Reading Analyzer MVP.

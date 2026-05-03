@@ -106,6 +106,62 @@ def main():
     status, reading_recommendation = call("/reading/recommendation")
     assert_ok("reading recommendation", status == 200 and "recommended_action" in reading_recommendation["recommendation"])
 
+    status, reading_progress = call("/reading/progress")
+    reading_progress_modules = reading_progress.get("modules", [])
+    reading_progress_module_ids = {module.get("module_id") for module in reading_progress_modules}
+    assert_ok(
+        "reading progress",
+        status == 200
+        and "summary" in reading_progress
+        and isinstance(reading_progress_modules, list)
+        and isinstance(reading_progress.get("learning_path"), list)
+        and "guided" in reading_progress_module_ids
+        and "practice" in reading_progress_module_ids
+        and "simulation" in reading_progress_module_ids
+        and "recommended_section" in reading_progress
+        and "finish_status" in reading_progress,
+    )
+
+    status, reading_progress_summary = call("/reading/progress/summary")
+    assert_ok(
+        "reading progress summary",
+        status == 200
+        and "summary" in reading_progress_summary
+        and "overall_progress_percent" in reading_progress_summary["summary"],
+    )
+
+    status, reading_progress_modules_response = call("/reading/progress/modules")
+    reading_module_ids = {module.get("module_id") for module in reading_progress_modules_response.get("modules", [])}
+    assert_ok(
+        "reading progress modules",
+        status == 200
+        and "trainer" in reading_module_ids
+        and "simulation" in reading_module_ids
+        and "review" not in reading_module_ids,
+    )
+
+    status, reading_progress_path = call("/reading/progress/path")
+    assert_ok(
+        "reading progress path",
+        status == 200
+        and isinstance(reading_progress_path.get("learning_path"), list)
+        and len(reading_progress_path["learning_path"]) >= 5,
+    )
+
+    status, reading_recommended_section = call("/reading/progress/recommended-section")
+    assert_ok(
+        "reading progress recommended section",
+        status == 200
+        and reading_recommended_section.get("recommended_section", {}).get("section"),
+    )
+
+    status, reading_finish_status = call("/reading/progress/finish-status")
+    assert_ok(
+        "reading progress finish status",
+        status == 200
+        and "is_finished" in reading_finish_status.get("finish_status", {}),
+    )
+
     status, reading_attempt = call(
         "/reading/attempt",
         {
@@ -858,6 +914,8 @@ def main():
         status == 200
         and "summary" in grammar_progress
         and isinstance(progress_modules, list)
+        and isinstance(grammar_progress.get("learning_path"), list)
+        and len(grammar_progress["learning_path"]) >= 8
         and "basic_trainer" in progress_module_ids
         and "simulation" in progress_module_ids
         and "recommended_section" in grammar_progress

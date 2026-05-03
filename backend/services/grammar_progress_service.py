@@ -117,7 +117,7 @@ def get_grammar_module_progress(user_id: str | None = None) -> dict[str, Any]:
     modules = [_mark_recommended(module, recommended["module_id"]) for module in modules]
     summary = get_grammar_progress_summary(user_id, modules=modules, journey=journey, recommended=recommended)
     finish_status = get_grammar_finish_status(user_id, modules=modules, history=history)
-    learning_path = get_grammar_learning_path(user_id, modules=modules)
+    learning_path = get_grammar_learning_path(user_id, modules=modules).get("learning_path", [])
     return {
         "summary": summary,
         "modules": modules,

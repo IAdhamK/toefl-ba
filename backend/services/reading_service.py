@@ -799,10 +799,13 @@ def get_reading_review_queue(user_id: str | None = None) -> dict[str, Any]:
                 "id": f"review-subskill-{item['subskill']}",
                 "type": "weak_subskill",
                 "title": f"Review {item['label']}",
+                "source_sub_skill": item["subskill"],
+                "target_sub_skill": target,
                 "sub_skill": target,
                 "priority": index,
                 "reason": f"Mastery {round(item['mastery_score'])}% dengan {item['wrong_count']} jawaban salah.",
                 "action": READING_ACTIONS.get(target, READING_ACTIONS["main_idea"]),
+                "completion_rule": "Selesai jika mastery skill ini minimal 70% atau rekomendasi latihan penggantinya sudah kuat.",
             }
         )
     for passage in low_score_passages(attempts)[:3]:

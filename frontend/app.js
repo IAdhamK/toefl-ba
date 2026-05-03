@@ -72,19 +72,28 @@ const defaultState = {
     startedAtMs: null,
     history: []
   },
+  readingProgress: {
+    summary: null,
+    modules: [],
+    learningPath: [],
+    recommendedSection: null,
+    finishStatus: null
+  },
   grammarTrainer: {
     selectedTopic: "subject_verb",
     topics: [],
     trainer: null,
     answers: {},
-    result: null
+    result: null,
+    topicProgress: {}
   },
   intermediateGrammarTrainer: {
     selectedTopic: "gerund_vs_main_verb",
     topics: [],
     trainer: null,
     answers: {},
-    result: null
+    result: null,
+    topicProgress: {}
   },
   grammarErrorCorrection: {
     selectedErrorType: "missing_be_after_modal",
@@ -92,7 +101,8 @@ const defaultState = {
     category: null,
     items: [],
     answers: {},
-    result: null
+    result: null,
+    errorProgress: {}
   },
   grammarSentenceBuilder: {
     selectedLevel: "basic",
@@ -100,7 +110,8 @@ const defaultState = {
     levels: [],
     items: [],
     answers: {},
-    result: null
+    result: null,
+    modeProgress: {}
   },
   grammarAdvancedLab: {
     selectedTopic: "nominalization",
@@ -109,7 +120,8 @@ const defaultState = {
     practiceAnswers: {},
     rewriteAnswers: {},
     practiceResult: null,
-    rewriteResult: null
+    rewriteResult: null,
+    topicProgress: {}
   },
   grammarReview: null,
   grammarSimulation: {
@@ -118,7 +130,8 @@ const defaultState = {
     session: null,
     answers: {},
     result: null,
-    history: []
+    history: [],
+    modeProgress: {}
   },
   grammarHub: {
     activeSection: "menu",
@@ -130,6 +143,11 @@ const defaultState = {
     learningPath: [],
     recommendedSection: null,
     finishStatus: null
+  },
+  grammarBreakdown: {
+    sentence: "",
+    analysis: null,
+    fallbackHtml: ""
   },
   adaptivePractice: null,
   chat: [
@@ -772,6 +790,7 @@ function loadState() {
     },
     readingReview: parsed.readingReview || null,
     readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(parsed.readingTrainer || {}) },
+    readingProgress: { ...structuredClone(defaultState.readingProgress), ...(parsed.readingProgress || {}) },
     grammarTrainer: { ...structuredClone(defaultState.grammarTrainer), ...(parsed.grammarTrainer || {}) },
     intermediateGrammarTrainer: { ...structuredClone(defaultState.intermediateGrammarTrainer), ...(parsed.intermediateGrammarTrainer || {}) },
     grammarErrorCorrection: { ...structuredClone(defaultState.grammarErrorCorrection), ...(parsed.grammarErrorCorrection || {}) },
@@ -781,6 +800,7 @@ function loadState() {
     grammarSimulation: { ...structuredClone(defaultState.grammarSimulation), ...(parsed.grammarSimulation || {}) },
     grammarHub: { ...structuredClone(defaultState.grammarHub), ...(parsed.grammarHub || {}) },
     grammarProgress: { ...structuredClone(defaultState.grammarProgress), ...(parsed.grammarProgress || {}) },
+    grammarBreakdown: { ...structuredClone(defaultState.grammarBreakdown), ...(parsed.grammarBreakdown || {}) },
     guidedReading: { ...structuredClone(defaultState.guidedReading), ...(parsed.guidedReading || {}) },
     readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(parsed.readingSimulation || {}) },
     chat: parsed.chat || structuredClone(defaultState.chat)
@@ -820,6 +840,7 @@ async function hydrateFromApi() {
         },
         readingReview: stateResponse.state.readingReview || state.readingReview || null,
         readingTrainer: { ...structuredClone(defaultState.readingTrainer), ...(stateResponse.state.readingTrainer || state.readingTrainer || {}) },
+        readingProgress: { ...structuredClone(defaultState.readingProgress), ...(stateResponse.state.readingProgress || state.readingProgress || {}) },
         grammarTrainer: { ...structuredClone(defaultState.grammarTrainer), ...(stateResponse.state.grammarTrainer || state.grammarTrainer || {}) },
         intermediateGrammarTrainer: { ...structuredClone(defaultState.intermediateGrammarTrainer), ...(stateResponse.state.intermediateGrammarTrainer || state.intermediateGrammarTrainer || {}) },
         grammarErrorCorrection: { ...structuredClone(defaultState.grammarErrorCorrection), ...(stateResponse.state.grammarErrorCorrection || state.grammarErrorCorrection || {}) },
@@ -829,6 +850,7 @@ async function hydrateFromApi() {
         grammarSimulation: { ...structuredClone(defaultState.grammarSimulation), ...(stateResponse.state.grammarSimulation || state.grammarSimulation || {}) },
         grammarHub: { ...structuredClone(defaultState.grammarHub), ...(stateResponse.state.grammarHub || state.grammarHub || {}) },
         grammarProgress: { ...structuredClone(defaultState.grammarProgress), ...(stateResponse.state.grammarProgress || state.grammarProgress || {}) },
+        grammarBreakdown: { ...structuredClone(defaultState.grammarBreakdown), ...(stateResponse.state.grammarBreakdown || state.grammarBreakdown || {}) },
         guidedReading: { ...structuredClone(defaultState.guidedReading), ...(stateResponse.state.guidedReading || state.guidedReading || {}) },
         readingSimulation: { ...structuredClone(defaultState.readingSimulation), ...(stateResponse.state.readingSimulation || state.readingSimulation || {}) }
       };
@@ -846,6 +868,7 @@ async function hydrateFromApi() {
     state.latestAnalytics = analyticsResponse.analytics;
     await refreshIntegratedJourney();
     await refreshReadingJourney();
+    await refreshReadingProgress();
     await refreshGrammarProgress();
   } catch (error) {
     apiOnline = false;
@@ -853,6 +876,7 @@ async function hydrateFromApi() {
     state.readingJourney = localReadingJourney();
     state.readingReview = localReadingReview();
     state.readingTrainer = localReadingTrainerState();
+    state.readingProgress = localReadingProgress();
     state.grammarProgress = localGrammarProgress();
   }
 }
@@ -884,12 +908,39 @@ async function refreshReadingJourney() {
     await refreshReadingTrainer(state.readingTrainer?.selectedSubSkill || "main_idea");
     await refreshReadingReview();
     await refreshReadingSimulationHistory();
+    await refreshReadingProgress();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
     apiOnline = false;
     state.readingJourney = localReadingJourney();
     state.readingReview = localReadingReview();
     state.readingTrainer = localReadingTrainerState();
+  }
+}
+
+async function refreshReadingProgress() {
+  if (!apiOnline) {
+    state.readingProgress = localReadingProgress();
+    return;
+  }
+  try {
+    const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
+    const response = await apiRequest(`/reading/progress${query}`);
+    const learningPath = Array.isArray(response.learning_path)
+      ? response.learning_path
+      : Array.isArray(response.learning_path?.learning_path)
+        ? response.learning_path.learning_path
+        : [];
+    state.readingProgress = {
+      summary: response.summary || null,
+      modules: response.modules || [],
+      learningPath,
+      recommendedSection: response.recommended_section || null,
+      finishStatus: response.finish_status || null
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    state.readingProgress = localReadingProgress();
   }
 }
 
@@ -949,10 +1000,15 @@ async function refreshGrammarProgress() {
   try {
     const query = state.user?.id ? `?user_id=${encodeURIComponent(state.user.id)}` : "";
     const response = await apiRequest(`/grammar/progress${query}`);
+    const learningPath = Array.isArray(response.learning_path)
+      ? response.learning_path
+      : Array.isArray(response.learning_path?.learning_path)
+        ? response.learning_path.learning_path
+        : [];
     state.grammarProgress = {
       summary: response.summary || null,
       modules: response.modules || [],
-      learningPath: response.learning_path || [],
+      learningPath,
       recommendedSection: response.recommended_section || null,
       finishStatus: response.finish_status || null
     };
@@ -1012,6 +1068,9 @@ function bindShell() {
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", async () => {
       state.activeView = button.dataset.view;
+      if (state.activeView === "reading") {
+        await refreshReadingProgress();
+      }
       if (state.activeView === "grammar") {
         await refreshGrammarProgress();
       }
@@ -2499,6 +2558,7 @@ function renderReading() {
   state.readingMode = activeMode;
   document.getElementById("readingView").innerHTML = `
     ${readingJourneyLabTop()}
+    ${readingProgressOverview()}
     ${readingHero(selectedLesson)}
     ${readingModeTabs(activeMode)}
     <section class="reading-workspace">
@@ -2511,8 +2571,9 @@ function renderReading() {
   });
 
   document.querySelectorAll("[data-reading-mode]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       state.readingMode = normalizeReadingMode(button.dataset.readingMode);
+      await refreshReadingProgress();
       saveState();
       renderReading();
     });
@@ -2566,6 +2627,7 @@ function renderReading() {
     saveState();
     await refreshIntegratedJourney();
     await refreshReadingJourney();
+    await refreshReadingProgress();
     document.getElementById("readingResult").innerHTML = resultTemplate(
       score >= 70 ? "success" : "warning",
       `Skor Reading: ${score}`,
@@ -2580,6 +2642,7 @@ function renderReading() {
   });
   document.getElementById("continueReadingButton")?.addEventListener("click", () => {
     state.readingMode = "practice";
+    refreshReadingProgress().catch(() => {});
     saveState();
     renderReading();
     document.getElementById("readingPracticePanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2593,6 +2656,7 @@ function renderReading() {
       state.readingTrainer = localReadingTrainerState(subSkill);
     }
     state.readingMode = "trainer";
+    await refreshReadingProgress();
     saveState();
     renderReading();
     document.getElementById("readingTrainerPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2630,6 +2694,17 @@ function renderReading() {
     await nextGuidedReadingStep(selectedLesson);
   });
 
+  document.querySelectorAll("[data-guided-step-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.guidedReading = {
+        ...(state.guidedReading || {}),
+        activeStep: Number(button.dataset.guidedStepIndex || 0)
+      };
+      saveState();
+      renderReading();
+    });
+  });
+
   document.querySelectorAll("[data-reading-trainer-subskill]").forEach((button) => {
     button.addEventListener("click", async () => {
       const subSkill = button.dataset.readingTrainerSubskill;
@@ -2655,7 +2730,8 @@ function renderReading() {
 }
 
 function normalizeReadingMode(mode) {
-  const allowed = ["overview", "practice", "guided", "trainer", "review", "simulation"];
+  if (mode === "review") return "trainer";
+  const allowed = ["overview", "practice", "guided", "trainer", "simulation"];
   return allowed.includes(mode) ? mode : "overview";
 }
 
@@ -2687,6 +2763,75 @@ function readingJourneyLabTop() {
         <button class="primary-button" type="button" data-reading-mode="practice">Lanjutkan Reading</button>
       </article>
     </section>
+  `;
+}
+
+function readingProgressOverview() {
+  const summary = getReadingProgressSummary();
+  const recommended = state.readingProgress?.recommendedSection || {};
+  const recommendedSection = getReadingRecommendedSection();
+  const recommendedTitle = recommended.title || readingModeMeta(recommendedSection).title;
+  const modules = getReadingProgressModules();
+  const statuses = [
+    ["recommended", "Direkomendasikan"],
+    ["not_started", "Belum mulai"],
+    ["in_progress", "Sedang berjalan"],
+    ["need_review", "Perlu diulang"],
+    ["completed", "Selesai"]
+  ];
+  return `
+    <section class="reading-progress-overview-card">
+      <div class="section-heading compact">
+        <div>
+          <p class="eyebrow">Progress Subfitur Reading</p>
+          <h3>${summary.progressPercent}% selesai · ${escapeHtml(summary.level)}</h3>
+          <p>${escapeHtml(`Langkah berikutnya: ${recommendedTitle}. ${summary.nextAction || "Ikuti rekomendasi Reading satu per satu."}`)}</p>
+        </div>
+        <button class="primary-button" type="button" data-reading-mode="${escapeHtml(recommendedSection)}">Mulai / Lanjutkan Rekomendasi</button>
+      </div>
+      ${readingPercentBar(summary.progressPercent)}
+      <div class="reading-progress-status-grid">
+        ${statuses.map(([status, label]) => {
+          const count = modules.filter((module) => module.status === status).length;
+          return `
+            <div class="reading-status-count status-${escapeHtml(status)}">
+              <strong>${count}</strong>
+              <span>${escapeHtml(label)}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      <div class="reading-finish-strip">
+        <strong>Target finish:</strong>
+        <span>${escapeHtml(summary.finishTarget || "Full Reading Simulation minimal 75%")}</span>
+      </div>
+    </section>
+  `;
+}
+
+function readingModuleProgressBanner(mode) {
+  const module = getReadingModuleByMode(mode);
+  const status = module.status || "not_started";
+  const completionText = mode === "review"
+    ? `${module.completed_items || 0}/${module.total_items || 0} item review selesai`
+    : `${module.completed_items || 0}/${module.total_items || 0} selesai`;
+  const scoreText = mode === "review"
+    ? `Weak mastery: ${formatScore(module.last_score)}`
+    : `Last score: ${formatScore(module.last_score)}`;
+  return `
+    <article class="reading-module-banner status-${escapeHtml(status)}">
+      <div>
+        <span class="reading-status-pill status-${escapeHtml(status)}">${getReadingStatusLabel(status)}</span>
+        <h3>${escapeHtml(module.title || readingModeMeta(mode).title)}</h3>
+        <p><strong>Next action:</strong> ${escapeHtml(module.next_action || "Kerjakan mode ini agar progress Reading tercatat.")}</p>
+      </div>
+      <div class="reading-module-banner-stats">
+        <strong>Progress: ${clampPercent(module.progress_percent)}%</strong>
+        <span>${escapeHtml(completionText)}</span>
+        <span>${escapeHtml(scoreText)}</span>
+      </div>
+      ${readingPercentBar(module.progress_percent)}
+    </article>
   `;
 }
 
@@ -2724,8 +2869,7 @@ function readingModeTabs(activeMode) {
   const guidanceTabs = [
     ["overview", "Overview", "Ringkasan"],
     ["guided", "Guided", "Langkah pelan"],
-    ["trainer", "Trainer", "Sub-skill"],
-    ["review", "Review", "Pola salah"]
+    ["trainer", "Trainer", "Sub-skill"]
   ];
   const testingTabs = [
     ["practice", "Practice", "Soal TOEFL"],
@@ -2736,9 +2880,9 @@ function readingModeTabs(activeMode) {
       <section class="reading-mode-group guidance">
         <div class="reading-mode-group-label">
           <span>Guidance Lab</span>
-          <small>Belajar pelan, review, dan perbaiki skill</small>
+          <small>Belajar pelan dan perbaiki skill</small>
         </div>
-        <div class="reading-mode-tabs guidance-tabs">
+        <div class="reading-mode-tabs guidance-tabs" style="--reading-tab-count: ${guidanceTabs.length}">
           ${guidanceTabs.map(([mode, label, hint]) => readingModeTabButton(mode, label, hint, activeMode, "guidance")).join("")}
         </div>
       </section>
@@ -2747,7 +2891,7 @@ function readingModeTabs(activeMode) {
           <span>Testing Zone</span>
           <small>Uji pemahaman dengan soal dan timer</small>
         </div>
-        <div class="reading-mode-tabs testing-tabs">
+        <div class="reading-mode-tabs testing-tabs" style="--reading-tab-count: ${testingTabs.length}">
           ${testingTabs.map(([mode, label, hint]) => readingModeTabButton(mode, label, hint, activeMode, "testing")).join("")}
         </div>
       </section>
@@ -2756,21 +2900,30 @@ function readingModeTabs(activeMode) {
 }
 
 function readingModeTabButton(mode, label, hint, activeMode, group) {
+  const module = getReadingModuleByMode(mode);
+  const status = module.status || "not_started";
   return `
     <button class="reading-mode-tab ${group} ${activeMode === mode ? "active" : ""}" type="button" data-reading-mode="${mode}">
-      <strong>${label}</strong>
+      <div class="reading-mode-tab-top">
+        <strong>${label}</strong>
+        <span class="reading-status-pill status-${escapeHtml(status)}">${getReadingStatusLabel(status)}</span>
+      </div>
       <span>${hint}</span>
+      <div class="reading-mode-mini-progress">
+        <i style="width: ${clampPercent(module.progress_percent)}%"></i>
+      </div>
+      <small>${clampPercent(module.progress_percent)}% · ${module.completed_items || 0}/${module.total_items || 0}</small>
     </button>
   `;
 }
 
 function readingActivePanel(activeMode, selectedLesson, allLessons) {
-  if (activeMode === "practice") return readingPracticeLayout(selectedLesson, allLessons);
-  if (activeMode === "guided") return readingGuidedLayout(selectedLesson, allLessons);
-  if (activeMode === "trainer") return `${readingSubskillProgress()}${readingTrainerPanel()}`;
-  if (activeMode === "review") return readingReviewPanel();
-  if (activeMode === "simulation") return readingSimulationPanel();
-  return readingOverviewLayout(selectedLesson, allLessons);
+  let panel = readingOverviewLayout(selectedLesson, allLessons);
+  if (activeMode === "practice") panel = readingPracticeLayout(selectedLesson, allLessons);
+  if (activeMode === "guided") panel = readingGuidedLayout(selectedLesson, allLessons);
+  if (activeMode === "trainer") panel = `${readingSubskillProgress()}${readingTrainerPanel()}`;
+  if (activeMode === "simulation") panel = readingSimulationPanel();
+  return `${readingModuleProgressBanner(activeMode)}${panel}`;
 }
 
 function readingOverviewLayout(selectedLesson, allLessons) {
@@ -2786,38 +2939,50 @@ function readingOverviewLayout(selectedLesson, allLessons) {
 }
 
 function readingNextStepsPanel() {
+  const steps = [
+    ["guided", "Guided Reading", "Pahami judul, subject/verb, vocabulary, paragraph map, dan main idea.", "Belajar pelan"],
+    ["practice", "Practice Questions", "Kerjakan soal dari passage aktif dan lihat Answer Review.", "Soal TOEFL"],
+    ["trainer", "Reading Trainer", "Latihan main idea, detail, inference, vocabulary, dan sentence breakdown.", "Sub-skill"],
+    ["simulation", "Reading Simulation", "Latihan Reading dengan timer dan final report.", "Finish line"]
+  ];
   return `
     <section class="panel reading-next-steps">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Alur belajar Reading</p>
           <h3>Pilih mode sesuai kebutuhan hari ini</h3>
-          <p>Mulai dari Guided kalau masih bingung, Practice untuk soal normal, Trainer untuk skill lemah, atau Simulation untuk latihan timer.</p>
+          <p>Setiap mode sekarang punya status dan progress. Mulai dari yang direkomendasikan, ulangi yang lemah, lalu selesaikan simulation.</p>
         </div>
       </div>
       <div class="reading-action-grid">
-        <button class="metric ghost-button" type="button" data-reading-mode="guided">
-          <span class="muted">Step-by-step</span>
-          <strong class="metric-word">Guided Reading</strong>
-          <small>Pahami judul, subject/verb, vocabulary, dan main idea.</small>
-        </button>
-        <button class="metric ghost-button" type="button" data-reading-mode="practice">
-          <span class="muted">TOEFL questions</span>
-          <strong class="metric-word">Practice</strong>
-          <small>Kerjakan soal dari passage aktif dan lihat review jawaban.</small>
-        </button>
-        <button class="metric ghost-button" type="button" data-reading-mode="trainer">
-          <span class="muted">Skill lemah</span>
-          <strong class="metric-word">Trainer</strong>
-          <small>Latihan main idea, detail, inference, vocabulary, dan sentence breakdown.</small>
-        </button>
-        <button class="metric ghost-button" type="button" data-reading-mode="simulation">
-          <span class="muted">Timed mode</span>
-          <strong class="metric-word">Simulation</strong>
-          <small>Latihan Reading dengan timer dan final report.</small>
-        </button>
+        ${steps.map(([mode, title, description, badge]) => readingModuleProgressCard(mode, title, description, badge)).join("")}
       </div>
     </section>
+  `;
+}
+
+function readingModuleProgressCard(mode, title, description, badge) {
+  const module = getReadingModuleByMode(mode);
+  const status = module.status || "not_started";
+  const completionText = mode === "review"
+    ? `${module.completed_items || 0}/${module.total_items || 0} item review`
+    : `${module.completed_items || 0}/${module.total_items || 0} selesai`;
+  const scoreText = mode === "review"
+    ? `Weak mastery: ${formatScore(module.last_score)}`
+    : `Last score: ${formatScore(module.last_score)}`;
+  return `
+    <button class="reading-module-progress-card status-${escapeHtml(status)}" type="button" data-reading-mode="${escapeHtml(mode)}">
+      <span class="reading-card-topline">
+        <span class="reading-badge">${escapeHtml(badge)}</span>
+        <span class="reading-status-pill status-${escapeHtml(status)}">${getReadingStatusLabel(status)}</span>
+      </span>
+      <strong>${escapeHtml(title)}</strong>
+      <small>${escapeHtml(description)}</small>
+      ${readingPercentBar(module.progress_percent)}
+      <span class="reading-card-meta">Progress ${clampPercent(module.progress_percent)}% · ${escapeHtml(completionText)}</span>
+      <span class="reading-card-meta">${escapeHtml(scoreText)}</span>
+      <span class="reading-card-action">${escapeHtml(getReadingButtonLabel(status))}</span>
+    </button>
   `;
 }
 
@@ -2997,6 +3162,7 @@ function readingReviewPanel() {
           ${readingMiniStat("Bantuan ID", weakness.bantuan_id_usage?.level || "normal")}
         </div>
       </div>
+      ${readingReviewCompletionGuide(review)}
       <div class="reading-two-column">
         <div class="reading-soft-card">
           <h3>Mistake pattern</h3>
@@ -3018,6 +3184,7 @@ function readingReviewPanel() {
                 <strong>${escapeHtml(item.title || "")}</strong>
                 <p>${escapeHtml(item.reason || "")}</p>
                 <small>${escapeHtml(item.action || "")}</small>
+                ${item.completion_rule ? `<span class="reading-card-meta">${escapeHtml(item.completion_rule)}</span>` : ""}
               </article>
             `).join("") : `<p class="muted">Belum ada item review.</p>`}
           </div>
@@ -3050,6 +3217,45 @@ function readingReviewPanel() {
         </div>
       ` : ""}
     </section>
+  `;
+}
+
+function readingReviewCompletionGuide(review) {
+  const module = getReadingModuleByMode("review");
+  const total = Number(module.total_items || 0);
+  const completed = Number(module.completed_items || 0);
+  const remaining = Math.max(total - completed, 0);
+  const progress = clampPercent(module.progress_percent);
+  return `
+    <div class="reading-review-guide">
+      <div>
+        <span class="reading-badge ${remaining ? "warning" : "success"}">${remaining ? `${remaining} item tersisa` : "Review selesai"}</span>
+        <h3>Cara membuat Review menjadi 100%</h3>
+        <p>
+          Review selesai kalau semua item di Review Queue sudah teratasi. Target praktisnya:
+          mastery skill prioritas minimal 70%, lalu tidak ada weakness prioritas yang masih aktif.
+        </p>
+      </div>
+      <div class="reading-review-progress-box">
+        <strong>${progress}%</strong>
+        <span>${completed}/${total || 1} item review selesai</span>
+        ${readingPercentBar(progress)}
+      </div>
+      <div class="reading-review-steps">
+        <article>
+          <b>1. Klik latihan ulang</b>
+          <p>Gunakan tombol <strong>Latihan Ulang Skill Lemah</strong> untuk membuka Trainer sesuai rekomendasi.</p>
+        </article>
+        <article>
+          <b>2. Naikkan mastery</b>
+          <p>Kerjakan latihan sampai skill prioritas mencapai minimal 70%.</p>
+        </article>
+        <article>
+          <b>3. Cek Review lagi</b>
+          <p>Kembali ke Review. Jika item queue sudah hilang atau selesai, progress Review akan naik.</p>
+        </article>
+      </div>
+    </div>
   `;
 }
 
@@ -3252,6 +3458,164 @@ function readingPercentBar(value) {
   return `<div class="reading-progress-line" aria-label="Progress ${percent}%"><span style="width: ${percent}%"></span></div>`;
 }
 
+function getReadingProgressSummary() {
+  const summary = state.readingProgress?.summary;
+  if (summary) {
+    return {
+      score: Math.round(Number(summary.reading_score || 0)),
+      level: summary.reading_level || "Understand Simple Meaning",
+      progressPercent: Math.round(Number(summary.overall_progress_percent || 0)),
+      activeModule: summary.active_module || "guided",
+      nextAction: summary.next_action || "",
+      finishTarget: summary.finish_target || "Full Reading Simulation minimal 75%",
+      completedModules: Number(summary.completed_modules || 0),
+      totalModules: Number(summary.total_modules || 6)
+    };
+  }
+  const journey = state.readingJourney || localReadingJourney();
+  const score = Math.round(Number(journey.reading_score || state.progress?.Reading || 0));
+  return {
+    score,
+    level: journey.reading_level || "Understand Simple Meaning",
+    progressPercent: score,
+    activeModule: score < 30 ? "guided" : score < 55 ? "practice" : score < 80 ? "trainer" : "simulation",
+    nextAction: journey.next_recommended_action || "Ikuti mode Reading yang direkomendasikan.",
+    finishTarget: "Full Reading Simulation minimal 75%",
+    completedModules: 0,
+    totalModules: 5
+  };
+}
+
+function getReadingProgressModules() {
+  const modules = state.readingProgress?.modules || [];
+  const visibleModules = modules.filter((module) => module.section !== "review" && module.module_id !== "review");
+  return visibleModules.length ? visibleModules : localReadingProgressModules();
+}
+
+function getReadingModuleByMode(mode) {
+  const section = normalizeReadingMode(mode);
+  return getReadingProgressModules().find((module) => module.section === section) || {
+    module_id: section,
+    title: readingModeMeta(section).title,
+    description: "",
+    status: "not_started",
+    progress_percent: 0,
+    completed_items: 0,
+    total_items: section === "simulation" ? 3 : 1,
+    last_score: null,
+    best_score: null,
+    attempt_count: 0,
+    next_action: "Mulai mode ini untuk mencatat progress Reading.",
+    recommended: false,
+    section
+  };
+}
+
+function getReadingRecommendedSection() {
+  const section = state.readingProgress?.recommendedSection?.section;
+  if (section) return normalizeReadingMode(section);
+  return getReadingProgressSummary().activeModule || "guided";
+}
+
+function getReadingStatusLabel(status) {
+  const labels = {
+    not_started: "Belum mulai",
+    in_progress: "Sedang berjalan",
+    need_review: "Perlu diulang",
+    completed: "Selesai",
+    recommended: "Direkomendasikan",
+    locked: "Belum dibuka"
+  };
+  return labels[status] || labels.not_started;
+}
+
+function getReadingButtonLabel(status) {
+  const labels = {
+    not_started: "Mulai",
+    in_progress: "Lanjutkan",
+    need_review: "Ulangi",
+    completed: "Lihat / Ulangi",
+    recommended: "Lanjutkan Rekomendasi",
+    locked: "Belum Dibuka"
+  };
+  return labels[status] || "Mulai";
+}
+
+function readingModeMeta(mode) {
+  const meta = {
+    overview: { title: "Reading Overview" },
+    guided: { title: "Guided Reading" },
+    practice: { title: "Practice Questions" },
+    trainer: { title: "Reading Trainer" },
+    simulation: { title: "Reading Simulation" }
+  };
+  return meta[mode] || meta.overview;
+}
+
+function localReadingProgress() {
+  const score = Number(state.progress?.Reading || 0);
+  const recommendedSection = score < 30 ? "guided" : score < 55 ? "practice" : score < 80 ? "trainer" : "simulation";
+  const modules = localReadingProgressModules().map((module) => ({
+    ...module,
+    status: module.section === recommendedSection ? "recommended" : module.status,
+    recommended: module.section === recommendedSection
+  }));
+  return {
+    summary: {
+      overall_progress_percent: score,
+      reading_level: score >= 80 ? "TOEFL Reading Simulation" : score >= 55 ? "Inference and Evidence" : "Understand Simple Meaning",
+      reading_score: score,
+      completed_modules: modules.filter((module) => module.status === "completed").length,
+      total_modules: modules.length,
+      active_module: recommendedSection,
+      next_action: readingModeMeta(recommendedSection).title,
+      finish_target: "Full Reading Simulation minimal 75%"
+    },
+    modules,
+    learningPath: modules.map((module, index) => ({ step: index + 1, ...module })),
+    recommendedSection: {
+      section: recommendedSection,
+      title: readingModeMeta(recommendedSection).title,
+      reason: "Fallback lokal: lanjutkan mode Reading yang sesuai progress saat ini.",
+      next_action: "Lanjutkan latihan Reading yang direkomendasikan."
+    },
+    finishStatus: {
+      is_finished: false,
+      finish_rule: "Full Reading Simulation minimal 75%",
+      full_simulation_score: 0,
+      message: "Belum finish. Ikuti rekomendasi Reading berikutnya sampai siap full simulation minimal 75%."
+    }
+  };
+}
+
+function localReadingProgressModules() {
+  const guidedTarget = Math.max(1, Math.min(3, getLessons().length || 1));
+  const data = [
+    ["overview", "Reading Overview", "Ringkasan level, score, skill kuat/lemah, dan langkah berikutnya.", 1],
+    ["guided", "Guided Reading", "Baca step-by-step sebelum menjawab soal.", guidedTarget],
+    ["practice", "Practice Questions", "Kerjakan soal TOEFL-style dan baca Answer Review.", 5],
+    ["trainer", "Reading Trainer", "Latihan sub-skill lemah secara spesifik.", 5],
+    ["simulation", "Reading Simulation", "Uji Reading dengan timer short, medium, atau full.", 3]
+  ];
+  return data.map(([section, title, description, total], index) => ({
+    step: index + 1,
+    module_id: section,
+    title,
+    description,
+    status: "not_started",
+    progress_percent: 0,
+    completed_items: 0,
+    total_items: total,
+    last_score: null,
+    best_score: null,
+    attempt_count: 0,
+    next_action: "Mulai mode ini untuk mengisi progress.",
+    recommended: false,
+    target_score: section === "simulation" ? 75 : 70,
+    section
+  }));
+}
+
 function readingSkillBreakdownCard(item) {
   const accuracy = Math.round(item.accuracy || item.mastery_score || 0);
   const tone = accuracy >= 70 ? "success" : accuracy >= 40 ? "warning" : "danger";
@@ -3363,6 +3727,7 @@ async function submitReadingSimulation() {
   saveState();
   await refreshIntegratedJourney();
   await refreshReadingJourney();
+  await refreshReadingProgress();
   renderReading();
   renderDashboard();
   renderJourney();
@@ -3499,7 +3864,7 @@ function guidedReadingPanel(lesson) {
   const guided = state.guidedReading?.lessonId === lesson.id ? state.guidedReading : structuredClone(defaultState.guidedReading);
   const hasSteps = guided.started && guided.steps?.length;
   const activeIndex = Math.min(guided.activeStep || 0, Math.max((guided.steps || []).length - 1, 0));
-  const visibleSteps = hasSteps ? guided.steps.slice(0, activeIndex + 1) : [];
+  const activeStep = hasSteps ? guided.steps[activeIndex] : null;
   return `
     <section class="panel reading-guided-panel" id="guidedReadingPanel">
       <div class="section-heading">
@@ -3513,11 +3878,19 @@ function guidedReadingPanel(lesson) {
       ${hasSteps ? `
         <div class="reading-step-track">
           ${guided.steps.map((step, index) => `
-            <span class="${index < activeIndex ? "done" : index === activeIndex ? "current" : ""}">${step.step}</span>
+            <button class="${index < activeIndex || guided.completed ? "done" : ""} ${index === activeIndex ? "current" : ""}" type="button" data-guided-step-index="${index}">
+              <span>${step.step}</span>
+              <small>${escapeHtml(guidedStepShortTitle(step))}</small>
+            </button>
           `).join("")}
         </div>
-        <div class="reading-guided-list">
-          ${visibleSteps.map((step) => guidedReadingStepCard(step, lesson)).join("")}
+        <div class="reading-guided-active-shell">
+          <div class="reading-guided-active-note">
+            <span class="reading-badge ${guided.completed ? "success" : "warning"}">${guided.completed ? "Semua langkah terbuka" : `Langkah ${activeIndex + 1} dari ${guided.steps.length}`}</span>
+            <h3>${escapeHtml(activeStep?.title || "Guided Reading")}</h3>
+            <p>Klik nomor langkah di atas untuk melihat proses tertentu. Proses ke-3 adalah Subject/Verb supaya kamu bisa menemukan inti kalimat sebelum lanjut vocabulary.</p>
+          </div>
+          ${activeStep ? guidedReadingStepCard(activeStep, lesson) : ""}
         </div>
         ${guided.completed ? "" : `
           <button id="nextGuidedReadingStepButton" class="ghost-button" type="button">
@@ -3533,6 +3906,19 @@ function guidedReadingPanel(lesson) {
       `}
     </section>
   `;
+}
+
+function guidedStepShortTitle(step) {
+  const labels = {
+    title: "Judul",
+    first_sentence: "Kalimat awal",
+    subject_verb: "Subject/Verb",
+    vocabulary: "Vocabulary",
+    paragraph_map: "Paragraph Map",
+    main_idea: "Main Idea",
+    answer_question: "Jawab Soal"
+  };
+  return labels[step.id] || step.title || `Step ${step.step}`;
 }
 
 function guidedReadingStepCard(step, lesson) {
@@ -3640,6 +4026,30 @@ async function nextGuidedReadingStep(lesson) {
   if ((state.guidedReading.activeStep || 0) >= lastIndex) {
     state.guidedReading.completed = true;
     addActivity("Reading", `Guided Reading: ${lesson.title}`, 100);
+    if (apiOnline) {
+      try {
+        const response = await apiRequest("/reading/attempt", {
+          method: "POST",
+          body: {
+            user_id: state.user?.id || "default-user",
+            passage_id: lesson.id,
+            activity_type: "guided_reading",
+            score: 100,
+            max_score: 100,
+            subskill_scores: {
+              general_meaning: 100,
+              main_idea: 100,
+              vocabulary_context: 90
+            },
+            feedback: `Guided Reading selesai untuk ${lesson.title}.`
+          }
+        });
+        state.readingJourney = response.reading_journey || state.readingJourney;
+        await refreshReadingProgress();
+      } catch (error) {
+        apiOnline = false;
+      }
+    }
     saveState();
     renderDashboard();
     renderJourney();
@@ -3779,6 +4189,7 @@ async function submitReadingTrainerAnswer(selected) {
       feedback = response.answer_feedback || feedback;
       state.readingJourney = response.reading_journey || state.readingJourney;
       await refreshReadingTrainer(subSkill);
+      await refreshReadingProgress();
     } catch (error) {
       apiOnline = false;
     }
@@ -4082,6 +4493,11 @@ function renderGrammar() {
       addActivity("Grammar", "Sentence breakdown", 80);
       saveState();
       let analysisHtml = grammarAnalysis(sentence);
+      state.grammarBreakdown = {
+        sentence,
+        analysis: null,
+        fallbackHtml: analysisHtml
+      };
       if (apiOnline) {
         try {
           const response = await apiRequest("/grammar/breakdown", {
@@ -4089,6 +4505,11 @@ function renderGrammar() {
             body: { sentence, user_id: state.user?.id || "default-user" }
           });
           analysisHtml = grammarApiTemplate(response.analysis);
+          state.grammarBreakdown = {
+            sentence,
+            analysis: response.analysis,
+            fallbackHtml: ""
+          };
         } catch (error) {
           apiOnline = false;
         }
@@ -4097,6 +4518,7 @@ function renderGrammar() {
       bindContextualHelpButtons(document.getElementById("grammarResult"));
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
+      saveState();
       renderDashboard();
       renderJourney();
     });
@@ -4111,9 +4533,18 @@ function renderGrammar() {
 
   document.querySelectorAll("[data-grammar-quiz-answer]").forEach((select) => {
     select.addEventListener("change", () => {
-      state.grammarTrainer.answers[select.dataset.grammarQuizAnswer] = select.value;
+      const topicId = state.grammarTrainer.selectedTopic || "subject_verb";
+      state.grammarTrainer.answers = {
+        ...(state.grammarTrainer.answers || {}),
+        [select.dataset.grammarQuizAnswer]: select.value
+      };
       state.grammarTrainer.result = null;
+      saveBasicGrammarTrainerTopicProgress(topicId, {
+        answers: state.grammarTrainer.answers,
+        result: null
+      });
       saveState();
+      renderGrammar();
     });
   });
 
@@ -4135,9 +4566,18 @@ function renderGrammar() {
 
   document.querySelectorAll("[data-intermediate-grammar-answer]").forEach((select) => {
     select.addEventListener("change", () => {
-      state.intermediateGrammarTrainer.answers[select.dataset.intermediateGrammarAnswer] = select.value;
+      const topicId = state.intermediateGrammarTrainer.selectedTopic || "gerund_vs_main_verb";
+      state.intermediateGrammarTrainer.answers = {
+        ...(state.intermediateGrammarTrainer.answers || {}),
+        [select.dataset.intermediateGrammarAnswer]: select.value
+      };
       state.intermediateGrammarTrainer.result = null;
+      saveIntermediateGrammarTopicProgress(topicId, {
+        answers: state.intermediateGrammarTrainer.answers,
+        result: null
+      });
       saveState();
+      renderGrammar();
     });
   });
 
@@ -4159,9 +4599,18 @@ function renderGrammar() {
 
   document.querySelectorAll("[data-grammar-error-answer]").forEach((select) => {
     select.addEventListener("change", () => {
-      state.grammarErrorCorrection.answers[select.dataset.grammarErrorAnswer] = select.value;
+      const errorType = state.grammarErrorCorrection.selectedErrorType || "missing_be_after_modal";
+      state.grammarErrorCorrection.answers = {
+        ...(state.grammarErrorCorrection.answers || {}),
+        [select.dataset.grammarErrorAnswer]: select.value
+      };
       state.grammarErrorCorrection.result = null;
+      saveGrammarErrorProgress(errorType, {
+        answers: state.grammarErrorCorrection.answers,
+        result: null
+      });
       saveState();
+      renderGrammar();
     });
   });
 
@@ -4190,8 +4639,16 @@ function renderGrammar() {
 
   document.querySelectorAll("[data-sentence-builder-answer]").forEach((input) => {
     input.addEventListener("input", () => {
-      state.grammarSentenceBuilder.answers[input.dataset.sentenceBuilderAnswer] = input.value;
+      const key = sentenceBuilderProgressKey(state.grammarSentenceBuilder.selectedLevel, state.grammarSentenceBuilder.selectedMode);
+      state.grammarSentenceBuilder.answers = {
+        ...(state.grammarSentenceBuilder.answers || {}),
+        [input.dataset.sentenceBuilderAnswer]: input.value
+      };
       state.grammarSentenceBuilder.result = null;
+      saveSentenceBuilderProgress(key, {
+        answers: state.grammarSentenceBuilder.answers,
+        result: null
+      });
       saveState();
     });
   });
@@ -4214,16 +4671,33 @@ function renderGrammar() {
 
   document.querySelectorAll("[data-advanced-practice-answer]").forEach((select) => {
     select.addEventListener("change", () => {
-      state.grammarAdvancedLab.practiceAnswers[select.dataset.advancedPracticeAnswer] = select.value;
+      const topicId = state.grammarAdvancedLab.selectedTopic || "nominalization";
+      state.grammarAdvancedLab.practiceAnswers = {
+        ...(state.grammarAdvancedLab.practiceAnswers || {}),
+        [select.dataset.advancedPracticeAnswer]: select.value
+      };
       state.grammarAdvancedLab.practiceResult = null;
+      saveAdvancedGrammarTopicProgress(topicId, {
+        practiceAnswers: state.grammarAdvancedLab.practiceAnswers,
+        practiceResult: null
+      });
       saveState();
+      renderGrammar();
     });
   });
 
   document.querySelectorAll("[data-advanced-rewrite-answer]").forEach((input) => {
     input.addEventListener("input", () => {
-      state.grammarAdvancedLab.rewriteAnswers[input.dataset.advancedRewriteAnswer] = input.value;
+      const topicId = state.grammarAdvancedLab.selectedTopic || "nominalization";
+      state.grammarAdvancedLab.rewriteAnswers = {
+        ...(state.grammarAdvancedLab.rewriteAnswers || {}),
+        [input.dataset.advancedRewriteAnswer]: input.value
+      };
       state.grammarAdvancedLab.rewriteResult = null;
+      saveAdvancedGrammarTopicProgress(topicId, {
+        rewriteAnswers: state.grammarAdvancedLab.rewriteAnswers,
+        rewriteResult: null
+      });
       saveState();
     });
   });
@@ -4256,10 +4730,13 @@ function renderGrammar() {
 
   document.querySelectorAll("[data-grammar-simulation-mode]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.grammarSimulation.mode = button.dataset.grammarSimulationMode;
-      state.grammarSimulation.session = null;
-      state.grammarSimulation.result = null;
-      state.grammarSimulation.answers = {};
+      persistCurrentGrammarSimulationMode();
+      const mode = button.dataset.grammarSimulationMode;
+      const savedProgress = grammarSimulationModeProgress(mode);
+      state.grammarSimulation.mode = mode;
+      state.grammarSimulation.session = savedProgress.session || null;
+      state.grammarSimulation.result = savedProgress.result || null;
+      state.grammarSimulation.answers = savedProgress.answers || {};
       saveState();
       renderGrammar();
     });
@@ -4276,8 +4753,16 @@ function renderGrammar() {
   document.querySelectorAll("[data-grammar-simulation-answer]").forEach((input) => {
     const eventName = input.tagName === "SELECT" ? "change" : "input";
     input.addEventListener(eventName, () => {
-      state.grammarSimulation.answers[input.dataset.grammarSimulationAnswer] = input.value;
+      state.grammarSimulation.answers = {
+        ...(state.grammarSimulation.answers || {}),
+        [input.dataset.grammarSimulationAnswer]: input.value
+      };
       state.grammarSimulation.result = null;
+      saveGrammarSimulationModeProgress(state.grammarSimulation.mode || "short", {
+        session: state.grammarSimulation.session || null,
+        answers: state.grammarSimulation.answers,
+        result: null
+      });
       saveState();
     });
   });
@@ -4297,41 +4782,49 @@ function renderGrammarActiveSection(activeSection) {
   const sections = {
     menu: renderGrammarHub,
     breakdown: () => renderGrammarSectionShell(
+      "breakdown",
       "Grammar Breakdown",
       "Bedah satu kalimat untuk menemukan subject, main verb, phrase, clause, dan makna Bahasa Indonesia.",
       grammarBreakdownPanel()
     ),
     basic_trainer: () => renderGrammarSectionShell(
+      "basic_trainer",
       "Basic Grammar Trainer",
       "Latihan dasar: parts of speech, subject, verb, object, modal, dan pola kalimat sederhana.",
       basicGrammarTrainerPanel()
     ),
     intermediate_trainer: () => renderGrammarSectionShell(
+      "intermediate_trainer",
       "Intermediate Grammar Trainer",
       "Latihan kalimat panjang: gerund, relative clause, reduced clause, passive voice, connector, dan parallel structure.",
       intermediateGrammarTrainerPanel()
     ),
     error_correction: () => renderGrammarSectionShell(
+      "error_correction",
       "Grammar Error Correction",
       "Cari kesalahan grammar dan pilih corrected sentence yang benar.",
       grammarErrorCorrectionPanel()
     ),
     sentence_builder: () => renderGrammarSectionShell(
+      "sentence_builder",
       "Grammar Sentence Builder",
       "Susun kata, lengkapi kalimat, gabungkan kalimat, dan tulis ulang kalimat BA.",
       grammarSentenceBuilderPanel()
     ),
     advanced_lab: () => renderGrammarSectionShell(
+      "advanced_lab",
       "Advanced Grammar Lab",
       "Latihan grammar formal: nominalization, hedging, inversion, conditional, academic connector, dan formal BA writing.",
       grammarAdvancedLabPanel()
     ),
     review: () => renderGrammarSectionShell(
+      "review",
       "Grammar Review",
       "Lihat kelemahan grammar, pola salah berulang, dan rekomendasi latihan ulang.",
       grammarReviewPanel()
     ),
     simulation: () => renderGrammarSectionShell(
+      "simulation",
       "Grammar Simulation",
       "Uji kemampuan grammar melalui simulasi short, medium, atau full.",
       grammarSimulationPanel()
@@ -4352,23 +4845,56 @@ function renderGrammarHub() {
         <span class="pill">8 langkah belajar</span>
       </div>
       ${renderGrammarProgressSummary()}
+      ${renderGrammarProgressBoard()}
       ${renderGrammarStartHereCard()}
       ${renderGrammarLearningPathWithProgress()}
       ${renderGrammarFinishTarget()}
-      ${renderGrammarQuickPick()}
     </section>
+  `;
+}
+
+function renderGrammarProgressBoard() {
+  const modules = getGrammarProgressModules();
+  const statuses = [
+    ["recommended", "Direkomendasikan"],
+    ["not_started", "Belum mulai"],
+    ["in_progress", "Sedang berjalan"],
+    ["need_review", "Perlu diulang"],
+    ["completed", "Selesai"]
+  ];
+  return `
+    <article class="grammar-progress-board">
+      <div>
+        <p class="eyebrow">Status Subfitur</p>
+        <h3>Peta progress semua Grammar module</h3>
+        <p>Lihat cepat module mana yang baru mulai, sedang berjalan, perlu diulang, atau sudah selesai.</p>
+      </div>
+      <div class="grammar-status-strip">
+        ${statuses.map(([status, label]) => {
+          const count = modules.filter((module) => module.status === status).length;
+          return `
+            <div class="grammar-status-count status-${escapeHtml(status)}">
+              <strong>${count}</strong>
+              <span>${escapeHtml(label)}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </article>
   `;
 }
 
 function renderGrammarProgressSummary() {
   const summary = getGrammarProgressSummary();
   const recommended = state.grammarProgress?.recommendedSection || {};
+  const recommendedTitle = recommended.title || grammarSectionMeta(summary.activeModule || "basic_trainer").title;
   return `
     <article class="module-card">
       <div class="section-heading compact">
         <div>
           <p class="eyebrow">Progress Grammar Kamu</p>
           <h3>${summary.progressPercent}% selesai · ${escapeHtml(summary.level)}</h3>
+          <p>${escapeHtml(`Progress kamu ${summary.progressPercent}%. Saat ini kamu berada di ${summary.level}. Langkah berikutnya: ${recommendedTitle}.`)}</p>
           <p>${escapeHtml(summary.nextAction || "Ikuti langkah yang direkomendasikan satu per satu.")}</p>
         </div>
         <span class="soft-pill">Finish: ${escapeHtml(summary.finishTarget || "Full Simulation 75%")}</span>
@@ -4383,7 +4909,7 @@ function renderGrammarProgressSummary() {
         </div>
         <div class="module-card soft">
           <span>Active Module</span>
-          <h3>${escapeHtml(recommended.title || grammarSectionMeta(summary.activeModule || "basic_trainer").title)}</h3>
+          <h3>${escapeHtml(recommendedTitle)}</h3>
         </div>
         <div class="module-card soft">
           <span>Completed Modules</span>
@@ -4427,7 +4953,7 @@ function renderGrammarStartHereCard() {
           <strong>${escapeHtml(recommendedMeta.title)}</strong>
         </div>
       </div>
-      <button class="primary-button mt-3" type="button" data-grammar-hub-section="${escapeHtml(recommendedSection)}">Mulai Belajar Terarah</button>
+      <button class="primary-button mt-3" type="button" data-grammar-hub-section="${escapeHtml(recommendedSection)}">Mulai / Lanjutkan Rekomendasi</button>
     </article>
   `;
 }
@@ -4547,47 +5073,37 @@ function renderGrammarFinishTarget() {
   const summary = getGrammarProgressSummary();
   const finish = state.grammarProgress?.finishStatus || {};
   const modules = getGrammarProgressModules();
+  const isFinished = Boolean(finish.is_finished);
+  const fullSimulationScore = finish.full_simulation_score ?? null;
   return `
     <article class="module-card mt-4">
       <div class="section-heading compact">
         <div>
           <p class="eyebrow">Target Finish Grammar</p>
           <h3>Target selesai yang jelas</h3>
+          <p>Grammar Lab dianggap selesai jika Full Grammar Simulation minimal 75%.</p>
           <p>${escapeHtml(finish.message || "Kamu dianggap selesai Grammar Lab jika sudah mampu menyelesaikan Full Grammar Simulation dengan skor minimal 75%. Jika belum sampai sana, cukup ikuti langkah yang direkomendasikan satu per satu.")}</p>
         </div>
-        <span class="pill">${finish.is_finished ? "Finish" : `${summary.progressPercent}% progress`}</span>
+        <span class="pill">${isFinished ? "Finish" : `${summary.progressPercent}% progress`}</span>
+      </div>
+      <div class="module-grid three">
+        <div class="module-card soft">
+          <span>Status finish</span>
+          <h3>${isFinished ? "Selesai" : "Belum selesai"}</h3>
+        </div>
+        <div class="module-card soft">
+          <span>Full simulation score</span>
+          <h3>${fullSimulationScore === null || fullSimulationScore === undefined ? "Belum ada" : `${Math.round(Number(fullSimulationScore))}%`}</h3>
+        </div>
+        <div class="module-card soft">
+          <span>Finish target</span>
+          <h3>75%</h3>
+        </div>
       </div>
       <div class="tag-row">
         ${modules.map((module) => `<span class="soft-pill">${escapeHtml(module.title)} · ${getModuleStatusLabel(module.status)}</span>`).join("")}
       </div>
     </article>
-  `;
-}
-
-function renderGrammarQuickPick() {
-  const cards = [
-    ["basic_trainer", "1. Basic Grammar Trainer", "Mulai dari fondasi: subject, verb, object, modal, dan simple sentence. Cocok untuk kamu yang masih bingung menentukan verb utama.", "Mulai di sini"],
-    ["breakdown", "2. Grammar Breakdown", "Gunakan saat kamu menemukan kalimat panjang dan ingin tahu mana subject, main verb, phrase, clause, dan maknanya.", "Bedah Kalimat"],
-    ["intermediate_trainer", "3. Intermediate Grammar Trainer", "Latihan membedakan main verb, -ing phrase, relative clause, passive voice, connector, dan parallel structure.", "Kalimat Panjang"],
-    ["error_correction", "4. Error Correction", "Latihan menemukan grammar error seperti must be, subject-verb agreement, passive voice, dan connector yang salah.", "Cari Kesalahan"],
-    ["sentence_builder", "5. Sentence Builder", "Latihan menyusun dan menulis kalimat sendiri agar kamu tidak hanya paham grammar, tetapi juga bisa menggunakannya.", "Buat Kalimat"],
-    ["advanced_lab", "6. Advanced Grammar Lab", "Latihan grammar untuk kalimat TOEFL, akademik, dan Business Analyst formal seperti nominalization dan hedging.", "Formal & Akademik"],
-    ["review", "7. Grammar Review", "Lihat pola salah yang sering muncul dan dapatkan rekomendasi latihan berikutnya.", "Ulangi Kelemahan"],
-    ["simulation", "8. Grammar Simulation", "Uji seluruh kemampuan grammar. Target finish: Full Simulation minimal 75%.", "Finish Line"]
-  ];
-  return `
-    <div class="mt-4">
-      <div class="section-heading compact">
-        <div>
-          <p class="eyebrow">Pilih Cepat</p>
-          <h3>Butuh fitur tertentu?</h3>
-          <p>Pakai kartu ini kalau kamu sudah tahu bagian yang ingin dibuka.</p>
-        </div>
-      </div>
-      <div class="module-grid two">
-        ${cards.map(([section, title, description, badge]) => grammarHubCard(section, title, description, badge)).join("")}
-      </div>
-    </div>
   `;
 }
 
@@ -4600,40 +5116,19 @@ function grammarPathStepCard(step) {
   const status = module.status || "not_started";
   const buttonLabel = getModuleButtonLabel(status);
   return `
-    <article class="module-card soft">
+    <article class="module-card soft grammar-progress-card status-${escapeHtml(status)}">
       <div class="split-row">
         <span class="pill">${step.number || step.step}</span>
-        <span class="soft-pill">${getModuleStatusLabel(status)}</span>
+        <span class="soft-pill grammar-status status-${escapeHtml(status)}">${getModuleStatusLabel(status)}</span>
       </div>
       <h3>${escapeHtml(title)}</h3>
       <p>${escapeHtml(description)}</p>
       <div class="progress-bar" aria-label="Progress ${escapeHtml(title)}">
         <span style="width: ${clampPercent(module.progress_percent)}%"></span>
       </div>
-      <p><strong>Progress:</strong> ${module.completed_items || 0}/${module.total_items || 0} · <strong>Last score:</strong> ${formatScore(module.last_score)}</p>
-      <p><strong>Target:</strong> ${escapeHtml(target || "Ikuti latihan sampai mencapai target skor.")}</p>
+      <p><strong>Progress:</strong> ${clampPercent(module.progress_percent)}% · ${module.completed_items || 0}/${module.total_items || 0} selesai · <strong>Last score:</strong> ${formatScore(module.last_score)}</p>
+      <p><strong>Next action:</strong> ${escapeHtml(target || "Ikuti latihan sampai mencapai target skor.")}</p>
       <button class="ghost-button" type="button" data-grammar-hub-section="${escapeHtml(section)}">${escapeHtml(buttonLabel)}</button>
-    </article>
-  `;
-}
-
-function grammarHubCard(section, title, description, badge) {
-  const module = getGrammarModuleBySection(section);
-  const status = module.status || "not_started";
-  return `
-    <article class="module-card soft">
-      <div class="split-row">
-        <span class="soft-pill">${escapeHtml(badge)}</span>
-        <span class="soft-pill">${getModuleStatusLabel(status)}</span>
-      </div>
-      <h3>${escapeHtml(title)}</h3>
-      <p>${escapeHtml(description)}</p>
-      <div class="progress-bar" aria-label="Progress ${escapeHtml(title)}">
-        <span style="width: ${clampPercent(module.progress_percent)}%"></span>
-      </div>
-      <p><strong>Progress:</strong> ${module.completed_items || 0}/${module.total_items || 0} · <strong>Last score:</strong> ${formatScore(module.last_score)}</p>
-      <p>${escapeHtml(module.next_action || "Buka module ini untuk mulai latihan.")}</p>
-      <button class="primary-button" type="button" data-grammar-hub-section="${escapeHtml(section)}">${escapeHtml(getModuleButtonLabel(status))}</button>
     </article>
   `;
 }
@@ -4738,9 +5233,9 @@ function getModuleButtonLabel(status) {
     not_started: "Mulai",
     in_progress: "Lanjutkan",
     need_review: "Ulangi",
-    completed: "Selesai",
-    recommended: "Direkomendasikan",
-    locked: "Belum dibuka"
+    completed: "Lihat / Ulangi",
+    recommended: "Lanjutkan Rekomendasi",
+    locked: "Belum Dibuka"
   };
   return labels[status] || "Mulai";
 }
@@ -4877,7 +5372,7 @@ function grammarBackButton() {
   return `<button class="ghost-button" type="button" data-grammar-back>Kembali ke Grammar Learning Path</button>`;
 }
 
-function renderGrammarSectionShell(title, subtitle, content) {
+function renderGrammarSectionShell(section, title, subtitle, content) {
   return `
     <section class="module-surface">
       <div class="section-heading">
@@ -4888,8 +5383,31 @@ function renderGrammarSectionShell(title, subtitle, content) {
         </div>
         ${grammarBackButton()}
       </div>
+      ${grammarModuleProgressBanner(section)}
     </section>
     ${content}
+  `;
+}
+
+function grammarModuleProgressBanner(section) {
+  const module = getGrammarModuleBySection(section);
+  const status = module.status || "not_started";
+  return `
+    <article class="grammar-module-banner status-${escapeHtml(status)}">
+      <div>
+        <span class="soft-pill grammar-status status-${escapeHtml(status)}">${getModuleStatusLabel(status)}</span>
+        <h3>${escapeHtml(module.title || grammarSectionMeta(section).title)}</h3>
+        <p><strong>Next action:</strong> ${escapeHtml(module.next_action || "Kerjakan latihan ini agar progress module tercatat.")}</p>
+      </div>
+      <div class="grammar-module-banner-stats">
+        <strong>Progress: ${clampPercent(module.progress_percent)}%</strong>
+        <span>${module.completed_items || 0}/${module.total_items || 0} selesai</span>
+        <span>Last score: ${formatScore(module.last_score)}</span>
+      </div>
+      <div class="progress-bar" aria-label="Progress ${escapeHtml(module.title || section)}">
+        <span style="width: ${clampPercent(module.progress_percent)}%"></span>
+      </div>
+    </article>
   `;
 }
 
@@ -4909,20 +5427,26 @@ function grammarSectionTitle(activeSection) {
 
 function grammarBreakdownPanel() {
   const grammarSample = "A business analyst operating within a complex enterprise environment must not only elicit requirements but also ensure alignment between stakeholder needs and organizational strategy.";
+  const savedSentence = state.grammarBreakdown?.sentence || grammarSample;
+  const savedResult = state.grammarBreakdown?.analysis
+    ? grammarApiTemplate(state.grammarBreakdown.analysis)
+    : state.grammarBreakdown?.fallbackHtml || "";
   return `
-    <section class="module-grid two">
-      <form id="grammarForm" class="module-surface form-grid">
+    <section class="module-grid two grammar-breakdown-layout">
+      <form id="grammarForm" class="module-surface form-grid grammar-input-panel">
         ${beginnerTip("Cara membaca grammar", "Cari subject dulu, lalu verb utama. Abaikan sementara phrase panjang yang hanya menambahkan informasi.")}
         <label>
           Kalimat
-          <textarea id="grammarInput">${grammarSample}</textarea>
+          <textarea id="grammarInput">${escapeHtml(savedSentence)}</textarea>
         </label>
-        ${renderContextualHelpButton("grammar", "grammar_sentence", grammarSample)}
-        <button class="ghost-button" id="grammarHelpButton" type="button">Bantu pahami grammar</button>
+        <div class="inline-actions grammar-action-row">
+          ${renderContextualHelpButton("grammar", "grammar_sentence", savedSentence)}
+          <button class="ghost-button" id="grammarHelpButton" type="button">Bantu pahami grammar</button>
+        </div>
         <button class="primary-button" type="submit">Analyze Grammar</button>
       </form>
       <div id="grammarResult" class="module-surface grammar-result-panel">
-        ${emptyStateTemplate("Hasil breakdown akan muncul di sini", "Submit satu kalimat untuk melihat Subject, Main Verb, Phrase, Pattern, dan terjemahan.")}
+        ${savedResult || emptyStateTemplate("Hasil breakdown akan muncul di sini", "Submit satu kalimat untuk melihat Subject, Main Verb, Phrase, Pattern, dan terjemahan.")}
       </div>
     </section>
   `;
@@ -5047,10 +5571,149 @@ function grammarChip(label, value) {
   `;
 }
 
+function ensureBasicGrammarTrainerProgress() {
+  if (!state.grammarTrainer) {
+    state.grammarTrainer = structuredClone(defaultState.grammarTrainer);
+  }
+  if (!state.grammarTrainer.topicProgress || typeof state.grammarTrainer.topicProgress !== "object") {
+    state.grammarTrainer.topicProgress = {};
+  }
+  const selectedTopic = state.grammarTrainer.selectedTopic || "subject_verb";
+  const hasLegacyAnswers = Object.values(state.grammarTrainer.answers || {}).some(Boolean);
+  if (!state.grammarTrainer.topicProgress[selectedTopic] && (hasLegacyAnswers || state.grammarTrainer.result)) {
+    state.grammarTrainer.topicProgress[selectedTopic] = {
+      answers: { ...(state.grammarTrainer.answers || {}) },
+      result: state.grammarTrainer.result || null,
+      updatedAt: new Date().toISOString()
+    };
+  }
+  return state.grammarTrainer.topicProgress;
+}
+
+function basicGrammarTrainerTopicProgress(topicId) {
+  const progress = ensureBasicGrammarTrainerProgress();
+  const item = progress[topicId] || {};
+  return {
+    answers: { ...(item.answers || {}) },
+    result: item.result || null,
+    updatedAt: item.updatedAt || null
+  };
+}
+
+function saveBasicGrammarTrainerTopicProgress(topicId, patch = {}) {
+  if (!topicId) return;
+  const progress = ensureBasicGrammarTrainerProgress();
+  const previous = progress[topicId] || {};
+  progress[topicId] = {
+    ...previous,
+    ...patch,
+    answers: { ...(patch.answers || previous.answers || {}) },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function persistCurrentBasicGrammarTrainerTopic() {
+  const topicId = state.grammarTrainer?.selectedTopic;
+  if (!topicId) return;
+  const hasAnswers = Object.values(state.grammarTrainer.answers || {}).some(Boolean);
+  if (!hasAnswers && !state.grammarTrainer.result) return;
+  saveBasicGrammarTrainerTopicProgress(topicId, {
+    answers: state.grammarTrainer.answers || {},
+    result: state.grammarTrainer.result || null
+  });
+}
+
+function basicGrammarQuizTotalForTopic(topicId, trainer) {
+  if (trainer?.topic_id === topicId && Array.isArray(trainer.quiz_items)) {
+    return trainer.quiz_items.length;
+  }
+  const savedResult = basicGrammarTrainerTopicProgress(topicId).result?.result;
+  return savedResult?.total_questions || 0;
+}
+
+function basicGrammarTopicStatus(topicId, trainer) {
+  const progress = basicGrammarTrainerTopicProgress(topicId);
+  const result = progress.result?.result;
+  if (result) {
+    return result.is_passed ? "completed" : "need_review";
+  }
+  const answerCount = Object.values(progress.answers || {}).filter(Boolean).length;
+  const total = basicGrammarQuizTotalForTopic(topicId, trainer);
+  if (answerCount > 0 && total > 0 && answerCount >= total) return "answered";
+  if (answerCount > 0) return "in_progress";
+  return "not_started";
+}
+
+function basicGrammarTopicStatusLabel(status) {
+  const labels = {
+    not_started: "Belum mulai",
+    in_progress: "Mulai dijawab",
+    answered: "Siap submit",
+    completed: "Selesai",
+    need_review: "Perlu diulang"
+  };
+  return labels[status] || labels.not_started;
+}
+
+function basicGrammarTopicStatusClass(status) {
+  if (status === "answered") return "status-recommended";
+  if (status === "completed") return "status-completed";
+  if (status === "need_review") return "status-need_review";
+  if (status === "in_progress") return "status-in_progress";
+  return "status-not_started";
+}
+
+function basicGrammarTopicScore(topicId) {
+  const result = basicGrammarTrainerTopicProgress(topicId).result?.result;
+  if (!result) return null;
+  return Math.round(result.score || 0);
+}
+
+function basicGrammarTopicVisualPercent(topicId, status) {
+  const score = basicGrammarTopicScore(topicId);
+  if (score !== null) return Math.max(0, Math.min(100, score));
+  if (status === "answered") return 70;
+  if (status === "in_progress") return 35;
+  return 0;
+}
+
+function basicGrammarQuizItemStatus(detail, selectedAnswer) {
+  if (detail) return detail.is_correct ? "completed" : "need_review";
+  return selectedAnswer ? "answered" : "not_started";
+}
+
+function basicGrammarQuizItemFeedback(item, detail, selectedAnswer) {
+  if (detail) {
+    return `
+      <div class="quiz-item-feedback ${detail.is_correct ? "success" : "warning"}">
+        <strong>${detail.is_correct ? "Benar" : "Perlu review"}</strong>
+        <p>Jawaban Anda: ${escapeHtml(detail.user_answer || "-")}</p>
+        <p>Jawaban benar: ${escapeHtml(detail.correct_answer || "-")}</p>
+        <small>${escapeHtml(detail.explanation_id || item.explanation_id || "")}</small>
+      </div>
+    `;
+  }
+  if (selectedAnswer) {
+    return `
+      <div class="quiz-item-feedback info">
+        <strong>Jawaban sudah dipilih</strong>
+        <p>Submit quiz untuk melihat benar/salah dan menyimpan progres topic ini.</p>
+      </div>
+    `;
+  }
+  return `<small class="muted">Belum dijawab.</small>`;
+}
+
 function basicGrammarTrainerPanel() {
+  ensureBasicGrammarTrainerProgress();
   const topics = state.grammarTrainer.topics?.length ? state.grammarTrainer.topics : localBasicGrammarTrainerTopics();
   const trainer = state.grammarTrainer.trainer || localBasicGrammarTrainer(state.grammarTrainer.selectedTopic || "subject_verb");
-  const result = state.grammarTrainer.result;
+  const topicProgress = basicGrammarTrainerTopicProgress(trainer.topic_id);
+  const answers = topicProgress.answers || {};
+  const result = topicProgress.result || state.grammarTrainer.result;
+  const currentStatus = basicGrammarTopicStatus(trainer.topic_id, trainer);
+  const currentScore = basicGrammarTopicScore(trainer.topic_id);
+  const resultDetails = result?.result?.details || [];
   return `
     <section class="module-surface">
       <div class="section-heading">
@@ -5061,12 +5724,46 @@ function basicGrammarTrainerPanel() {
         </div>
         <span class="pill">Learn -> Practice -> Quiz</span>
       </div>
-      <div class="quick-actions">
+      <div class="grammar-topic-strip">
         ${topics.map((topic) => `
-          <button class="ghost-button ${topic.topic_id === trainer.topic_id ? "selected-control" : ""}" type="button" data-grammar-trainer-topic="${escapeHtml(topic.topic_id)}">
-            ${escapeHtml(topic.title)}
-          </button>
+          ${(() => {
+            const status = basicGrammarTopicStatus(topic.topic_id, topic.topic_id === trainer.topic_id ? trainer : null);
+            const score = basicGrammarTopicScore(topic.topic_id);
+            const visualPercent = basicGrammarTopicVisualPercent(topic.topic_id, status);
+            return `
+              <button class="grammar-topic-card ${topic.topic_id === trainer.topic_id ? "selected-control" : ""} ${basicGrammarTopicStatusClass(status)}" type="button" data-grammar-trainer-topic="${escapeHtml(topic.topic_id)}">
+                <span class="topic-card-topline">
+                  <span class="topic-card-title">${escapeHtml(topic.title)}</span>
+                  <span class="grammar-status ${basicGrammarTopicStatusClass(status)}">${escapeHtml(basicGrammarTopicStatusLabel(status))}</span>
+                </span>
+                <span class="topic-card-meta">
+                  <span>Skor terakhir</span>
+                  <strong>${score === null ? "Belum ada" : `${score}%`}</strong>
+                </span>
+                <span class="topic-card-progress" aria-hidden="true"><span style="width: ${visualPercent}%"></span></span>
+              </button>
+            `;
+          })()}
         `).join("")}
+      </div>
+      <div class="grammar-module-banner ${basicGrammarTopicStatusClass(currentStatus)}">
+        <div>
+          <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+          <h3>${escapeHtml(trainer.title)}</h3>
+          <p>${currentStatus === "not_started"
+            ? "Mulai dari contoh, lalu pilih jawaban quiz pendek."
+            : currentStatus === "answered"
+              ? "Jawaban sudah dipilih. Submit quiz untuk mengunci hasil dan menyimpan progres."
+              : currentStatus === "completed"
+                ? "Topic ini sudah selesai. Kamu masih bisa ulangi untuk memperkuat fondasi."
+                : currentStatus === "need_review"
+                  ? "Topic ini perlu diulang. Baca feedback per soal, lalu submit ulang jika sudah yakin."
+                  : "Lanjutkan jawaban yang sudah kamu mulai."}</p>
+        </div>
+        <div class="grammar-module-banner-stats">
+          <strong>${currentScore === null ? "-" : `${currentScore}%`}</strong>
+          <span>Skor terakhir</span>
+        </div>
       </div>
       <div class="module-grid two">
         <article class="module-card soft">
@@ -5105,17 +5802,34 @@ function basicGrammarTrainerPanel() {
           `).join("")}
         </article>
         <form id="basicGrammarTrainerForm" class="module-card">
-          <h3>Quiz pendek</h3>
+          <div class="quiz-panel-header">
+            <div>
+              <h3>Quiz pendek</h3>
+              <p class="muted">Pilihan dan hasil tersimpan per topic. Kamu bisa pindah topic tanpa mengulang dari awal.</p>
+            </div>
+            <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+          </div>
           ${(trainer.quiz_items || []).map((item) => `
-            <label>
-              ${escapeHtml(item.instruction_id)}
-              <span class="muted">${escapeHtml(item.sentence)}</span>
-              <strong>${escapeHtml(item.question)}</strong>
-              <select data-grammar-quiz-answer="${escapeHtml(item.id)}">
-                <option value="">Pilih jawaban</option>
-                ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${state.grammarTrainer.answers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
-              </select>
-            </label>
+            ${(() => {
+              const selectedAnswer = answers?.[item.id] || "";
+              const detail = resultDetails.find((entry) => entry.question_id === item.id);
+              const itemStatus = basicGrammarQuizItemStatus(detail, selectedAnswer);
+              return `
+                <label class="quiz-answer-card ${basicGrammarTopicStatusClass(itemStatus)}">
+                  <span class="quiz-card-topline">
+                    <span>${escapeHtml(item.instruction_id)}</span>
+                    <span class="grammar-status ${basicGrammarTopicStatusClass(itemStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(itemStatus))}</span>
+                  </span>
+                  <span class="muted">${escapeHtml(item.sentence)}</span>
+                  <strong>${escapeHtml(item.question)}</strong>
+                  <select data-grammar-quiz-answer="${escapeHtml(item.id)}">
+                    <option value="">Pilih jawaban</option>
+                    ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${selectedAnswer === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+                  </select>
+                  ${basicGrammarQuizItemFeedback(item, detail, selectedAnswer)}
+                </label>
+              `;
+            })()}
           `).join("")}
           <button class="primary-button" type="submit">Submit Basic Trainer</button>
           ${result ? grammarTrainerResultTemplate(result) : emptyStateTemplate("Belum submit quiz", "Pilih jawaban pada quiz pendek, lalu submit untuk melihat skor dan rekomendasi.")}
@@ -5126,7 +5840,9 @@ function basicGrammarTrainerPanel() {
 }
 
 async function loadBasicGrammarTrainer(topicId = "subject_verb") {
+  persistCurrentBasicGrammarTrainerTopic();
   const selectedTopic = topicId || "subject_verb";
+  const savedTopicProgress = basicGrammarTrainerTopicProgress(selectedTopic);
   if (apiOnline) {
     try {
       const [topicsResponse, trainerResponse] = await Promise.all([
@@ -5137,8 +5853,9 @@ async function loadBasicGrammarTrainer(topicId = "subject_verb") {
         selectedTopic,
         topics: topicsResponse.topics || [],
         trainer: trainerResponse.trainer,
-        answers: {},
-        result: null
+        answers: savedTopicProgress.answers || {},
+        result: savedTopicProgress.result || null,
+        topicProgress: state.grammarTrainer.topicProgress || {}
       };
       saveState();
       return;
@@ -5150,8 +5867,9 @@ async function loadBasicGrammarTrainer(topicId = "subject_verb") {
     selectedTopic,
     topics: localBasicGrammarTrainerTopics(),
     trainer: localBasicGrammarTrainer(selectedTopic),
-    answers: {},
-    result: null
+    answers: savedTopicProgress.answers || {},
+    result: savedTopicProgress.result || null,
+    topicProgress: state.grammarTrainer.topicProgress || {}
   };
   saveState();
 }
@@ -5169,6 +5887,10 @@ async function submitBasicGrammarTrainer() {
         }
       });
       state.grammarTrainer.result = response;
+      saveBasicGrammarTrainerTopicProgress(topicId, {
+        answers: state.grammarTrainer.answers || {},
+        result: response
+      });
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
       saveState();
@@ -5207,6 +5929,10 @@ async function submitBasicGrammarTrainer() {
       mentor_message: score >= 70 ? "Bagus. Kamu sudah memahami latihan dasar ini." : "Tidak apa-apa. Ulangi pelan-pelan dari subject dan verb."
     }
   };
+  saveBasicGrammarTrainerTopicProgress(topicId, {
+    answers: state.grammarTrainer.answers || {},
+    result: state.grammarTrainer.result
+  });
   saveState();
 }
 
@@ -5232,11 +5958,360 @@ function grammarTrainerResultTemplate(response) {
   `;
 }
 
+function grammarAnswerCount(answers = {}) {
+  return Object.values(answers || {}).filter((value) => String(value || "").trim()).length;
+}
+
+function grammarResultPayload(response) {
+  return response?.result || response || null;
+}
+
+function grammarResultScore(response) {
+  const result = grammarResultPayload(response);
+  if (!result) return null;
+  const score = result.score ?? result.total_score;
+  if (score === null || score === undefined || Number.isNaN(Number(score))) return null;
+  return Math.round(Number(score));
+}
+
+function grammarActivityStatus(answers = {}, response = null, totalItems = 0) {
+  const result = grammarResultPayload(response);
+  if (result && (result.score !== undefined || result.total_score !== undefined || result.is_passed !== undefined)) {
+    const passed = result.is_passed ?? Number(result.score ?? result.total_score ?? 0) >= 70;
+    return passed ? "completed" : "need_review";
+  }
+  const count = grammarAnswerCount(answers);
+  if (count > 0 && totalItems > 0 && count >= totalItems) return "answered";
+  if (count > 0) return "in_progress";
+  return "not_started";
+}
+
+function grammarActivityVisualPercent(answers = {}, response = null, totalItems = 0) {
+  const score = grammarResultScore(response);
+  if (score !== null) return Math.max(0, Math.min(100, score));
+  const count = grammarAnswerCount(answers);
+  if (!count) return 0;
+  if (!totalItems) return 35;
+  return Math.max(10, Math.min(70, Math.round((count / totalItems) * 70)));
+}
+
+function grammarResultDetails(response) {
+  return grammarResultPayload(response)?.details || [];
+}
+
+function grammarFindResultDetail(response, id) {
+  return grammarResultDetails(response).find((detail) => (
+    detail.question_id === id || detail.item_id === id
+  ));
+}
+
+function grammarActivityFeedback(item, detail, selectedAnswer, labels = {}) {
+  if (detail) {
+    const correctValue = detail.correct_answer || detail.expected_answer || detail.corrected_sentence || item.correct_answer || item.expected_answer || item.corrected_sentence || "-";
+    const isPositive = detail.is_correct || Number(detail.partial_score || 0) >= 70;
+    return `
+      <div class="quiz-item-feedback ${isPositive ? "success" : "warning"}">
+        <strong>${isPositive ? (labels.correctTitle || "Benar") : (labels.wrongTitle || "Perlu review")}</strong>
+        <p>${escapeHtml(labels.userAnswer || "Jawaban Anda")}: ${escapeHtml(detail.user_answer || "-")}</p>
+        <p>${escapeHtml(labels.correctAnswer || "Jawaban benar")}: ${escapeHtml(correctValue)}</p>
+        <small>${escapeHtml(detail.explanation_id || item.explanation_id || "")}</small>
+      </div>
+    `;
+  }
+  if (String(selectedAnswer || "").trim()) {
+    return `
+      <div class="quiz-item-feedback info">
+        <strong>Jawaban sudah diisi</strong>
+        <p>Submit untuk melihat benar/salah dan menyimpan progres bagian ini.</p>
+      </div>
+    `;
+  }
+  return `<small class="muted">Belum dijawab.</small>`;
+}
+
+function grammarActivityStatusMessage(status, noun = "bagian ini") {
+  const messages = {
+    not_started: `Mulai ${noun} dengan membaca contoh, lalu isi latihan.`,
+    in_progress: `Kamu sudah mulai mengisi ${noun}. Lanjutkan sampai semua item terjawab.`,
+    answered: `Semua jawaban ${noun} sudah diisi. Submit untuk mengunci hasil.`,
+    completed: `${noun} sudah selesai. Kamu masih bisa ulangi untuk memperkuat pemahaman.`,
+    need_review: `${noun} perlu diulang. Baca feedback, perbaiki jawaban, lalu submit lagi.`
+  };
+  return messages[status] || messages.not_started;
+}
+
+function grammarSelectorCard({ title, status, score, percent, dataAttr, dataValue, selected = false, meta = "Skor terakhir" }) {
+  const attr = `${dataAttr}="${escapeHtml(dataValue)}"`;
+  return `
+    <button class="grammar-topic-card ${selected ? "selected-control" : ""} ${basicGrammarTopicStatusClass(status)}" type="button" ${attr}>
+      <span class="topic-card-topline">
+        <span class="topic-card-title">${escapeHtml(title)}</span>
+        <span class="grammar-status ${basicGrammarTopicStatusClass(status)}">${escapeHtml(basicGrammarTopicStatusLabel(status))}</span>
+      </span>
+      <span class="topic-card-meta">
+        <span>${escapeHtml(meta)}</span>
+        <strong>${score === null || score === undefined ? "Belum ada" : `${Math.round(Number(score))}%`}</strong>
+      </span>
+      <span class="topic-card-progress" aria-hidden="true"><span style="width: ${clampPercent(percent)}%"></span></span>
+    </button>
+  `;
+}
+
+function ensureIntermediateGrammarProgress() {
+  if (!state.intermediateGrammarTrainer.topicProgress || typeof state.intermediateGrammarTrainer.topicProgress !== "object") {
+    state.intermediateGrammarTrainer.topicProgress = {};
+  }
+  return state.intermediateGrammarTrainer.topicProgress;
+}
+
+function intermediateGrammarTopicProgress(topicId) {
+  const progress = ensureIntermediateGrammarProgress();
+  const item = progress[topicId] || {};
+  return {
+    answers: { ...(item.answers || {}) },
+    result: item.result || null,
+    updatedAt: item.updatedAt || null
+  };
+}
+
+function saveIntermediateGrammarTopicProgress(topicId, patch = {}) {
+  if (!topicId) return;
+  const progress = ensureIntermediateGrammarProgress();
+  const previous = progress[topicId] || {};
+  progress[topicId] = {
+    ...previous,
+    ...patch,
+    answers: { ...(patch.answers || previous.answers || {}) },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function persistCurrentIntermediateGrammarTopic() {
+  const topicId = state.intermediateGrammarTrainer?.selectedTopic;
+  if (!topicId) return;
+  if (!grammarAnswerCount(state.intermediateGrammarTrainer.answers) && !state.intermediateGrammarTrainer.result) return;
+  saveIntermediateGrammarTopicProgress(topicId, {
+    answers: state.intermediateGrammarTrainer.answers || {},
+    result: state.intermediateGrammarTrainer.result || null
+  });
+}
+
+function intermediateGrammarTotalItems(topicId, trainer) {
+  if (trainer?.topic_id === topicId) {
+    return (trainer.quiz_items || []).length + (trainer.trap_items || []).length;
+  }
+  return intermediateGrammarTopicProgress(topicId).result?.result?.total_questions || 0;
+}
+
+function ensureGrammarErrorProgress() {
+  if (!state.grammarErrorCorrection.errorProgress || typeof state.grammarErrorCorrection.errorProgress !== "object") {
+    state.grammarErrorCorrection.errorProgress = {};
+  }
+  return state.grammarErrorCorrection.errorProgress;
+}
+
+function grammarErrorProgress(errorType) {
+  const progress = ensureGrammarErrorProgress();
+  const item = progress[errorType] || {};
+  return {
+    answers: { ...(item.answers || {}) },
+    result: item.result || null,
+    updatedAt: item.updatedAt || null
+  };
+}
+
+function saveGrammarErrorProgress(errorType, patch = {}) {
+  if (!errorType) return;
+  const progress = ensureGrammarErrorProgress();
+  const previous = progress[errorType] || {};
+  progress[errorType] = {
+    ...previous,
+    ...patch,
+    answers: { ...(patch.answers || previous.answers || {}) },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function persistCurrentGrammarError() {
+  const errorType = state.grammarErrorCorrection?.selectedErrorType;
+  if (!errorType) return;
+  if (!grammarAnswerCount(state.grammarErrorCorrection.answers) && !state.grammarErrorCorrection.result) return;
+  saveGrammarErrorProgress(errorType, {
+    answers: state.grammarErrorCorrection.answers || {},
+    result: state.grammarErrorCorrection.result || null
+  });
+}
+
+function sentenceBuilderProgressKey(level = "basic", mode = "arrange_words") {
+  return `${level || "basic"}::${mode || "arrange_words"}`;
+}
+
+function ensureSentenceBuilderProgress() {
+  if (!state.grammarSentenceBuilder.modeProgress || typeof state.grammarSentenceBuilder.modeProgress !== "object") {
+    state.grammarSentenceBuilder.modeProgress = {};
+  }
+  return state.grammarSentenceBuilder.modeProgress;
+}
+
+function sentenceBuilderProgress(key) {
+  const progress = ensureSentenceBuilderProgress();
+  const item = progress[key] || {};
+  return {
+    answers: { ...(item.answers || {}) },
+    result: item.result || null,
+    updatedAt: item.updatedAt || null
+  };
+}
+
+function saveSentenceBuilderProgress(key, patch = {}) {
+  if (!key) return;
+  const progress = ensureSentenceBuilderProgress();
+  const previous = progress[key] || {};
+  progress[key] = {
+    ...previous,
+    ...patch,
+    answers: { ...(patch.answers || previous.answers || {}) },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function persistCurrentSentenceBuilder() {
+  const key = sentenceBuilderProgressKey(state.grammarSentenceBuilder?.selectedLevel, state.grammarSentenceBuilder?.selectedMode);
+  if (!grammarAnswerCount(state.grammarSentenceBuilder.answers) && !state.grammarSentenceBuilder.result) return;
+  saveSentenceBuilderProgress(key, {
+    answers: state.grammarSentenceBuilder.answers || {},
+    result: state.grammarSentenceBuilder.result || null
+  });
+}
+
+function ensureAdvancedGrammarProgress() {
+  if (!state.grammarAdvancedLab.topicProgress || typeof state.grammarAdvancedLab.topicProgress !== "object") {
+    state.grammarAdvancedLab.topicProgress = {};
+  }
+  return state.grammarAdvancedLab.topicProgress;
+}
+
+function advancedGrammarTopicProgress(topicId) {
+  const progress = ensureAdvancedGrammarProgress();
+  const item = progress[topicId] || {};
+  return {
+    practiceAnswers: { ...(item.practiceAnswers || {}) },
+    rewriteAnswers: { ...(item.rewriteAnswers || {}) },
+    practiceResult: item.practiceResult || null,
+    rewriteResult: item.rewriteResult || null,
+    updatedAt: item.updatedAt || null
+  };
+}
+
+function saveAdvancedGrammarTopicProgress(topicId, patch = {}) {
+  if (!topicId) return;
+  const progress = ensureAdvancedGrammarProgress();
+  const previous = progress[topicId] || {};
+  progress[topicId] = {
+    ...previous,
+    ...patch,
+    practiceAnswers: { ...(patch.practiceAnswers || previous.practiceAnswers || {}) },
+    rewriteAnswers: { ...(patch.rewriteAnswers || previous.rewriteAnswers || {}) },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function persistCurrentAdvancedGrammarTopic() {
+  const topicId = state.grammarAdvancedLab?.selectedTopic;
+  if (!topicId) return;
+  const hasPractice = grammarAnswerCount(state.grammarAdvancedLab.practiceAnswers);
+  const hasRewrite = grammarAnswerCount(state.grammarAdvancedLab.rewriteAnswers);
+  if (!hasPractice && !hasRewrite && !state.grammarAdvancedLab.practiceResult && !state.grammarAdvancedLab.rewriteResult) return;
+  saveAdvancedGrammarTopicProgress(topicId, {
+    practiceAnswers: state.grammarAdvancedLab.practiceAnswers || {},
+    rewriteAnswers: state.grammarAdvancedLab.rewriteAnswers || {},
+    practiceResult: state.grammarAdvancedLab.practiceResult || null,
+    rewriteResult: state.grammarAdvancedLab.rewriteResult || null
+  });
+}
+
+function combinedAdvancedStatus(progress, topic) {
+  const practiceTotal = (topic?.practice_items || []).slice(0, 4).length;
+  const rewriteTotal = (topic?.rewrite_items || []).slice(0, 4).length;
+  const practiceStatus = grammarActivityStatus(progress.practiceAnswers, progress.practiceResult, practiceTotal);
+  const rewriteStatus = grammarActivityStatus(progress.rewriteAnswers, progress.rewriteResult, rewriteTotal);
+  if (practiceStatus === "need_review" || rewriteStatus === "need_review") return "need_review";
+  if (practiceStatus === "completed" && rewriteStatus === "completed") return "completed";
+  if (practiceStatus === "answered" || rewriteStatus === "answered") return "answered";
+  if (practiceStatus === "in_progress" || rewriteStatus === "in_progress" || practiceStatus === "completed" || rewriteStatus === "completed") return "in_progress";
+  return "not_started";
+}
+
+function combinedAdvancedScore(progress) {
+  const scores = [grammarResultScore(progress.practiceResult), grammarResultScore(progress.rewriteResult)].filter((score) => score !== null);
+  if (!scores.length) return null;
+  return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+}
+
+function ensureGrammarSimulationProgress() {
+  if (!state.grammarSimulation.modeProgress || typeof state.grammarSimulation.modeProgress !== "object") {
+    state.grammarSimulation.modeProgress = {};
+  }
+  return state.grammarSimulation.modeProgress;
+}
+
+function grammarSimulationModeProgress(mode) {
+  const progress = ensureGrammarSimulationProgress();
+  const item = progress[mode] || {};
+  return {
+    session: item.session || null,
+    answers: { ...(item.answers || {}) },
+    result: item.result || null,
+    updatedAt: item.updatedAt || null
+  };
+}
+
+function saveGrammarSimulationModeProgress(mode, patch = {}) {
+  if (!mode) return;
+  const progress = ensureGrammarSimulationProgress();
+  const previous = progress[mode] || {};
+  progress[mode] = {
+    ...previous,
+    ...patch,
+    answers: { ...(patch.answers || previous.answers || {}) },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function persistCurrentGrammarSimulationMode() {
+  const mode = state.grammarSimulation?.mode;
+  if (!mode) return;
+  if (!state.grammarSimulation.session && !state.grammarSimulation.result && !grammarAnswerCount(state.grammarSimulation.answers)) return;
+  saveGrammarSimulationModeProgress(mode, {
+    session: state.grammarSimulation.session || null,
+    answers: state.grammarSimulation.answers || {},
+    result: state.grammarSimulation.result || null
+  });
+}
+
+function grammarSimulationModeStatus(mode) {
+  const progress = grammarSimulationModeProgress(mode);
+  const result = grammarResultPayload(progress.result?.result || progress.result);
+  if (result?.total_score !== undefined || result?.score !== undefined) {
+    const score = Number(result.total_score ?? result.score ?? 0);
+    if (mode === "full") return score >= 75 ? "completed" : "need_review";
+    return score >= 70 ? "completed" : "need_review";
+  }
+  if (progress.session || grammarAnswerCount(progress.answers)) return "in_progress";
+  return "not_started";
+}
+
 function intermediateGrammarTrainerPanel() {
   const data = state.intermediateGrammarTrainer;
+  ensureIntermediateGrammarProgress();
   const topics = data.topics?.length ? data.topics : localIntermediateGrammarTrainerTopics();
   const trainer = data.trainer || localIntermediateGrammarTrainer(data.selectedTopic || "gerund_vs_main_verb");
-  const result = data.result;
+  const savedProgress = intermediateGrammarTopicProgress(trainer.topic_id);
+  const answers = savedProgress.answers || {};
+  const result = savedProgress.result || data.result;
+  const allQuizItems = [...(trainer.quiz_items || []), ...(trainer.trap_items || [])];
+  const currentStatus = grammarActivityStatus(answers, result, allQuizItems.length);
+  const currentScore = grammarResultScore(result);
   return `
     <section class="module-surface">
       <div class="section-heading">
@@ -5247,12 +6322,34 @@ function intermediateGrammarTrainerPanel() {
         </div>
         <span class="pill">Trap-aware practice</span>
       </div>
-      <div class="quick-actions">
+      <div class="grammar-topic-strip">
         ${topics.map((topic) => `
-          <button class="ghost-button ${topic.topic_id === trainer.topic_id ? "selected-control" : ""}" type="button" data-intermediate-grammar-topic="${escapeHtml(topic.topic_id)}">
-            ${escapeHtml(topic.title)}
-          </button>
+          ${(() => {
+            const topicProgress = intermediateGrammarTopicProgress(topic.topic_id);
+            const total = intermediateGrammarTotalItems(topic.topic_id, topic.topic_id === trainer.topic_id ? trainer : null);
+            const status = grammarActivityStatus(topicProgress.answers, topicProgress.result, total);
+            return grammarSelectorCard({
+              title: topic.title,
+              status,
+              score: grammarResultScore(topicProgress.result),
+              percent: grammarActivityVisualPercent(topicProgress.answers, topicProgress.result, total),
+              dataAttr: "data-intermediate-grammar-topic",
+              dataValue: topic.topic_id,
+              selected: topic.topic_id === trainer.topic_id
+            });
+          })()}
         `).join("")}
+      </div>
+      <div class="grammar-module-banner ${basicGrammarTopicStatusClass(currentStatus)}">
+        <div>
+          <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+          <h3>${escapeHtml(trainer.title)}</h3>
+          <p>${escapeHtml(grammarActivityStatusMessage(currentStatus, "topic intermediate ini"))}</p>
+        </div>
+        <div class="grammar-module-banner-stats">
+          <strong>${currentScore === null ? "-" : `${currentScore}%`}</strong>
+          <span>Skor terakhir</span>
+        </div>
       </div>
       <div class="module-grid two">
         <article class="module-card soft">
@@ -5293,17 +6390,34 @@ function intermediateGrammarTrainerPanel() {
           `).join("")}
         </article>
         <form id="intermediateGrammarTrainerForm" class="module-card">
-          <h3>Quiz + Trap Check</h3>
-          ${[...(trainer.quiz_items || []), ...(trainer.trap_items || [])].map((item) => `
-            <label>
-              ${escapeHtml(item.instruction_id || item.trap_type || "Trap check")}
-              <span class="muted">${escapeHtml(item.sentence)}</span>
-              <strong>${escapeHtml(item.question)}</strong>
-              <select data-intermediate-grammar-answer="${escapeHtml(item.id)}">
-                <option value="">Pilih jawaban</option>
-                ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${data.answers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
-              </select>
-            </label>
+          <div class="quiz-panel-header">
+            <div>
+              <h3>Quiz + Trap Check</h3>
+              <p class="muted">Jawaban tersimpan per topic. Pindah topic tidak akan menghapus pilihanmu.</p>
+            </div>
+            <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+          </div>
+          ${allQuizItems.map((item) => `
+            ${(() => {
+              const selectedAnswer = answers?.[item.id] || "";
+              const detail = grammarFindResultDetail(result, item.id);
+              const itemStatus = basicGrammarQuizItemStatus(detail, selectedAnswer);
+              return `
+                <label class="quiz-answer-card ${basicGrammarTopicStatusClass(itemStatus)}">
+                  <span class="quiz-card-topline">
+                    <span>${escapeHtml(item.instruction_id || item.trap_type || "Trap check")}</span>
+                    <span class="grammar-status ${basicGrammarTopicStatusClass(itemStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(itemStatus))}</span>
+                  </span>
+                  <span class="muted">${escapeHtml(item.sentence)}</span>
+                  <strong>${escapeHtml(item.question)}</strong>
+                  <select data-intermediate-grammar-answer="${escapeHtml(item.id)}">
+                    <option value="">Pilih jawaban</option>
+                    ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${selectedAnswer === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+                  </select>
+                  ${grammarActivityFeedback(item, detail, selectedAnswer)}
+                </label>
+              `;
+            })()}
           `).join("")}
           <button class="primary-button" type="submit">Submit Intermediate Trainer</button>
           ${result ? grammarTrainerResultTemplate(result) : emptyStateTemplate("Belum submit intermediate quiz", "Jawab quiz dan trap check untuk melihat skor, mistakes, dan rekomendasi.")}
@@ -5327,7 +6441,9 @@ function intermediatePracticeCard(item) {
 }
 
 async function loadIntermediateGrammarTrainer(topicId = "gerund_vs_main_verb") {
+  persistCurrentIntermediateGrammarTopic();
   const selectedTopic = topicId || "gerund_vs_main_verb";
+  const savedProgress = intermediateGrammarTopicProgress(selectedTopic);
   if (apiOnline) {
     try {
       const [topicsResponse, trainerResponse] = await Promise.all([
@@ -5338,8 +6454,9 @@ async function loadIntermediateGrammarTrainer(topicId = "gerund_vs_main_verb") {
         selectedTopic,
         topics: topicsResponse.topics || [],
         trainer: trainerResponse.trainer,
-        answers: {},
-        result: null
+        answers: savedProgress.answers || {},
+        result: savedProgress.result || null,
+        topicProgress: state.intermediateGrammarTrainer.topicProgress || {}
       };
       saveState();
       return;
@@ -5351,8 +6468,9 @@ async function loadIntermediateGrammarTrainer(topicId = "gerund_vs_main_verb") {
     selectedTopic,
     topics: localIntermediateGrammarTrainerTopics(),
     trainer: localIntermediateGrammarTrainer(selectedTopic),
-    answers: {},
-    result: null
+    answers: savedProgress.answers || {},
+    result: savedProgress.result || null,
+    topicProgress: state.intermediateGrammarTrainer.topicProgress || {}
   };
   saveState();
 }
@@ -5370,6 +6488,10 @@ async function submitIntermediateGrammarTrainer() {
         }
       });
       state.intermediateGrammarTrainer.result = response;
+      saveIntermediateGrammarTopicProgress(topicId, {
+        answers: state.intermediateGrammarTrainer.answers || {},
+        result: response
+      });
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
       saveState();
@@ -5412,6 +6534,10 @@ async function submitIntermediateGrammarTrainer() {
       review_topic_id: topicId
     }
   };
+  saveIntermediateGrammarTopicProgress(topicId, {
+    answers: state.intermediateGrammarTrainer.answers || {},
+    result: state.intermediateGrammarTrainer.result
+  });
   saveState();
 }
 
@@ -5490,10 +6616,15 @@ function localIntermediateGrammarTrainer(topicId = "gerund_vs_main_verb") {
 
 function grammarErrorCorrectionPanel() {
   const data = state.grammarErrorCorrection;
+  ensureGrammarErrorProgress();
   const categories = data.categories?.length ? data.categories : localGrammarErrorCategories();
   const category = data.category || localGrammarErrorCategory(data.selectedErrorType || "missing_be_after_modal");
   const items = data.items?.length ? data.items : localGrammarErrorItems(category.error_type);
-  const result = data.result;
+  const savedProgress = grammarErrorProgress(category.error_type);
+  const answers = savedProgress.answers || {};
+  const result = savedProgress.result || data.result;
+  const currentStatus = grammarActivityStatus(answers, result, items.length);
+  const currentScore = grammarResultScore(result);
   return `
     <section class="module-surface">
       <div class="section-heading">
@@ -5504,12 +6635,35 @@ function grammarErrorCorrectionPanel() {
         </div>
         <span class="pill">Error -> Rule -> Correction</span>
       </div>
-      <div class="quick-actions">
+      <div class="grammar-topic-strip">
         ${categories.map((item) => `
-          <button class="ghost-button ${item.error_type === category.error_type ? "selected-control" : ""}" type="button" data-grammar-error-type="${escapeHtml(item.error_type)}">
-            ${escapeHtml(item.title)}
-          </button>
+          ${(() => {
+            const progress = grammarErrorProgress(item.error_type);
+            const total = item.error_type === category.error_type ? items.length : grammarResultPayload(progress.result)?.total_questions || 0;
+            const status = grammarActivityStatus(progress.answers, progress.result, total);
+            return grammarSelectorCard({
+              title: item.title,
+              status,
+              score: grammarResultScore(progress.result),
+              percent: grammarActivityVisualPercent(progress.answers, progress.result, total),
+              dataAttr: "data-grammar-error-type",
+              dataValue: item.error_type,
+              selected: item.error_type === category.error_type,
+              meta: "Skor correction"
+            });
+          })()}
         `).join("")}
+      </div>
+      <div class="grammar-module-banner ${basicGrammarTopicStatusClass(currentStatus)}">
+        <div>
+          <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+          <h3>${escapeHtml(category.title)}</h3>
+          <p>${escapeHtml(grammarActivityStatusMessage(currentStatus, "kategori error ini"))}</p>
+        </div>
+        <div class="grammar-module-banner-stats">
+          <strong>${currentScore === null ? "-" : `${currentScore}%`}</strong>
+          <span>Skor terakhir</span>
+        </div>
       </div>
       <div class="module-grid two">
         <article class="module-card soft">
@@ -5533,18 +6687,35 @@ function grammarErrorCorrectionPanel() {
         </article>
       </div>
       <form id="grammarErrorCorrectionForm" class="module-card">
-        <h3>Correction quiz</h3>
+        <div class="quiz-panel-header">
+          <div>
+            <h3>Correction quiz</h3>
+            <p class="muted">Pilih corrected sentence. Pilihan dan hasil tersimpan per error type.</p>
+          </div>
+          <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+        </div>
         ${items.map((item) => `
-          <label>
-            ${escapeHtml(item.instruction_id)}
-            <span class="muted">Salah: ${escapeHtml(item.incorrect_sentence)}</span>
-            <strong>${escapeHtml(item.question)}</strong>
-            <select data-grammar-error-answer="${escapeHtml(item.id)}">
-              <option value="">Pilih jawaban</option>
-              ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${data.answers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
-            </select>
-            <small>${escapeHtml(item.hint_id || "")}</small>
-          </label>
+          ${(() => {
+            const selectedAnswer = answers?.[item.id] || "";
+            const detail = grammarFindResultDetail(result, item.id);
+            const itemStatus = basicGrammarQuizItemStatus(detail, selectedAnswer);
+            return `
+              <label class="quiz-answer-card ${basicGrammarTopicStatusClass(itemStatus)}">
+                <span class="quiz-card-topline">
+                  <span>${escapeHtml(item.instruction_id)}</span>
+                  <span class="grammar-status ${basicGrammarTopicStatusClass(itemStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(itemStatus))}</span>
+                </span>
+                <span class="muted">Salah: ${escapeHtml(item.incorrect_sentence)}</span>
+                <strong>${escapeHtml(item.question)}</strong>
+                <select data-grammar-error-answer="${escapeHtml(item.id)}">
+                  <option value="">Pilih jawaban</option>
+                  ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${selectedAnswer === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+                </select>
+                <small>${escapeHtml(item.hint_id || "")}</small>
+                ${grammarActivityFeedback(item, detail, selectedAnswer, { correctAnswer: "Corrected sentence" })}
+              </label>
+            `;
+          })()}
         `).join("")}
         <button class="primary-button" type="submit">Submit Error Correction</button>
         ${result ? grammarErrorCorrectionResultTemplate(result) : emptyStateTemplate("Belum submit correction", "Pilih kalimat yang benar untuk melihat skor, corrected sentence, dan rekomendasi.")}
@@ -5554,7 +6725,9 @@ function grammarErrorCorrectionPanel() {
 }
 
 async function loadGrammarErrorCorrection(errorType = "missing_be_after_modal") {
+  persistCurrentGrammarError();
   const selectedErrorType = errorType || "missing_be_after_modal";
+  const savedProgress = grammarErrorProgress(selectedErrorType);
   if (apiOnline) {
     try {
       const [categoriesResponse, detailResponse] = await Promise.all([
@@ -5566,8 +6739,9 @@ async function loadGrammarErrorCorrection(errorType = "missing_be_after_modal") 
         categories: categoriesResponse.categories || [],
         category: detailResponse.category,
         items: detailResponse.items || [],
-        answers: {},
-        result: null
+        answers: savedProgress.answers || {},
+        result: savedProgress.result || null,
+        errorProgress: state.grammarErrorCorrection.errorProgress || {}
       };
       saveState();
       return;
@@ -5581,8 +6755,9 @@ async function loadGrammarErrorCorrection(errorType = "missing_be_after_modal") 
     categories: localGrammarErrorCategories(),
     category,
     items: localGrammarErrorItems(selectedErrorType),
-    answers: {},
-    result: null
+    answers: savedProgress.answers || {},
+    result: savedProgress.result || null,
+    errorProgress: state.grammarErrorCorrection.errorProgress || {}
   };
   saveState();
 }
@@ -5600,6 +6775,10 @@ async function submitGrammarErrorCorrection() {
         }
       });
       state.grammarErrorCorrection.result = response;
+      saveGrammarErrorProgress(errorType, {
+        answers: state.grammarErrorCorrection.answers || {},
+        result: response
+      });
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
       saveState();
@@ -5641,6 +6820,10 @@ async function submitGrammarErrorCorrection() {
       mentor_message: score >= 70 ? "Bagus. Kamu mulai bisa mengenali grammar error umum." : "Pelan-pelan. Bandingkan kalimat salah dan benar."
     }
   };
+  saveGrammarErrorProgress(errorType, {
+    answers: state.grammarErrorCorrection.answers || {},
+    result: state.grammarErrorCorrection.result
+  });
   saveState();
 }
 
@@ -5716,6 +6899,7 @@ function localGrammarErrorItems(errorType = "missing_be_after_modal") {
 
 function grammarSentenceBuilderPanel() {
   const data = state.grammarSentenceBuilder;
+  ensureSentenceBuilderProgress();
   const levels = data.levels?.length ? data.levels : localSentenceBuilderLevels();
   const selectedLevel = data.selectedLevel || "basic";
   const selectedMode = data.selectedMode || "arrange_words";
@@ -5723,7 +6907,12 @@ function grammarSentenceBuilderPanel() {
   const modes = activeLevel?.modes || ["arrange_words", "complete_sentence", "fix_word_order"];
   const activeMode = modes.includes(selectedMode) ? selectedMode : modes[0];
   const items = data.items?.length ? data.items : localSentenceBuilderItems(selectedLevel, activeMode);
-  const result = data.result;
+  const activeKey = sentenceBuilderProgressKey(selectedLevel, activeMode);
+  const savedProgress = sentenceBuilderProgress(activeKey);
+  const answers = savedProgress.answers || {};
+  const result = savedProgress.result || data.result;
+  const currentStatus = grammarActivityStatus(answers, result, items.length);
+  const currentScore = grammarResultScore(result);
   return `
     <section class="module-surface">
       <div class="section-heading">
@@ -5741,12 +6930,36 @@ function grammarSentenceBuilderPanel() {
           </button>
         `).join("")}
       </div>
-      <div class="quick-actions">
+      <div class="grammar-topic-strip">
         ${modes.map((mode) => `
-          <button class="ghost-button ${mode === activeMode ? "selected-control" : ""}" type="button" data-sentence-builder-mode="${escapeHtml(mode)}">
-            ${escapeHtml(sentenceBuilderModeLabel(mode))}
-          </button>
+          ${(() => {
+            const key = sentenceBuilderProgressKey(selectedLevel, mode);
+            const progress = sentenceBuilderProgress(key);
+            const modeItems = mode === activeMode ? items : localSentenceBuilderItems(selectedLevel, mode);
+            const status = grammarActivityStatus(progress.answers, progress.result, modeItems.length);
+            return grammarSelectorCard({
+              title: sentenceBuilderModeLabel(mode),
+              status,
+              score: grammarResultScore(progress.result),
+              percent: grammarActivityVisualPercent(progress.answers, progress.result, modeItems.length),
+              dataAttr: "data-sentence-builder-mode",
+              dataValue: mode,
+              selected: mode === activeMode,
+              meta: "Skor mode"
+            });
+          })()}
         `).join("")}
+      </div>
+      <div class="grammar-module-banner ${basicGrammarTopicStatusClass(currentStatus)}">
+        <div>
+          <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+          <h3>${escapeHtml(sentenceBuilderModeLabel(activeMode))}</h3>
+          <p>${escapeHtml(grammarActivityStatusMessage(currentStatus, "mode Sentence Builder ini"))}</p>
+        </div>
+        <div class="grammar-module-banner-stats">
+          <strong>${currentScore === null ? "-" : `${currentScore}%`}</strong>
+          <span>Skor terakhir</span>
+        </div>
       </div>
       <article class="module-card soft">
         <span class="soft-pill">${escapeHtml(activeLevel?.id || selectedLevel)} · ${escapeHtml(activeMode)}</span>
@@ -5754,17 +6967,34 @@ function grammarSentenceBuilderPanel() {
         <p>Isi jawaban dengan kalimat atau kata yang menurutmu paling tepat. Untuk rewrite formal, sistem menerima partial credit berdasarkan kata kunci penting.</p>
       </article>
       <form id="grammarSentenceBuilderForm" class="module-card">
-        <h3>Sentence builder practice</h3>
+        <div class="quiz-panel-header">
+          <div>
+            <h3>Sentence builder practice</h3>
+            <p class="muted">Jawaban tersimpan per level dan mode. Pindah mode tidak akan menghapus latihan yang sudah diisi.</p>
+          </div>
+          <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+        </div>
         <div class="module-card-list">
           ${items.map((item) => `
-            <label class="case-box soft">
-              <span class="soft-pill">${escapeHtml(sentenceBuilderModeLabel(item.mode))} · ${escapeHtml(item.related_topic_id)}</span>
-              <strong>${escapeHtml(item.instruction_id)}</strong>
-              <span class="muted">${escapeHtml(item.prompt_text)}</span>
-              ${(item.input_parts || []).length ? `<small>Input parts: ${escapeHtml(item.input_parts.join(" / "))}</small>` : ""}
-              <input type="text" data-sentence-builder-answer="${escapeHtml(item.id)}" value="${escapeHtml(data.answers?.[item.id] || "")}" placeholder="Tulis jawaban kamu di sini" />
-              <small>${escapeHtml(item.beginner_tip || "")}</small>
-            </label>
+            ${(() => {
+              const selectedAnswer = answers?.[item.id] || "";
+              const detail = grammarFindResultDetail(result, item.id);
+              const itemStatus = basicGrammarQuizItemStatus(detail, selectedAnswer);
+              return `
+                <label class="quiz-answer-card ${basicGrammarTopicStatusClass(itemStatus)}">
+                  <span class="quiz-card-topline">
+                    <span class="soft-pill">${escapeHtml(sentenceBuilderModeLabel(item.mode))} · ${escapeHtml(item.related_topic_id)}</span>
+                    <span class="grammar-status ${basicGrammarTopicStatusClass(itemStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(itemStatus))}</span>
+                  </span>
+                  <strong>${escapeHtml(item.instruction_id)}</strong>
+                  <span class="muted">${escapeHtml(item.prompt_text)}</span>
+                  ${(item.input_parts || []).length ? `<small>Input parts: ${escapeHtml(item.input_parts.join(" / "))}</small>` : ""}
+                  <input type="text" data-sentence-builder-answer="${escapeHtml(item.id)}" value="${escapeHtml(selectedAnswer)}" placeholder="Tulis jawaban kamu di sini" />
+                  <small>${escapeHtml(item.beginner_tip || "")}</small>
+                  ${grammarActivityFeedback(item, detail, selectedAnswer, { correctAnswer: "Expected answer" })}
+                </label>
+              `;
+            })()}
           `).join("")}
         </div>
         <button class="primary-button" type="submit">Submit Sentence Builder</button>
@@ -5786,9 +7016,12 @@ function sentenceBuilderModeLabel(mode) {
 }
 
 async function loadGrammarSentenceBuilder(level = "basic", mode = null) {
+  persistCurrentSentenceBuilder();
   const selectedLevel = level || "basic";
   const fallbackLevel = localSentenceBuilderLevels().find((item) => item.id === selectedLevel) || localSentenceBuilderLevels()[0];
   const selectedMode = mode && fallbackLevel.modes.includes(mode) ? mode : fallbackLevel.modes[0];
+  const key = sentenceBuilderProgressKey(selectedLevel, selectedMode);
+  const savedProgress = sentenceBuilderProgress(key);
   if (apiOnline) {
     try {
       const [levelsResponse, itemsResponse] = await Promise.all([
@@ -5800,8 +7033,9 @@ async function loadGrammarSentenceBuilder(level = "basic", mode = null) {
         selectedMode,
         levels: levelsResponse.levels || [],
         items: itemsResponse.items || [],
-        answers: {},
-        result: null
+        answers: savedProgress.answers || {},
+        result: savedProgress.result || null,
+        modeProgress: state.grammarSentenceBuilder.modeProgress || {}
       };
       saveState();
       return;
@@ -5814,8 +7048,9 @@ async function loadGrammarSentenceBuilder(level = "basic", mode = null) {
     selectedMode,
     levels: localSentenceBuilderLevels(),
     items: localSentenceBuilderItems(selectedLevel, selectedMode),
-    answers: {},
-    result: null
+    answers: savedProgress.answers || {},
+    result: savedProgress.result || null,
+    modeProgress: state.grammarSentenceBuilder.modeProgress || {}
   };
   saveState();
 }
@@ -5835,6 +7070,10 @@ async function submitGrammarSentenceBuilder() {
         }
       });
       state.grammarSentenceBuilder.result = response;
+      saveSentenceBuilderProgress(sentenceBuilderProgressKey(level, mode), {
+        answers: state.grammarSentenceBuilder.answers || {},
+        result: response
+      });
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
       saveState();
@@ -5876,6 +7115,10 @@ async function submitGrammarSentenceBuilder() {
       mentor_message: score >= 70 ? "Bagus. Kamu mulai bisa membangun kalimat yang rapi." : "Tidak apa-apa. Bangun kalimat dari bagian paling kecil dulu."
     }
   };
+  saveSentenceBuilderProgress(sentenceBuilderProgressKey(level, mode), {
+    answers: state.grammarSentenceBuilder.answers || {},
+    result: state.grammarSentenceBuilder.result
+  });
   saveState();
 }
 
@@ -5987,8 +7230,16 @@ function normalizeLocalSentence(value) {
 
 function grammarAdvancedLabPanel() {
   const data = state.grammarAdvancedLab;
+  ensureAdvancedGrammarProgress();
   const topics = data.topics?.length ? data.topics : localAdvancedGrammarTopics();
   const topic = data.topic || localAdvancedGrammarTopic(data.selectedTopic || "nominalization");
+  const savedProgress = advancedGrammarTopicProgress(topic.topic_id);
+  const practiceAnswers = savedProgress.practiceAnswers || {};
+  const rewriteAnswers = savedProgress.rewriteAnswers || {};
+  const practiceResult = savedProgress.practiceResult || data.practiceResult;
+  const rewriteResult = savedProgress.rewriteResult || data.rewriteResult;
+  const currentStatus = combinedAdvancedStatus({ ...savedProgress, practiceResult, rewriteResult }, topic);
+  const currentScore = combinedAdvancedScore({ ...savedProgress, practiceResult, rewriteResult });
   return `
     <section class="module-surface">
       <div class="section-heading">
@@ -5999,12 +7250,35 @@ function grammarAdvancedLabPanel() {
         </div>
         <span class="pill">Advanced but guided</span>
       </div>
-      <div class="quick-actions">
+      <div class="grammar-topic-strip">
         ${topics.map((item) => `
-          <button class="ghost-button ${item.topic_id === topic.topic_id ? "selected-control" : ""}" type="button" data-advanced-grammar-topic="${escapeHtml(item.topic_id)}">
-            ${escapeHtml(item.title)}
-          </button>
+          ${(() => {
+            const progress = advancedGrammarTopicProgress(item.topic_id);
+            const topicData = item.topic_id === topic.topic_id ? topic : null;
+            const status = combinedAdvancedStatus(progress, topicData);
+            return grammarSelectorCard({
+              title: item.title,
+              status,
+              score: combinedAdvancedScore(progress),
+              percent: grammarActivityVisualPercent({ ...progress.practiceAnswers, ...progress.rewriteAnswers }, { result: { score: combinedAdvancedScore(progress) } }, 1),
+              dataAttr: "data-advanced-grammar-topic",
+              dataValue: item.topic_id,
+              selected: item.topic_id === topic.topic_id,
+              meta: "Rata-rata skor"
+            });
+          })()}
         `).join("")}
+      </div>
+      <div class="grammar-module-banner ${basicGrammarTopicStatusClass(currentStatus)}">
+        <div>
+          <span class="grammar-status ${basicGrammarTopicStatusClass(currentStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(currentStatus))}</span>
+          <h3>${escapeHtml(topic.title)}</h3>
+          <p>${escapeHtml(grammarActivityStatusMessage(currentStatus, "advanced topic ini"))}</p>
+        </div>
+        <div class="grammar-module-banner-stats">
+          <strong>${currentScore === null ? "-" : `${currentScore}%`}</strong>
+          <span>Rata-rata skor</span>
+        </div>
       </div>
       <div class="module-grid two">
         <article class="module-card soft">
@@ -6031,33 +7305,67 @@ function grammarAdvancedLabPanel() {
       </div>
       <div class="module-grid two">
         <form id="advancedGrammarPracticeForm" class="module-card">
-          <h3>Advanced practice</h3>
+          <div class="quiz-panel-header">
+            <div>
+              <h3>Advanced practice</h3>
+              <p class="muted">Latihan pilihan ganda untuk memahami pola advanced.</p>
+            </div>
+            <span class="grammar-status ${basicGrammarTopicStatusClass(grammarActivityStatus(practiceAnswers, practiceResult, (topic.practice_items || []).slice(0, 4).length))}">${escapeHtml(basicGrammarTopicStatusLabel(grammarActivityStatus(practiceAnswers, practiceResult, (topic.practice_items || []).slice(0, 4).length)))}</span>
+          </div>
           ${(topic.practice_items || []).slice(0, 4).map((item) => `
-            <label>
-              ${escapeHtml(item.instruction_id)}
-              <span class="muted">${escapeHtml(item.sentence)}</span>
-              <strong>${escapeHtml(item.question)}</strong>
-              <select data-advanced-practice-answer="${escapeHtml(item.id)}">
-                <option value="">Pilih jawaban</option>
-                ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${data.practiceAnswers?.[item.id] === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
-              </select>
-            </label>
+            ${(() => {
+              const selectedAnswer = practiceAnswers?.[item.id] || "";
+              const detail = grammarFindResultDetail(practiceResult, item.id);
+              const itemStatus = basicGrammarQuizItemStatus(detail, selectedAnswer);
+              return `
+                <label class="quiz-answer-card ${basicGrammarTopicStatusClass(itemStatus)}">
+                  <span class="quiz-card-topline">
+                    <span>${escapeHtml(item.instruction_id)}</span>
+                    <span class="grammar-status ${basicGrammarTopicStatusClass(itemStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(itemStatus))}</span>
+                  </span>
+                  <span class="muted">${escapeHtml(item.sentence)}</span>
+                  <strong>${escapeHtml(item.question)}</strong>
+                  <select data-advanced-practice-answer="${escapeHtml(item.id)}">
+                    <option value="">Pilih jawaban</option>
+                    ${(item.options || []).map((option) => `<option value="${escapeHtml(option)}" ${selectedAnswer === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+                  </select>
+                  ${grammarActivityFeedback(item, detail, selectedAnswer)}
+                </label>
+              `;
+            })()}
           `).join("")}
           <button class="primary-button" type="submit">Submit Advanced Practice</button>
-          ${data.practiceResult ? advancedGrammarResultTemplate(data.practiceResult, "practice") : emptyStateTemplate("Belum submit advanced practice", "Jawab soal pilihan untuk melihat score dan feedback advanced grammar.")}
+          ${practiceResult ? advancedGrammarResultTemplate(practiceResult, "practice") : emptyStateTemplate("Belum submit advanced practice", "Jawab soal pilihan untuk melihat score dan feedback advanced grammar.")}
         </form>
         <form id="advancedGrammarRewriteForm" class="module-card">
-          <h3>Advanced rewrite</h3>
+          <div class="quiz-panel-header">
+            <div>
+              <h3>Advanced rewrite</h3>
+              <p class="muted">Tulis ulang kalimat menjadi versi BA formal. Jawaban tersimpan per topic.</p>
+            </div>
+            <span class="grammar-status ${basicGrammarTopicStatusClass(grammarActivityStatus(rewriteAnswers, rewriteResult, (topic.rewrite_items || []).slice(0, 4).length))}">${escapeHtml(basicGrammarTopicStatusLabel(grammarActivityStatus(rewriteAnswers, rewriteResult, (topic.rewrite_items || []).slice(0, 4).length)))}</span>
+          </div>
           ${(topic.rewrite_items || []).slice(0, 4).map((item) => `
-            <label>
-              ${escapeHtml(item.instruction_id)}
-              <span class="muted">${escapeHtml(item.original_sentence)}</span>
-              <input type="text" data-advanced-rewrite-answer="${escapeHtml(item.id)}" value="${escapeHtml(data.rewriteAnswers?.[item.id] || "")}" placeholder="Tulis versi formal kamu" />
-              <small>Keyword penting: ${escapeHtml((item.required_keywords || []).join(", "))}</small>
-            </label>
+            ${(() => {
+              const selectedAnswer = rewriteAnswers?.[item.id] || "";
+              const detail = grammarFindResultDetail(rewriteResult, item.id);
+              const itemStatus = basicGrammarQuizItemStatus(detail, selectedAnswer);
+              return `
+                <label class="quiz-answer-card ${basicGrammarTopicStatusClass(itemStatus)}">
+                  <span class="quiz-card-topline">
+                    <span>${escapeHtml(item.instruction_id)}</span>
+                    <span class="grammar-status ${basicGrammarTopicStatusClass(itemStatus)}">${escapeHtml(basicGrammarTopicStatusLabel(itemStatus))}</span>
+                  </span>
+                  <span class="muted">${escapeHtml(item.original_sentence)}</span>
+                  <input type="text" data-advanced-rewrite-answer="${escapeHtml(item.id)}" value="${escapeHtml(selectedAnswer)}" placeholder="Tulis versi formal kamu" />
+                  <small>Keyword penting: ${escapeHtml((item.required_keywords || []).join(", "))}</small>
+                  ${grammarActivityFeedback(item, detail, selectedAnswer, { correctAnswer: "Expected answer" })}
+                </label>
+              `;
+            })()}
           `).join("")}
           <button class="primary-button" type="submit">Submit Advanced Rewrite</button>
-          ${data.rewriteResult ? advancedGrammarResultTemplate(data.rewriteResult, "rewrite") : emptyStateTemplate("Belum submit advanced rewrite", "Tulis ulang kalimat informal menjadi kalimat BA yang lebih formal.")}
+          ${rewriteResult ? advancedGrammarResultTemplate(rewriteResult, "rewrite") : emptyStateTemplate("Belum submit advanced rewrite", "Tulis ulang kalimat informal menjadi kalimat BA yang lebih formal.")}
         </form>
       </div>
     </section>
@@ -6065,7 +7373,9 @@ function grammarAdvancedLabPanel() {
 }
 
 async function loadGrammarAdvancedLab(topicId = "nominalization") {
+  persistCurrentAdvancedGrammarTopic();
   const selectedTopic = topicId || "nominalization";
+  const savedProgress = advancedGrammarTopicProgress(selectedTopic);
   if (apiOnline) {
     try {
       const [topicsResponse, topicResponse] = await Promise.all([
@@ -6076,10 +7386,11 @@ async function loadGrammarAdvancedLab(topicId = "nominalization") {
         selectedTopic,
         topics: topicsResponse.topics || [],
         topic: topicResponse.topic,
-        practiceAnswers: {},
-        rewriteAnswers: {},
-        practiceResult: null,
-        rewriteResult: null
+        practiceAnswers: savedProgress.practiceAnswers || {},
+        rewriteAnswers: savedProgress.rewriteAnswers || {},
+        practiceResult: savedProgress.practiceResult || null,
+        rewriteResult: savedProgress.rewriteResult || null,
+        topicProgress: state.grammarAdvancedLab.topicProgress || {}
       };
       saveState();
       return;
@@ -6091,10 +7402,11 @@ async function loadGrammarAdvancedLab(topicId = "nominalization") {
     selectedTopic,
     topics: localAdvancedGrammarTopics(),
     topic: localAdvancedGrammarTopic(selectedTopic),
-    practiceAnswers: {},
-    rewriteAnswers: {},
-    practiceResult: null,
-    rewriteResult: null
+    practiceAnswers: savedProgress.practiceAnswers || {},
+    rewriteAnswers: savedProgress.rewriteAnswers || {},
+    practiceResult: savedProgress.practiceResult || null,
+    rewriteResult: savedProgress.rewriteResult || null,
+    topicProgress: state.grammarAdvancedLab.topicProgress || {}
   };
   saveState();
 }
@@ -6112,6 +7424,12 @@ async function submitAdvancedGrammarPractice() {
         }
       });
       state.grammarAdvancedLab.practiceResult = response;
+      saveAdvancedGrammarTopicProgress(topicId, {
+        practiceAnswers: state.grammarAdvancedLab.practiceAnswers || {},
+        rewriteAnswers: state.grammarAdvancedLab.rewriteAnswers || {},
+        practiceResult: response,
+        rewriteResult: state.grammarAdvancedLab.rewriteResult || null
+      });
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
       saveState();
@@ -6121,6 +7439,12 @@ async function submitAdvancedGrammarPractice() {
     }
   }
   state.grammarAdvancedLab.practiceResult = localAdvancedResult(state.grammarAdvancedLab.practiceAnswers || {}, state.grammarAdvancedLab.topic?.practice_items || []);
+  saveAdvancedGrammarTopicProgress(topicId, {
+    practiceAnswers: state.grammarAdvancedLab.practiceAnswers || {},
+    rewriteAnswers: state.grammarAdvancedLab.rewriteAnswers || {},
+    practiceResult: state.grammarAdvancedLab.practiceResult,
+    rewriteResult: state.grammarAdvancedLab.rewriteResult || null
+  });
   saveState();
 }
 
@@ -6137,6 +7461,12 @@ async function submitAdvancedGrammarRewrite() {
         }
       });
       state.grammarAdvancedLab.rewriteResult = response;
+      saveAdvancedGrammarTopicProgress(topicId, {
+        practiceAnswers: state.grammarAdvancedLab.practiceAnswers || {},
+        rewriteAnswers: state.grammarAdvancedLab.rewriteAnswers || {},
+        practiceResult: state.grammarAdvancedLab.practiceResult || null,
+        rewriteResult: response
+      });
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
       saveState();
@@ -6146,6 +7476,12 @@ async function submitAdvancedGrammarRewrite() {
     }
   }
   state.grammarAdvancedLab.rewriteResult = localAdvancedResult(state.grammarAdvancedLab.rewriteAnswers || {}, state.grammarAdvancedLab.topic?.rewrite_items || []);
+  saveAdvancedGrammarTopicProgress(topicId, {
+    practiceAnswers: state.grammarAdvancedLab.practiceAnswers || {},
+    rewriteAnswers: state.grammarAdvancedLab.rewriteAnswers || {},
+    practiceResult: state.grammarAdvancedLab.practiceResult || null,
+    rewriteResult: state.grammarAdvancedLab.rewriteResult
+  });
   saveState();
 }
 
@@ -6262,6 +7598,7 @@ function grammarReviewPanel() {
   const primary = weakness.primary_weakness || {};
   const secondary = weakness.secondary_weakness || {};
   const recommended = review.recommended_practice || {};
+  const recommendedSection = mapGrammarRecommendationToSection(recommended) || "basic_trainer";
   return `
     <section class="module-surface">
       <div class="section-heading">
@@ -6276,6 +7613,33 @@ function grammarReviewPanel() {
         <strong>${escapeHtml(review.mentor_message || "Mulai kerjakan beberapa latihan grammar agar review lebih akurat.")}</strong>
         <p>Recommended: ${escapeHtml(recommended.next_action || "Latihan ulang grammar foundation.")}</p>
       </div>
+      <article class="module-card soft">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">Cara menyelesaikan Review</p>
+            <h3>Review bukan latihan terpisah, tapi penunjuk ulang</h3>
+            <p>Untuk membuat Review membaik, buka rekomendasi di bawah, kerjakan latihan yang lemah, lalu kembali ke Review dan klik Refresh Review.</p>
+          </div>
+          <button class="primary-button" type="button" data-grammar-hub-section="${escapeHtml(recommendedSection)}">Buka latihan rekomendasi</button>
+        </div>
+        <div class="module-grid three">
+          <div class="module-card">
+            <span>1</span>
+            <strong>Baca kelemahan utama</strong>
+            <small>Lihat topik dengan mastery terendah.</small>
+          </div>
+          <div class="module-card">
+            <span>2</span>
+            <strong>Kerjakan latihan rekomendasi</strong>
+            <small>Targetkan skor minimal 70%.</small>
+          </div>
+          <div class="module-card">
+            <span>3</span>
+            <strong>Refresh Review</strong>
+            <small>Progress Review mengikuti hasil latihan baru.</small>
+          </div>
+        </div>
+      </article>
       <div class="module-grid three">
         <article class="module-card soft">
           <span class="soft-pill">Primary weakness</span>
@@ -6413,6 +7777,7 @@ function localGrammarReview() {
 
 function grammarSimulationPanel() {
   const data = state.grammarSimulation;
+  ensureGrammarSimulationProgress();
   const modes = data.modes?.length ? data.modes : localGrammarSimulationModes();
   const activeMode = modes.find((mode) => mode.id === data.mode) || modes[0];
   const session = data.session;
@@ -6427,14 +7792,28 @@ function grammarSimulationPanel() {
         </div>
         <span class="pill">No Bantuan ID during test</span>
       </div>
-      <div class="module-grid three">
+      <div class="grammar-topic-strip">
         ${modes.map((mode) => `
-          <button class="module-card text-left ${mode.id === activeMode.id ? "selected-control" : ""}" type="button" data-grammar-simulation-mode="${escapeHtml(mode.id)}">
-            <span class="soft-pill">${escapeHtml(mode.id)}</span>
-            <h3>${escapeHtml(mode.title)}</h3>
-            <p>${Number(mode.question_count)} soal · ${Number(mode.duration_minutes)} menit</p>
-            <small>${escapeHtml(mode.description)}</small>
-          </button>
+          ${(() => {
+            const progress = grammarSimulationModeProgress(mode.id);
+            const progressResult = grammarResultPayload(progress.result?.result || progress.result);
+            const score = progressResult?.total_score ?? progressResult?.score ?? null;
+            const status = grammarSimulationModeStatus(mode.id);
+            return `
+              <button class="grammar-topic-card ${mode.id === activeMode.id ? "selected-control" : ""} ${basicGrammarTopicStatusClass(status)}" type="button" data-grammar-simulation-mode="${escapeHtml(mode.id)}">
+                <span class="topic-card-topline">
+                  <span class="topic-card-title">${escapeHtml(mode.title)}</span>
+                  <span class="grammar-status ${basicGrammarTopicStatusClass(status)}">${escapeHtml(basicGrammarTopicStatusLabel(status))}</span>
+                </span>
+                <span class="topic-card-meta">
+                  <span>${Number(mode.question_count)} soal · ${Number(mode.duration_minutes)} menit</span>
+                  <strong>${score === null || score === undefined ? "Belum ada" : `${Math.round(Number(score))}%`}</strong>
+                </span>
+                <span class="topic-card-progress" aria-hidden="true"><span style="width: ${score === null || score === undefined ? (progress.session ? 35 : 0) : clampPercent(score)}%"></span></span>
+                <small>${escapeHtml(mode.description)}</small>
+              </button>
+            `;
+          })()}
         `).join("")}
       </div>
       <button id="startGrammarSimulationButton" class="primary-button" type="button">Mulai Simulasi Grammar</button>
@@ -6530,6 +7909,7 @@ function grammarSimulationResultTemplate(result) {
 }
 
 async function startGrammarSimulation() {
+  persistCurrentGrammarSimulationMode();
   const mode = state.grammarSimulation.mode || "short";
   if (apiOnline) {
     try {
@@ -6546,8 +7926,14 @@ async function startGrammarSimulation() {
         session: sessionResponse.session,
         answers: {},
         result: null,
-        history: state.grammarSimulation.history || []
+        history: state.grammarSimulation.history || [],
+        modeProgress: state.grammarSimulation.modeProgress || {}
       };
+      saveGrammarSimulationModeProgress(mode, {
+        session: sessionResponse.session,
+        answers: {},
+        result: null
+      });
       saveState();
       return;
     } catch (error) {
@@ -6560,8 +7946,14 @@ async function startGrammarSimulation() {
     session: localGrammarSimulationSession(mode),
     answers: {},
     result: null,
-    history: state.grammarSimulation.history || []
+    history: state.grammarSimulation.history || [],
+    modeProgress: state.grammarSimulation.modeProgress || {}
   };
+  saveGrammarSimulationModeProgress(mode, {
+    session: state.grammarSimulation.session,
+    answers: {},
+    result: null
+  });
   saveState();
 }
 
@@ -6584,6 +7976,11 @@ async function submitGrammarSimulation() {
       const historyResponse = await apiRequest(`/grammar/simulation/history?user_id=${encodeURIComponent(state.user?.id || "default-user")}`);
       state.grammarSimulation.result = response.result;
       state.grammarSimulation.history = historyResponse.history || [];
+      saveGrammarSimulationModeProgress(session.mode, {
+        session,
+        answers: state.grammarSimulation.answers || {},
+        result: response.result
+      });
       await refreshIntegratedJourney();
       await refreshGrammarProgress();
       saveState();
@@ -6623,6 +8020,11 @@ async function submitGrammarSimulation() {
     recommended_next_practice: "Ulangi Grammar Review untuk melihat area lemah.",
     recommendation: { next_action: "Ulangi Grammar Review untuk melihat area lemah." }
   };
+  saveGrammarSimulationModeProgress(session.mode, {
+    session,
+    answers: state.grammarSimulation.answers || {},
+    result: state.grammarSimulation.result
+  });
   saveState();
 }
 

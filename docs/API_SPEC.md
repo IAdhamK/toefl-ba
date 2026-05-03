@@ -297,6 +297,23 @@ Reading Journey response includes:
 - `last_passage_id`
 - `next_recommended_action`
 
+Reading subfeature progress endpoints:
+
+- `GET /api/reading/progress`
+- `GET /api/reading/progress/summary`
+- `GET /api/reading/progress/modules`
+- `GET /api/reading/progress/path`
+- `GET /api/reading/progress/recommended-section`
+- `GET /api/reading/progress/finish-status`
+
+`GET /api/reading/progress` returns:
+
+- `summary`: overall Reading progress, level, score, active module, next action, and finish target.
+- `modules`: progress per Reading subfeature: Overview, Guided Reading, Practice, Trainer, Review, and Simulation.
+- `learning_path`: ordered roadmap with status, progress percentage, completed items, last score, and next action.
+- `recommended_section`: the next Reading mode to open.
+- `finish_status`: finish rule and Full Reading Simulation score.
+
 ## AI
 
 - `POST /api/ai/chat`

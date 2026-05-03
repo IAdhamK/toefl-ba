@@ -18,6 +18,13 @@ from backend.services.reading_service import (
     start_reading_simulation,
     submit_reading_simulation,
 )
+from backend.services.reading_progress_service import (
+    get_reading_finish_status,
+    get_reading_learning_path,
+    get_reading_module_progress,
+    get_reading_progress_summary,
+    get_recommended_reading_section,
+)
 
 
 router = APIRouter(prefix="/api/reading", tags=["reading"])
@@ -36,6 +43,36 @@ def reading_levels() -> dict:
 @router.get("/recommendation")
 def reading_recommendation(user_id: str | None = None) -> dict:
     return {"recommendation": get_reading_recommendation(user_id)}
+
+
+@router.get("/progress")
+def reading_progress(user_id: str | None = None) -> dict:
+    return get_reading_module_progress(user_id)
+
+
+@router.get("/progress/summary")
+def reading_progress_summary(user_id: str | None = None) -> dict:
+    return {"summary": get_reading_progress_summary(user_id)}
+
+
+@router.get("/progress/modules")
+def reading_progress_modules(user_id: str | None = None) -> dict:
+    return {"modules": get_reading_module_progress(user_id)["modules"]}
+
+
+@router.get("/progress/path")
+def reading_progress_path(user_id: str | None = None) -> dict:
+    return get_reading_learning_path(user_id)
+
+
+@router.get("/progress/recommended-section")
+def reading_progress_recommended_section(user_id: str | None = None) -> dict:
+    return {"recommended_section": get_recommended_reading_section(user_id)}
+
+
+@router.get("/progress/finish-status")
+def reading_progress_finish_status(user_id: str | None = None) -> dict:
+    return {"finish_status": get_reading_finish_status(user_id)}
 
 
 @router.get("/review")

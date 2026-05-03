@@ -205,7 +205,8 @@ Project sudah naik dari MVP lokal satu file menjadi **MVP terstruktur dengan Fas
   - hero lebih ringkas dengan next action yang jelas.
   - progress skill dibuat dalam kartu visual.
   - modul utama dan recent activity dibuat lebih mudah dipindai.
-- Reading UI tetap mempertahankan Journey Lab, Reading Lab, Guided Reading, Trainer, Review, dan TOEFL Simulation; mode belajar dan mode testing sudah dibedakan secara visual.
+- Reading UI tetap mempertahankan Journey Lab, Reading Lab, Guided Reading, Trainer, Practice, dan TOEFL Simulation; mode belajar dan mode testing sudah dibedakan secara visual.
+- Grid koleksi di UI dibuat lebih adaptif dengan `auto-fit`, sehingga saat card/menu ditambah, diedit, atau dihapus, layout tidak meninggalkan slot kosong atau komposisi yang kaku.
 - Bantuan ID, Grammar, Vocabulary, AI Tutor, Writing, Listening, Scenario, dan Admin CMS diperbarui agar memakai struktur halaman yang lebih konsisten:
   - header halaman, microcopy, form/card yang lebih jelas, empty state, dan feedback area.
   - AI Tutor sekarang punya quick prompt buttons.

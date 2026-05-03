@@ -1327,13 +1327,12 @@ Akibatnya halaman terasa terlalu panjang, padat, dan membingungkan untuk pemula.
   - `advanced_lab`
   - `review`
   - `simulation`
-- Menambahkan Grammar Hub menu cards.
+- Menambahkan Grammar Hub menu cards. Catatan terbaru: quick-pick cards kemudian dihapus karena duplikatif dengan roadmap.
 - Menambahkan helper:
   - `renderGrammarHub()`
   - `setGrammarSection()`
   - `grammarBackButton()`
   - `renderGrammarSectionShell()`
-  - `grammarHubCard()`
   - `grammarBreakdownPanel()`
 - Menambahkan tombol `Kembali ke Menu Grammar` di setiap sub-section.
 
@@ -1420,7 +1419,7 @@ Section ini juga menampilkan checklist ringkas agar user memahami posisi belajar
 
 ### Improved Beginner Guidance
 
-Copy pada quick pick card diperjelas agar setiap fitur menjawab:
+Copy pada roadmap card diperjelas agar setiap fitur menjawab:
 
 - fitur ini dipakai untuk apa
 - kapan sebaiknya digunakan
@@ -1433,7 +1432,7 @@ Tombol back pada sub-section juga diarahkan ke `Kembali ke Grammar Learning Path
 - Progress checklist masih sederhana dan belum membaca seluruh riwayat simulasi secara detail.
 - Rekomendasi otomatis masih rule-based dari grammar review, grammar journey, atau fallback progress lokal.
 - Hub belum punya animasi stepper atau status selesai per module yang benar-benar granular.
-- Quick pick masih tersedia untuk user yang ingin lompat langsung ke fitur tertentu.
+- Quick pick sudah dihapus karena membuat dua jalur navigasi yang ambigu. User diarahkan memakai Start Here dan Roadmap saja.
 
 ### Next Recommended Polish
 
@@ -1537,7 +1536,31 @@ Each Grammar roadmap card now shows:
 - next action
 - contextual button label: `Mulai`, `Lanjutkan`, `Ulangi`, `Selesai`, or `Direkomendasikan`
 
-Quick Pick cards also display the same progress metadata so every feature visibly connects to Grammar Journey.
+Quick Pick cards were removed after UX testing because they duplicated the Learning Path and made module choice ambiguous. The Learning Path cards now act as the single visible navigation surface for Grammar modules.
+
+## Grammar Hub Quick Pick Removal
+
+Status: Completed
+
+### Problem Solved
+
+The `Pilih Cepat` section duplicated the same module cards already shown in the Grammar Learning Path. Beginner users could not tell whether they should follow the roadmap or choose a quick card, so the hub felt like two competing navigation systems.
+
+### Implemented Changes
+
+- Removed `renderGrammarQuickPick()` from the Grammar Hub.
+- Removed the unused `grammarHubCard()` helper.
+- Kept Start Here, Learning Path, Progress Summary, Status Board, and Finish Target.
+- Existing Grammar subfeatures remain accessible through the Learning Path cards and recommendation button.
+
+### UX Result
+
+Grammar Hub now has one clear flow:
+
+1. Check current progress.
+2. Use `Mulai / Lanjutkan Rekomendasi`.
+3. Follow `Alur Belajar yang Disarankan`.
+4. Return from any subfeature to Grammar Learning Path.
 
 ### Finish Status Rule
 
@@ -1567,6 +1590,128 @@ The finish status endpoint returns whether the user has finished, the full simul
 - Persist simulation mode in a dedicated table later.
 - Add `last activity` and `continue last exercise` inside each Grammar module card.
 - Improve mobile layout for progress-heavy Grammar Hub cards.
+
+## Grammar Hub Progress UI Fix
+
+Status: Completed
+
+### What Changed
+
+- Grammar Hub now shows visible progress per subfeature.
+- Each Grammar subfeature card shows status, progress percentage, completed items, last score, and next action.
+- The `Mulai dari Sini` button opens the recommended module from Grammar Progress data, with fallback to Basic Grammar Trainer.
+- Learning Path cards now show progress per step instead of static descriptions only.
+- Finish target is visible: Grammar Lab is finished when Full Grammar Simulation reaches at least 75%.
+- A Grammar status board now summarizes how many subfeatures are recommended, not started, in progress, need review, or completed.
+- Every Grammar subfeature page now shows its own progress banner so the selected feature still feels connected to the Grammar Journey.
+- Roadmap progress now reads the actual `learning_path` array from `/api/grammar/progress` instead of falling back to local zero-progress data.
+- Frontend progress loading accepts both the fixed array shape and the older nested `learning_path.learning_path` shape for safer compatibility.
+
+## Basic Grammar Trainer Quiz State Fix
+
+### Problem Solved
+
+- Quiz pendek sebelumnya memakai satu state global untuk `answers` dan `result`.
+- Saat user pindah topic lalu kembali, pilihan jawaban dan hasil submit terlihat hilang.
+- UI juga belum memberi status yang jelas apakah sebuah topic sudah mulai dijawab, siap submit, selesai, atau perlu diulang.
+
+### Implemented Changes
+
+- Basic Grammar Trainer now stores quiz answers and submit results per topic in frontend state.
+- Topic buttons now show status:
+  - `Belum mulai`
+  - `Mulai dijawab`
+  - `Siap submit`
+  - `Selesai`
+  - `Perlu diulang`
+- Quiz cards now show per-question feedback after submit.
+- If a user selects an answer, moves to another topic, then returns, the previous selection is preserved.
+- If a submitted topic is reopened, the score and feedback remain visible.
+
+### Known Limitations
+
+- This state is frontend/local-state based and depends on saved browser state.
+- Backend progress still depends on submit actions, not on merely selecting an answer.
+- The same persistence pattern has now been applied to the other major Grammar subfeatures.
+
+## Grammar Subfeature UX Hardening
+
+Status: Completed
+
+### Problem Solved
+
+Basic Grammar Trainer already had clearer per-topic progress, but the other Grammar subfeatures still felt disconnected. User answers could look lost after switching topic, category, mode, or simulation mode, and several panels did not clearly show whether the current activity was belum mulai, sedang berjalan, siap submit, selesai, atau perlu diulang.
+
+### Implemented Changes
+
+- Intermediate Grammar Trainer now stores answer and submit result state per topic.
+- Grammar Error Correction now stores answer and submit result state per error category.
+- Grammar Sentence Builder now stores answer and submit result state per level and mode.
+- Advanced Grammar Lab now stores practice and rewrite state per advanced topic.
+- Grammar Simulation now stores session, answers, and result per simulation mode.
+- Grammar Breakdown keeps the last sentence and analysis visible after leaving and returning to the section.
+- Grammar Review now explains how review progress should be completed: open the recommended practice, finish the weak module, then refresh review.
+
+### UI Result
+
+- Topic, category, and mode cards now show status badges, score, and progress bars.
+- Quiz/practice items show whether an answer has been filled, submitted correctly, or needs review.
+- Switching to another Grammar subfeature no longer forces the user to restart choices that were already filled.
+- Each subfeature has a progress banner that keeps the user connected to Grammar Journey.
+
+### Testing Checklist
+
+- Intermediate Trainer: choose an answer, switch topic, return, and confirm the answer remains visible.
+- Error Correction: choose an answer, switch error category, return, and confirm the answer remains visible.
+- Sentence Builder: type an answer, switch mode, return, and confirm the typed answer remains visible.
+- Advanced Lab: choose practice/rewrite answers, switch topic, return, and confirm state remains visible.
+- Simulation: start or answer in one mode, switch mode, return, and confirm session state is preserved.
+
+## Grammar Subfeature UI Polish
+
+Status: Completed
+
+### Problem Solved
+
+Several Grammar subfeature panels had uneven spacing. In Grammar Breakdown, the input panel stretched to match the long result panel, causing large empty gaps between the beginner tip, textarea, help button, and submit button. Other subfeatures also needed more consistent spacing, card density, and clearer colors.
+
+### Implemented Changes
+
+- Added scoped `#grammarView` UI rules so Grammar polish does not disturb Reading, Vocabulary, Writing, or other modules.
+- Improved Grammar two-column layouts so side panels align to the top instead of stretching awkwardly.
+- Made Grammar Breakdown input panel compact and sticky on desktop.
+- Grouped Grammar Breakdown help actions into one action row.
+- Refined Grammar cards, chips, quiz answer cards, status banners, and progress bars.
+- Improved Grammar color usage with teal, mint, blue, green, and amber states.
+- Reduced oversized gaps and made nested cards easier to scan.
+
+### UX Result
+
+Grammar subfeatures now feel closer to a focused learning workspace:
+
+- input and result panels are balanced
+- progress/status cards are easier to read
+- quiz states are visually clearer
+- long breakdown results have better hierarchy
+- buttons no longer appear stranded by excessive vertical spacing
+
+### Status Labels
+
+- `not_started` -> `Belum mulai`
+- `in_progress` -> `Sedang berjalan`
+- `need_review` -> `Perlu diulang`
+- `completed` -> `Selesai`
+- `recommended` -> `Direkomendasikan`
+- `locked` -> `Belum dibuka`
+
+### Button Labels
+
+- `not_started` -> `Mulai`
+- `in_progress` -> `Lanjutkan`
+- `need_review` -> `Ulangi`
+- `completed` -> `Lihat / Ulangi`
+- `recommended` -> `Lanjutkan Rekomendasi`
+- `locked` -> `Belum Dibuka`
 
 ## Codex Next Prompt
 
